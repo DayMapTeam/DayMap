@@ -46,10 +46,11 @@ function isFinished(stop, now) {
  * - follow: { center, heading } moves the camera with the person during a trip,
  *   or null. Only trips move the camera like this; nothing in the background does.
  * - onUserCameraMove(): the person dragged, scrolled or used keys on the map.
+ * - route: the trip's route ({ steps: [{ kind, path, ride }] }) drawn on the ground, or null.
  */
 export default function MapView({
   stops, selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, stopStates = {},
-  userPosition = null, tripActive = false, follow = null, onUserCameraMove,
+  userPosition = null, tripActive = false, follow = null, onUserCameraMove, route = null,
 }) {
   const containerRef = useRef(null)
   const markersRef = useRef(new Map())
@@ -138,7 +139,8 @@ export default function MapView({
         for (const type of CAMERA_EVENTS) map.addEventListener(type, handleCameraChange)
         containerRef.current.append(map)
         setSteep(map.tilt > STEEP_TILT)
-        setRuntime({ map, Marker: maps3d.Marker3DInteractiveElement, PlainMarker: maps3d.Marker3DElement, colors: markerColors() })
+        setRuntime({ map, Marker: maps3d.Marker3DInteractiveElement, PlainMarker: maps3d.Marker3DElement,
+          Polyline: maps3d.Polyline3DElement, colors: markerColors() })
       } catch {
         if (!cancelled) {
           setError('Could not load Google Maps. Check the browser console.')
@@ -294,6 +296,30 @@ export default function MapView({
       if (map.isConnected) map.flyCameraTo({ endCamera: saved, durationMillis: flyMillis(800) })
     }
   }, [runtime, tripActive])
+
+  // The trip's route, one line per step: walking, driving, or each ride in its line colour.
+  useEffect(() => {
+    if (!runtime?.Polyline || !route) return undefined
+    const style = getComputedStyle(document.documentElement)
+    const token = (name) => style.getPropertyValue(name).trim()
+    const colors = { walk: token('--mode-walk'), drive: token('--mode-drive'), ride: token('--mode-bus') }
+    const lines = route.steps.filter((step) => step.path.length >= 2).map((step) => {
+      const line = new runtime.Polyline({
+        path: step.path.map(({ lat, lng }) => ({ lat, lng, altitude: 0 })),
+        altitudeMode: 'CLAMP_TO_GROUND',
+        strokeColor: (step.kind === 'ride' && step.ride?.color) || colors[step.kind] || colors.walk,
+        strokeWidth: step.kind === 'walk' ? 14 : 18,
+        outerColor: '#ffffff',
+        outerWidth: 0.3,
+        drawsOccludedSegments: true,
+      })
+      runtime.map.append(line)
+      return line
+    })
+    return () => {
+      for (const line of lines) line.remove()
+    }
+  }, [runtime, route])
 
   // Follow the person during a trip, heading-up.
   useEffect(() => {
