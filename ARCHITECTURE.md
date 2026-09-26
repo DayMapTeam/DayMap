@@ -103,6 +103,8 @@ client/src/
   components/           # Shared UI primitives (Hannah coordinates)
   services/             # Express API and Supabase Auth clients
 server/src/
+  app.js                # Creates/exports Express app; middleware and route mounting
+  index.js              # Process entry point; validates PORT and starts listener
   routes/               # Express handlers and validation (Sudipta)
   middleware/           # Authentication and error handling (Sudipta)
   integrations/         # Calendar, Places, Routes, later weather (Rafid)
@@ -121,6 +123,8 @@ supabase/migrations/    # Versioned SQL schema and access policies (Sudipta)
 - The schema changes only through `supabase/migrations/` ([§7](#7-database-and-access-control)).
 
 Area owners are listed in [CONTRIBUTING.md §1](CONTRIBUTING.md#1-team-and-ownership).
+
+**Backend stage 1:** `server/src/app.js` and `server/src/index.js` now provide application construction and server startup. They sit above `routes/`, which is reserved for endpoint handlers. Other backend directories and endpoints remain planned and should be added with their features. See [server/README.md](server/README.md) for current commands. Client and server currently have separate packages/lockfiles; root workspaces remain a scaffold follow-up.
 
 ## 4. Frontend
 

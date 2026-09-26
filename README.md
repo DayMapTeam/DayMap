@@ -4,7 +4,7 @@ An interactive map that turns your calendar into a personalised daily route and 
 
 DayMap puts one day on a 3D map of Adelaide, next to a linked event planner. Google Calendar events, activities you add, and the travel time between them form a single plan. When something runs over, DayMap proposes one clear adjustment and changes nothing until you accept it.
 
-> **Status (September 2026):** planning. This repository holds documentation only. The app scaffold arrives with issue DM-01.
+> **Status (September 2026):** initial implementation. The frontend has a shared fixture and selection demo; the backend has an Express app and separate server entry point. API endpoints and live integrations are still planned.
 
 ## Documentation
 
@@ -16,7 +16,7 @@ DayMap puts one day on a 3D map of Adelaide, next to a linked event planner. Goo
 
 ## Getting started
 
-Setup instructions will be added here with DM-01. Until then, the planned commands are in [CONTRIBUTING.md §5](CONTRIBUTING.md#5-development-workflow).
+Run the frontend using [client/README.md](client/README.md), and the backend using [server/README.md](server/README.md). Each currently has its own npm commands; root workspace commands remain planned in [CONTRIBUTING.md §5](CONTRIBUTING.md#5-development-workflow).
 
 ## Team Members
 
