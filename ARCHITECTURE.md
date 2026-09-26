@@ -392,6 +392,7 @@ Token rules:
 - Deduplicate by calendar ID plus event/occurrence ID (`sourceCalendarId` + `sourceEventId`), so repeated imports create no duplicates.
 - Handle cancellations, date-only all-day events, virtual meetings, and missing or ambiguous addresses.
 - A missing location becomes a planner question, never a guessed map pin.
+- Imported events start `fixed`. The person can make any timed event flexible (or fixed again) in its details; a Calendar event made flexible keeps DayMap's times on re-import, and only its title follows Calendar.
 - Import is read-only. DayMap never writes to Google Calendar.
 
 ## 9. Routing and scheduling

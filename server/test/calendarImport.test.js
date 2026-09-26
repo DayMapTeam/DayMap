@@ -256,3 +256,19 @@ test('import is unavailable without a Calendar configuration', async t => {
   assert.equal(response.status, 503)
   assert.equal((await response.json()).error.code, 'CALENDAR_NOT_CONFIGURED')
 })
+
+test('a Calendar event the person made flexible keeps DayMap times on re-import', () => {
+  const first = planWith(eventsToStops([lecture, standup], day))
+  const saved = structuredClone(first.plan)
+  const catchUp = saved.stops[1]
+  // Made flexible in DayMap and moved 30 minutes later.
+  catchUp.timing = { ...catchUp.timing, kind: 'flexible', fixedStartAt: null, fixedEndAt: null,
+    scheduledStartAt: '2026-09-28T03:30:00.000Z', scheduledEndAt: '2026-09-28T04:15:00.000Z' }
+  const renamed = { ...standup, summary: 'Team standup (moved room)' }
+  const { plan } = planWith(eventsToStops([lecture, renamed], day), saved)
+  const kept = plan.stops.find(stop => stop.id === catchUp.id)
+  assert.deepEqual(kept.timing, catchUp.timing)
+  assert.equal(kept.title, 'Team standup (moved room)', 'the title still follows Calendar')
+  assert.equal(plan.stops[0].timing.kind, 'fixed', 'other events stay fixed')
+  validateSave(plan.id, { baseVersion: plan.version, plan })
+})

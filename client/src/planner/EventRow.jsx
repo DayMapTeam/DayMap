@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatDuration, formatTimeRange } from '../components/formatTime.js'
+import { WhenModeToggle } from './AddEventFields.jsx'
 import EventEditForm from './EventEditForm.jsx'
 import PlacePicker from './PlacePicker.jsx'
 import { KIND_LABELS } from './stopLabels.js'
@@ -31,9 +32,11 @@ const KIND_NOTES = {
  * @param {'set' | 'needed' | 'none'} props.placeState Whether the stop has a place, needs one, or needs none.
  * @param {string | null} props.calendarPlace The location text from Google Calendar, if any.
  * @param {(stopId: string, location: object | null) => void} props.onSetPlace Sets a place, or null for "no place needed".
+ * @param {((stopId: string, kind: 'fixed' | 'flexible') => void) | null} props.onSetKind Null when the kind can't change now.
+ * @param {string | null} props.kindHint Why the kind can't change right now, if it can't.
  */
 export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onDelete, conflict,
-  placeState, calendarPlace, onSetPlace }) {
+  placeState, calendarPlace, onSetPlace, onSetKind, kindHint }) {
   const [picking, setPicking] = useState(false)
   if (!open && picking) setPicking(false)
   const { timing } = stop
@@ -101,6 +104,19 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
               {placeState === 'needed' && calendarPlace && (
                 <span className="event-place-hint">Google Calendar says “{calendarPlace}”.</span>
               )}
+            </div>
+          )}
+          {timing.kind !== 'all-day' && stop.status === 'planned' && hasTimes && (
+            <div className="event-kind">
+              <span className="event-form-label event-kind-label">Can DayMap move this?</span>
+              <WhenModeToggle
+                value={timing.kind}
+                onChange={(kind) => onSetKind?.(stop.id, kind)}
+                options={[['fixed', 'No, fixed'], ['flexible', 'Yes, flexible']]}
+                label="Can DayMap move this?"
+                disabled={onSetKind === null}
+              />
+              {kindHint && <span className="event-place-hint">{kindHint}</span>}
             </div>
           )}
           <p className="event-details-info">

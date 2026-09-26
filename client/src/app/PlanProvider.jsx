@@ -34,6 +34,9 @@ export function PlanProvider({ initialPlan, children }) {
   const undoAdd = useCallback((stopId) => {
     dispatch({ type: 'undo-add', stopId })
   }, [])
+  const setStopKind = useCallback((stopId, kind) => {
+    dispatch({ type: 'set-stop-kind', stopId, kind })
+  }, [])
   const setStopLocation = useCallback((stopId, location) => {
     dispatch({ type: 'set-stop-location', stopId, location })
   }, [])
@@ -55,9 +58,10 @@ export function PlanProvider({ initialPlan, children }) {
     discardDraft,
     addStop,
     undoAdd,
+    setStopKind,
     setStopLocation,
     loadPlan,
-  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, setStopLocation, loadPlan])
+  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, setStopKind, setStopLocation, loadPlan])
 
   return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>
 }
