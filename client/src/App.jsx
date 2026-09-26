@@ -1,33 +1,35 @@
 import { usePlan } from './app/planContext.js'
-import { EventSelector } from './demo/EventSelector.jsx'
-import { SelectionPreview } from './demo/SelectionPreview.jsx'
-import { MapView } from './map/MapView.jsx'
+import AppHeader from './components/AppHeader.jsx'
+import PlaceSearch from './components/PlaceSearch.jsx'
+import { usePlanClock } from './components/usePlanClock.js'
+import MapView from './map/MapView.jsx'
+import Planner from './planner/Planner.jsx'
 import './App.css'
 
 function App() {
   const { plan, selectedStopId, selectStop } = usePlan()
+  const { now, isDemoTime } = usePlanClock(plan)
 
   return (
-    <main className="demo-page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">DAYMAP <span className="demo-badge">Demo data</span></p>
-          <h1>A shared start for your day.</h1>
-          <p>Four fictional Adelaide activities. Select an event to try the shared state.</p>
-        </div>
-        <div className="day-label"><time dateTime={plan.date}>{plan.date}</time><span>{plan.timezone}</span></div>
-      </header>
+    <div className="app">
       <MapView
         stops={plan.stops}
+        legs={plan.legs}
         selectedStopId={selectedStopId}
         onSelectStop={selectStop}
       />
-      <div className="demo-grid">
-        <EventSelector />
-        <SelectionPreview />
+      <AppHeader
+        date={plan.date}
+        timezone={plan.timezone}
+        dataMode={plan.dataMode}
+        now={now}
+        isDemoTime={isDemoTime}
+      />
+      <div className="app-controls-top-left">
+        <PlaceSearch />
       </div>
-      <footer>Sample locations are approximate. No calendar connection, live travel times, or saved changes.</footer>
-    </main>
+      <Planner now={now} />
+    </div>
   )
 }
 

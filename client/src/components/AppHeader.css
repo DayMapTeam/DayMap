@@ -1,0 +1,90 @@
+/* Glass without the drop shadow: a hairline separates it from the map. */
+.app-header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--header-height);
+  padding: 0 var(--space-5);
+  border-width: 0 0 1px;
+  border-bottom-color: var(--separator);
+  box-shadow: none;
+}
+
+.app-header-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-header-mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--label);
+  border-radius: 50%;
+}
+
+.app-header-mark::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.app-header-wordmark {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.app-header-demo {
+  padding: 2px var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+  background: var(--fill);
+  border-radius: var(--radius-pill);
+}
+
+.app-header-spacer {
+  flex: 1;
+}
+
+.app-header-date,
+.app-header-dot {
+  font-size: 14px;
+  color: var(--label-2);
+}
+
+.app-header-dot {
+  margin: 0 calc(var(--space-2) * -1);
+}
+
+.app-header-now {
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.app-header-demo-time {
+  font-weight: 400;
+  color: var(--label-2);
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    gap: var(--space-3);
+    padding: 0 var(--space-4);
+  }
+
+  .app-header-date,
+  .app-header-dot {
+    display: none;
+  }
+}

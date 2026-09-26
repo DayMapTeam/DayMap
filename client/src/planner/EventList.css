@@ -1,0 +1,293 @@
+.event-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event-list-count:empty {
+  display: none;
+}
+
+.event-list-count {
+  padding: var(--space-1) 0 var(--space-2);
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+/*
+ * Flat, native-list items. Selection pads the item out with a matching
+ * negative margin so the row text stays aligned with the rest of the panel.
+ */
+.event-item {
+  margin: 0 -10px;
+  border-radius: var(--radius-control);
+  transition: background var(--duration-press) var(--ease-spring);
+}
+
+.event-item[data-selected] {
+  background: var(--blue-tint);
+}
+
+.event-row {
+  display: grid;
+  grid-template-columns: 10px 1fr auto 12px;
+  align-items: start;
+  column-gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 10px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  transition:
+    background var(--duration-press) var(--ease-spring),
+    transform var(--duration-press) var(--ease-spring);
+}
+
+.event-item:not([data-selected]) .event-row:hover {
+  background: var(--fill);
+}
+
+.event-row:active {
+  transform: scale(var(--press-scale));
+}
+
+/* Centred on the first line of the name (15px × 1.4 line height). */
+.event-row-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5.5px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.event-row-dot[data-kind='fixed'] {
+  background: var(--label);
+}
+
+.event-row-dot[data-kind='all-day'] {
+  background: var(--label-2);
+}
+
+.event-row-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.event-row-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.event-item[data-selected] .event-row-name {
+  color: var(--blue);
+}
+
+.event-row-changed {
+  margin-left: var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.event-row-details {
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.event-row-time {
+  padding-top: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+  white-space: nowrap;
+}
+
+/* Points right when closed, down when open. */
+.event-row-chevron {
+  margin-top: 5px;
+  color: var(--label-3);
+  transition: transform var(--duration-panel) var(--ease-spring);
+}
+
+.event-row[aria-expanded='true'] .event-row-chevron {
+  transform: rotate(90deg);
+}
+
+/* Finished stops: --label-2 keeps 4.5:1 contrast; "Finished" is written in the details. */
+.event-row[data-past] .event-row-name {
+  color: var(--label-2);
+}
+
+.event-row[data-past] .event-row-dot {
+  opacity: 0.4;
+}
+
+/* Expanded area */
+.event-details {
+  display: grid;
+  gap: 10px;
+  padding: 0 10px 14px 32px;
+  animation: event-details-in var(--duration-panel) var(--ease-spring);
+}
+
+@keyframes event-details-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.event-details-info {
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+/* Edit form: an inset group like native settings. */
+.event-form {
+  display: grid;
+  gap: 10px;
+}
+
+.event-form-group {
+  display: grid;
+  background: var(--fill);
+  border-radius: var(--radius-card);
+}
+
+.event-form-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hit-target);
+  padding: 0 var(--space-3);
+}
+
+.event-form-field + .event-form-field {
+  border-top: 1px solid var(--separator);
+}
+
+.event-form-label {
+  flex: none;
+  width: 52px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+.event-form-input,
+.event-form-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  text-align: right;
+}
+
+.event-form-input {
+  height: 32px;
+  padding: 0 var(--space-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-thumb);
+}
+
+.event-form-input:focus-visible {
+  background: var(--solid);
+  outline: var(--focus-ring);
+  outline-offset: 0;
+}
+
+.event-form-input[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1.5px var(--red);
+}
+
+.event-form-value {
+  padding-right: var(--space-2);
+  color: var(--label-2);
+}
+
+.event-form-hint {
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.event-form-error {
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  background: var(--red-tint);
+  border-radius: var(--radius-control);
+}
+
+.event-form-actions,
+.draft-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Pending draft: a solid card so it stands out on the glass. */
+.draft-card {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-4);
+  background: var(--solid);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.draft-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.draft-card-changes {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  list-style: none;
+}
+
+.draft-card-body {
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.draft-card-alert {
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--orange-ink);
+  background: var(--orange-tint);
+  border-radius: var(--radius-control);
+}
+
+/*
+ * Journey between rows: 2×16 line in the mode colour, grey while travel is
+ * unknown. The line is centred under the row dot and the text lines up with
+ * the row text.
+ */
+.travel-connector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 28px;
+  padding-left: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+.travel-connector-line {
+  width: 2px;
+  height: 16px;
+  background: var(--label-3);
+  border-radius: 1px;
+}
