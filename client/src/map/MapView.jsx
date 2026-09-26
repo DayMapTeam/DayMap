@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
+import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
 import './MapView.css'
-
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-
-if (apiKey) {
-  setOptions({ key: apiKey, v: 'weekly' })
-}
 
 // These are mutable Google Maps elements, not React state objects.
 function updateMarkerSelection({ marker, pin, title }, selected) {
@@ -18,7 +12,7 @@ function updateMarkerSelection({ marker, pin, title }, selected) {
   marker.title = selected ? `${title} (selected)` : title
 }
 
-export default function MapView({ stops, selectedStopId, onSelectStop }) {
+export default function MapView({ stops, selectedStopId, onSelectStop, previewPlace = null }) {
   const containerRef = useRef(null)
   const markersRef = useRef(new Map())
   const [runtime, setRuntime] = useState(null)
@@ -33,8 +27,8 @@ export default function MapView({ stops, selectedStopId, onSelectStop }) {
     async function loadMap() {
       try {
         const [maps3d, { PinElement }] = await Promise.all([
-          importLibrary('maps3d'),
-          importLibrary('marker'),
+          loadMapsLibrary('maps3d'),
+          loadMapsLibrary('marker'),
         ])
         if (cancelled) return
 
@@ -107,6 +101,32 @@ export default function MapView({ stops, selectedStopId, onSelectStop }) {
       updateMarkerSelection(entry, id === selectedStopId)
     }
   }, [runtime, stops, onSelectStop, selectedStopId])
+
+  useEffect(() => {
+    if (!runtime || !previewPlace) return
+
+    const { lat, lng, label } = previewPlace
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    const marker = new runtime.Marker({
+      position: { lat, lng },
+      altitudeMode: 'CLAMP_TO_GROUND',
+      collisionBehavior: 'REQUIRED',
+      drawsWhenOccluded: true,
+      label: `${label} (preview)`,
+      title: `${label} (preview)`,
+      zIndex: 20,
+    })
+    marker.append(new runtime.PinElement({
+      background: '#7e22ce', borderColor: '#581c87', glyphColor: '#ffffff', glyphText: 'P',
+    }))
+    runtime.map.append(marker)
+    // Camera changes belong to explicit place selection, not planner updates.
+    runtime.map.flyCameraTo({
+      endCamera: { center: { lat, lng, altitude: 0 }, range: 1200, tilt: 60 },
+      durationMillis: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800,
+    })
+    return () => marker.remove()
+  }, [runtime, previewPlace])
 
   const message = !apiKey ? 'Missing Google Maps API key.' : error
 

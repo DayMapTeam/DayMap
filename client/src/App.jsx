@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { usePlan } from './app/planContext.js'
 import AppHeader from './components/AppHeader.jsx'
 import PlaceSearch from './components/PlaceSearch.jsx'
@@ -8,6 +9,7 @@ import './App.css'
 
 function App() {
   const { plan, selectedStopId, selectStop } = usePlan()
+  const [previewPlace, setPreviewPlace] = useState(null)
   const { now, isDemoTime } = usePlanClock(plan)
 
   return (
@@ -17,6 +19,7 @@ function App() {
         legs={plan.legs}
         selectedStopId={selectedStopId}
         onSelectStop={selectStop}
+        previewPlace={previewPlace}
       />
       <AppHeader
         date={plan.date}
@@ -26,7 +29,7 @@ function App() {
         isDemoTime={isDemoTime}
       />
       <div className="app-controls-top-left">
-        <PlaceSearch />
+        <PlaceSearch onPlaceSelect={setPreviewPlace} />
       </div>
       <Planner now={now} />
     </div>
