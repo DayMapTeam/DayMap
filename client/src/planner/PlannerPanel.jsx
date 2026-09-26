@@ -15,9 +15,12 @@ const SHEET_QUERY = '(max-width: 719px)'
  * @param {boolean} props.open Open (desktop) or expanded (mobile sheet).
  * @param {(open: boolean) => void} props.onOpenChange
  * @param {import('react').ReactNode} props.toolbar Controls under the title, such as the filter.
+ * @param {import('react').ReactNode} props.headerAction Button in the title row, such as + Add.
+ * @param {import('react').ReactNode} props.takeover Replaces the title, toolbar and body while set (the guided add sheet).
+ * @param {import('react').ReactNode} props.overlay A dialog over the whole panel; the rest is inert while it shows.
  * @param {import('react').ReactNode} props.children Scrollable body content.
  */
-export default function PlannerPanel({ open, onOpenChange, toolbar, children }) {
+export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction, takeover, overlay, children }) {
   const { plan } = usePlan()
   const isSheet = useMediaQuery(SHEET_QUERY)
   const toggleRef = useRef(null)
@@ -56,56 +59,68 @@ export default function PlannerPanel({ open, onOpenChange, toolbar, children }) 
       <section
         id="planner"
         className="planner glass"
-        aria-labelledby="planner-title"
+        aria-labelledby={takeover ? undefined : 'planner-title'}
+        aria-label={takeover ? 'Planner' : undefined}
         data-open={open}
         hidden={showReopen}
       >
-        {isSheet && (
-          <button
-            ref={toggleRef}
-            type="button"
-            className="planner-handle"
-            aria-controls="planner-body"
-            aria-expanded={open}
-            aria-label={open ? 'Collapse planner' : 'Expand planner'}
-            onClick={toggle}
-          >
-            <span className="planner-grabber" aria-hidden="true" />
-          </button>
-        )}
-        <div className="planner-top">
-          <div className="planner-title-row">
-            <h2 id="planner-title" className="planner-title">Planner</h2>
-            <StatusPill plan={plan} />
-            {!isSheet && (
-              <button
-                ref={toggleRef}
-                type="button"
-                className="planner-collapse"
-                aria-controls="planner"
-                aria-expanded="true"
-                aria-label="Collapse planner"
-                onClick={toggle}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                  <path
-                    d="M6 3.5 10.5 8 6 12.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
-          {/* Out of reach while the sheet only peeks. */}
-          <div inert={isSheet && !open}>{toolbar}</div>
+        {/* inert, not hidden: the panel stays visible behind the overlay but can't be reached. */}
+        <div className="planner-content" inert={overlay ? true : undefined}>
+          {isSheet && (
+            <button
+              ref={toggleRef}
+              type="button"
+              className="planner-handle"
+              aria-controls="planner-body"
+              aria-expanded={open}
+              aria-label={open ? 'Collapse planner' : 'Expand planner'}
+              onClick={toggle}
+            >
+              <span className="planner-grabber" aria-hidden="true" />
+            </button>
+          )}
+          {takeover ? (
+            <div className="planner-takeover" inert={isSheet && !open}>{takeover}</div>
+          ) : (
+            <>
+              <div className="planner-top">
+                <div className="planner-title-row">
+                  <h2 id="planner-title" className="planner-title">Planner</h2>
+                  <StatusPill plan={plan} />
+                  {headerAction}
+                  {!isSheet && (
+                    <button
+                      ref={toggleRef}
+                      type="button"
+                      className="planner-collapse"
+                      aria-controls="planner"
+                      aria-expanded="true"
+                      aria-label="Collapse planner"
+                      onClick={toggle}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                        <path
+                          d="M6 3.5 10.5 8 6 12.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                {/* Out of reach while the sheet only peeks. */}
+                <div inert={isSheet && !open}>{toolbar}</div>
+              </div>
+              <div id="planner-body" className="planner-body" inert={isSheet && !open}>
+                {children}
+              </div>
+            </>
+          )}
         </div>
-        <div id="planner-body" className="planner-body" inert={isSheet && !open}>
-          {children}
-        </div>
+        {overlay}
       </section>
     </>
   )

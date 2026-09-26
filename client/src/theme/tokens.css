@@ -20,6 +20,7 @@
   --fill-2: rgba(118, 118, 128, 0.2);
   --separator: rgba(60, 60, 67, 0.15);
   --solid: #ffffff;
+  --scrim: rgba(0, 0, 0, 0.2); /* behind a dialog inside the planner */
 
   /* Text */
   --label: #1c1c1e;
@@ -35,7 +36,10 @@
   --orange-ink: #8a4b00;
   --red: #ff3b30;
   --red-tint: rgba(255, 59, 48, 0.12);
+  --red-ink: #a1150b;
   --green: #30d158;
+  --green-tint: rgba(48, 209, 88, 0.12);
+  --green-ink: #1c5b2c;
   --star: #1c1c1e;
 
   /* Travel modes */

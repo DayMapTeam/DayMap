@@ -21,9 +21,11 @@ function matchesFilter(stop, needle) {
  * @param {string} props.filter Text from the planner filter. Hides rows only.
  * @param {string | null} props.openStopId
  * @param {(stopId: string | null) => void} props.onOpenStopChange
- * @param {{ stopId: string, key: number } | null} props.revealRequest Scroll to and highlight this row.
+ * @param {{ stopId: string, key: number | string } | null} props.revealRequest Scroll to and highlight this row.
+ * @param {string | null} props.newStopId A just-added stop, labelled New.
+ * @param {(stopId: string) => void} props.onRequestDelete Ask before deleting this stop.
  */
-export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest }) {
+export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete }) {
   const { plan, draft, selectedStopId, selectStop, editStopDraft } = usePlan()
   const listRef = useRef(null)
   const shown = draft?.plan ?? plan
@@ -76,9 +78,11 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
               open={stop.id === openStopId}
               past={stop.timing.scheduledEndAt !== null && Date.parse(stop.timing.scheduledEndAt) <= now.getTime()}
               changed={changedIds.has(stop.id)}
+              added={stop.id === newStopId}
               flashKey={revealRequest?.stopId === stop.id ? revealRequest.key : null}
               onToggle={toggle}
               onSave={save}
+              onDelete={onRequestDelete}
             />
           </li>
         ))}
