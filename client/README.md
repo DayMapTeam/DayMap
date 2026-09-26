@@ -1,6 +1,6 @@
 # DayMap frontend
 
-React + JavaScript + Vite. The page shows the map-page layout (DM-02 in progress): a glass header, a placeholder map, and the planner panel listing the shared sample day. There is no geographic map yet. It runs without login, API keys, or a backend.
+React + JavaScript + Vite. The page shows an Adelaide 3D map, a floating planner, and browser Places search. The planner uses fictional sample data without login or a backend. Map rendering and place search require a restricted Google browser key.
 
 ## Run locally
 
@@ -21,6 +21,17 @@ npm run build
 ```
 
 There are no root npm scripts yet. Tests use Node's built-in test runner and introduce no additional dependencies. Lint includes the shared fixture outside `client/`; Vite allows that directory during development.
+
+## Google setup and place search
+
+1. In the DayMap Google Cloud project, enable **Maps JavaScript API** and **Places API (New)**.
+2. Edit the browser key: keep **Websites** restrictions for `http://localhost:5173/*` and `http://127.0.0.1:5173/*`; allow both APIs under **API restrictions**. Billing must be enabled on the project.
+3. Set `VITE_GOOGLE_MAPS_API_KEY` in ignored `client/.env.local`, using `.env.example` as the template. Restart Vite after changing it. Never commit the real key.
+4. Search for `State Library` in the top-left field. Choose a suggestion by pointer or ArrowDown/Enter. A purple P pin previews the location and the camera moves there.
+5. Choose another place: the previous preview is replaced. Clear search or press Escape: the preview disappears. It never changes the day's activities or selected itinerary stop.
+6. Confirm itinerary pin/card selection still works. Try a query with no matches and check that the status is clear.
+
+Search waits 300ms after typing and requires two characters. Results favour Adelaide and are restricted to Australia. Loading, no-results and provider errors appear below the field. Session tokens group autocomplete with the selected place details; only coordinates and formatted address are requested. No Places data is persisted. Live verification requires the Cloud setup above; unit tests cover debouncing, stale responses, clearing during details loading and disposal.
 
 ## Sample day
 
@@ -88,7 +99,7 @@ A pin click calls `onSelectStop(stopId, { anchor })`, where `anchor` is the clic
 1. Open the page. The header shows the plan date and `9:50am · demo time`; demo mode uses a fixed clock on the plan date so finished stops look the same whenever the demo runs.
 2. The planner lists four stops in order, each with its time range, Fixed/Flexible, location and duration. Stops that ended before the demo time are greyed out (none in the current fixture; Morning lecture runs until 10:00am). Between rows, travel shows as *Travel unknown* until routes exist.
 3. Select a row by click, or with Tab and Enter/Space. It highlights; selecting another row moves the highlight. Selection lives in `PlanProvider`, so the map will follow it.
-4. Type `market` in *Filter your day*: one row remains, *Showing 1 of 4 stops* appears, and the travel lines hide. Clear it and all four return. Typing in *Search places* (top left) says place results aren't available yet.
+4. Type `market` in *Filter your day*: one row remains, *Showing 1 of 4 stops* appears, and the travel lines hide. Clear it and all four return. Use *Search places* (top left) for Google location suggestions; it is independent of the planner filter.
 5. Expand *Morning lecture*: details only, with "DayMap will never move a fixed event." Expand *Library study*: the edit form opens and the lecture row closes. An end before the start, or times outside 10:00am–12:00pm, show an error and nothing is saved.
 6. Change Library study to 10:45–11:45 and Save. The row shows the new time marked *Changed*, and a card lists the change. *Keep current plan* restores 10:30–11:30; *Accept changes* applies it.
 7. Collapse the planner with the › button; the *Planner* pill reopens it. Below 720px the planner is a bottom sheet; its handle switches between peek and full height. Open/collapsed is remembered per browser.

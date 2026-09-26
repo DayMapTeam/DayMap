@@ -10,6 +10,7 @@ import './App.css'
 
 function App() {
   const { plan, selectedStopId, selectStop } = usePlan()
+  const [previewPlace, setPreviewPlace] = useState(null)
   const { now, isDemoTime } = usePlanClock(plan)
   // The popup opens only from a pin click on the map: { stopId, anchor } or null.
   const [popup, setPopup] = useState(null)
@@ -39,6 +40,7 @@ function App() {
           legs={plan.legs}
           selectedStopId={selectedStopId}
           onSelectStop={selectFromMap}
+          previewPlace={previewPlace}
         />
       </div>
       <AppHeader
@@ -49,7 +51,7 @@ function App() {
         isDemoTime={isDemoTime}
       />
       <div className="app-controls-top-left">
-        <PlaceSearch />
+        <PlaceSearch onPlaceSelect={setPreviewPlace} />
       </div>
       <Planner now={now} revealRequest={revealRequest} />
       {popup !== null && (
