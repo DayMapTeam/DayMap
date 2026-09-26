@@ -1,0 +1,129 @@
+/*
+ * DayMap design tokens (Native Glass, light only). The only place colours,
+ * fonts, radii, shadows, spacing and motion values are defined. Components
+ * read these variables and never hard-code their own.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Font */
+  --font-sans: 'Instrument Sans', -apple-system, system-ui, sans-serif;
+
+  /* Surfaces */
+  --glass: rgba(255, 255, 255, 0.78);
+  --glass-strong: rgba(255, 255, 255, 0.92);
+  --glass-opaque: rgba(255, 255, 255, 0.96); /* no blur support, or reduced transparency */
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-blur: blur(24px) saturate(180%);
+  --fill: rgba(118, 118, 128, 0.12);
+  --fill-2: rgba(118, 118, 128, 0.2);
+  --separator: rgba(60, 60, 67, 0.15);
+  --solid: #ffffff;
+
+  /* Text */
+  --label: #1c1c1e;
+  --label-2: #6e6e73;
+  --label-3: #aeaeb2;
+  --on-accent: #ffffff;
+
+  /* Accent and semantic */
+  --blue: #0a84ff;
+  --blue-tint: rgba(10, 132, 255, 0.12);
+  --orange: #ff9f0a;
+  --orange-tint: rgba(255, 159, 10, 0.14);
+  --orange-ink: #8a4b00;
+  --red: #ff3b30;
+  --red-tint: rgba(255, 59, 48, 0.12);
+  --green: #30d158;
+  --star: #1c1c1e;
+
+  /* Travel modes */
+  --mode-bus: #0a84ff;
+  --mode-walk: #30b0c7;
+  --mode-drive: #5e5ce6;
+
+  /*
+   * Map placeholder until DM-03. Stays a gradient: committing a Google map
+   * screenshot would persist provider imagery (ARCHITECTURE §9).
+   */
+  --map-placeholder: linear-gradient(160deg, #8a9a86, #a9ad9e 35%, #7f8a8f 70%, #6c7a70);
+
+  /* Radii */
+  --radius-panel: 18px;
+  --radius-photo: 11px;
+  --radius-card: 14px;
+  --radius-legend: 12px;
+  --radius-control: 10px;
+  --radius-segmented: 9px;
+  --radius-thumb: 8px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow-glass: 0 12px 32px rgba(0, 0, 0, 0.18);
+  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.15);
+  --shadow-thumb: 0 1px 3px rgba(0, 0, 0, 0.15);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-marker: 0 4px 12px rgba(0, 0, 0, 0.35);
+
+  /* Focus */
+  --focus-ring: 3px solid rgba(10, 132, 255, 0.5);
+  --focus-offset: 2px;
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-panel: 250ms;
+  --duration-press: 180ms;
+  --duration-popup: 200ms;
+  --duration-camera: 700ms;
+  --press-scale: 0.97;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Layout */
+  --header-height: 52px;
+  --overlay-inset: 16px;
+  --overlay-top: calc(var(--header-height) + var(--overlay-inset));
+  --panel-width: 360px;
+  --sheet-peek: 88px; /* mobile planner: handle + title row */
+  --hit-target: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-panel: 0ms;
+    --duration-press: 0ms;
+    --duration-popup: 0ms;
+    --duration-camera: 0ms;
+    --press-scale: 1;
+  }
+}
+
+/* The glass recipe. Every floating surface uses this class or --solid. */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--glass-opaque);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--glass-opaque);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
