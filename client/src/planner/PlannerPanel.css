@@ -7,8 +7,14 @@
   display: flex;
   flex-direction: column;
   width: var(--panel-width);
-  overflow: hidden;
+  /* clip, not hidden: a hidden-overflow box can still be scrolled by focus, which pushed the header out of view. */
+  overflow: clip;
   border-radius: var(--radius-panel);
+}
+
+/* Groups the panel's contents so a dialog can make them inert; adds no box of its own. */
+.planner-content {
+  display: contents;
 }
 
 /* display: flex above would otherwise override the hidden attribute. */
@@ -112,6 +118,8 @@
 
 .status-pill {
   display: inline-flex;
+  min-width: 0;
+  overflow: hidden;
   align-items: center;
   gap: 6px;
   padding: var(--space-1) 10px;
@@ -122,7 +130,13 @@
   border-radius: var(--radius-pill);
 }
 
+.status-pill-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .status-pill-dot {
+  flex: none;
   width: 8px;
   height: 8px;
   background: var(--label-3);

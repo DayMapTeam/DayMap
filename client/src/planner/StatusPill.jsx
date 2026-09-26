@@ -7,11 +7,13 @@
  */
 export default function StatusPill({ plan }) {
   const count = plan.stops.length
+  const text = `${count} ${count === 1 ? 'stop' : 'stops'} · travel unknown`
 
+  // Shrinks with an ellipsis so the header's buttons always fit; the title keeps the full text.
   return (
-    <p className="status-pill">
+    <p className="status-pill" title={text}>
       <span className="status-pill-dot" aria-hidden="true" />
-      {count} {count === 1 ? 'stop' : 'stops'} · travel unknown
+      <span className="status-pill-text">{text}</span>
     </p>
   )
 }

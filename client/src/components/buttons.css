@@ -1,7 +1,9 @@
 /* Shared button styles. */
 
 .button-filled,
-.button-text {
+.button-text,
+.button-destructive,
+.button-danger {
   min-height: 36px;
   font-size: 14px;
   font-weight: 600;
@@ -33,7 +35,28 @@
   background: var(--blue-tint);
 }
 
+/* Red text; sits on the left of its action row. */
+.button-destructive {
+  margin-right: auto;
+  padding: 0 var(--space-2);
+  color: var(--red);
+  background: transparent;
+}
+
+.button-destructive:hover {
+  background: var(--red-tint);
+}
+
+/* Filled red: confirms something that can't be undone. */
+.button-danger {
+  padding: 0 18px;
+  color: var(--on-accent);
+  background: var(--red);
+}
+
 .button-filled:not(:disabled):active,
-.button-text:active {
+.button-text:active,
+.button-destructive:active,
+.button-danger:active {
   transform: scale(var(--press-scale));
 }
