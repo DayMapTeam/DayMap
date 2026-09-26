@@ -15,11 +15,11 @@ const NOTICE_MS = 5000
 export function useTrip({ plan, now, reading }) {
   const [state, dispatch] = useReducer(tripReducer, initialTrip)
   // The plan and time for the next reading, without re-feeding a reading when they change.
-  const latest = useRef({ plan, now })
+  const latest = useRef({ plan, now, reading })
 
   useEffect(() => {
-    latest.current = { plan, now }
-  }, [plan, now])
+    latest.current = { plan, now, reading }
+  }, [plan, now, reading])
 
   useEffect(() => {
     if (reading) dispatch({ type: 'reading', reading, plan: latest.current.plan, now: latest.current.now })
@@ -42,19 +42,17 @@ export function useTrip({ plan, now, reading }) {
     ? tripStops(plan).find((stop) => stop.id === state.targetId) ?? null
     : null
 
-  const go = useCallback((stopId) => dispatch({ type: 'go', stopId }), [])
+  // Go at the place you already are just records it; the map doesn't move.
+  const go = useCallback((stopId) => dispatch({ type: 'go', stopId, plan: latest.current.plan, reading: latest.current.reading }), [])
   const end = useCallback(() => dispatch({ type: 'end' }), [])
   const arrive = useCallback(() => dispatch({ type: 'arrive' }), [])
-  const acceptAsk = useCallback(() => dispatch({ type: 'accept-ask' }), [])
-  const dismissAsk = useCallback(() => dispatch({ type: 'dismiss-ask' }), [])
 
   return {
     state,
     next,
     target,
     atStop: state.atStopId === null ? null : stops.get(state.atStopId) ?? null,
-    askStop: state.ask === null ? null : stops.get(state.ask.toStopId) ?? null,
     noticeStop: state.notice === null ? null : stops.get(state.notice.stopId) ?? null,
-    go, end, arrive, acceptAsk, dismissAsk,
+    go, end, arrive,
   }
 }

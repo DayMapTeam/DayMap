@@ -1,8 +1,8 @@
-/* Trip controls: bottom-left over the map, clear of the planner. */
+/* Trip controls: bottom-left over the map, clear of the planner and above Google's logo. */
 
 .trip-dock {
   position: absolute;
-  bottom: var(--overlay-inset);
+  bottom: calc(var(--overlay-inset) + 28px);
   left: var(--overlay-inset);
   z-index: 4;
   display: flex;
@@ -16,11 +16,31 @@
   pointer-events: auto;
 }
 
-.trip-card {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-4) var(--space-3);
-  border-radius: var(--radius-card);
+.trip-go {
+  align-self: flex-start;
+  width: 64px;
+  height: 64px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--blue);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: var(--shadow-float);
+  transition: transform var(--duration-press) var(--ease-spring);
+}
+
+.trip-go:active {
+  transform: scale(var(--press-scale));
+}
+
+.trip-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  border-radius: var(--radius-pill);
   animation: trip-in var(--duration-popup) var(--ease-spring);
 }
 
@@ -31,70 +51,42 @@
   }
 }
 
-.trip-eyebrow {
-  font-size: 12px;
+.trip-bar-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--blue);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px var(--blue-tint);
+}
+
+.trip-bar-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-bar-end {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
   color: var(--label-2);
-}
-
-.trip-title {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.trip-primary {
-  font-size: 14px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.trip-secondary {
-  font-size: 13px;
-  color: var(--label-2);
-  font-variant-numeric: tabular-nums;
-}
-
-.trip-late {
-  color: var(--red-ink);
-}
-
-.trip-hint {
-  font-size: 12px;
-  color: var(--label-2);
-}
-
-.trip-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
-  margin-top: var(--space-2);
-}
-
-.trip-actions .button-filled {
-  min-height: 40px;
-}
-
-.trip-link {
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
-}
-
-.trip-end {
-  margin-left: auto;
-}
-
-.trip-location {
-  padding-left: 0;
+  background: var(--fill);
+  border: 0;
+  border-radius: 50%;
 }
 
 .trip-toast {
   display: flex;
   align-items: center;
   gap: 10px;
-  justify-self: start;
+  align-self: flex-start;
   max-width: 100%;
   padding: 6px 6px 6px 14px;
   min-height: 44px;

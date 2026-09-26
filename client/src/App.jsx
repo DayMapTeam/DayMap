@@ -18,7 +18,6 @@ import StopPopup from './planner/StopPopup.jsx'
 import TripDock from './trip/TripDock.jsx'
 import { bearingDegrees, tripStops } from './trip/tripRules.js'
 import { useLocation } from './trip/useLocation.js'
-import { useSimulatedWalk } from './trip/useSimulatedWalk.js'
 import { useTrip } from './trip/useTrip.js'
 import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 import './App.css'
@@ -40,12 +39,9 @@ function App() {
   const [popup, setPopup] = useState(null)
   const [revealRequest, setRevealRequest] = useState(null)
 
-  // Trips use the accepted plan and the device's position, or a labelled
-  // simulated walk on the demo day.
+  // Trips use the accepted plan and the device's position, watched while DayMap is open.
   const location = useLocation()
-  const simulation = useSimulatedWalk()
-  const sim = plan.dataMode === 'demo' ? simulation : null
-  const reading = sim?.position ?? location.position
+  const reading = location.position
   const trip = useTrip({ plan, now, reading })
   const tripTargetId = trip.target?.id ?? null
   // The camera follows each new trip until the person moves the map themselves.
@@ -62,12 +58,7 @@ function App() {
   }, [])
   const recenter = useCallback(() => setFollowState((current) => ({ ...current, paused: false })), [])
 
-  // Go is the tap that may ask for location on a live day. The demo day never asks.
-  const { go } = trip
-  const startTrip = useCallback((stopId) => {
-    go(stopId)
-    if (plan.dataMode === 'live' && location.status === 'off') location.enable()
-  }, [go, plan.dataMode, location])
+  const { go: startTrip } = trip
   const navigableIds = useMemo(() => new Set(tripStops(plan).map((stop) => stop.id)), [plan])
 
   // Esc, ×, clicking the open pin again, or clicking the empty map: close and deselect.
@@ -143,15 +134,10 @@ function App() {
       </div>
       <TripDock
         trip={trip}
-        plan={plan}
-        now={now}
-        reading={reading}
-        legs={draft ? [] : planning.analysis.legs}
-        location={location}
         onGo={startTrip}
         following={following}
+        hasPosition={reading !== null}
         onRecenter={recenter}
-        sim={sim}
       />
       <Planner
         now={now}

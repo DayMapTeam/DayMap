@@ -118,18 +118,50 @@ test('ending a trip you started yourself does not suppress automatic starts', ()
   assert.equal(state.suppressed, false)
 })
 
-test('leaving well before the stop ends asks first', () => {
+test('leaving early starts directions straight away, without asking', () => {
   const early = at('2026-09-25T23:40:00Z') // 09:10, the lecture runs until 10:00
-  let state = feed({ ...initialTrip, atStopId: 'stop-university' },
+  const state = feed({ ...initialTrip, atStopId: 'stop-university' },
     [away(university, 200), away(university, 200), away(university, 200)], { now: early })
-  assert.equal(state.phase, 'idle')
-  assert.deepEqual(state.ask, { toStopId: 'stop-library' })
-  const accepted = tripReducer(state, { type: 'accept-ask' })
-  assert.equal(accepted.phase, 'navigating')
-  assert.equal(accepted.targetId, 'stop-library')
-  const dismissed = tripReducer(state, { type: 'dismiss-ask' })
-  assert.equal(dismissed.ask, null)
-  assert.equal(dismissed.suppressed, true)
+  assert.equal(state.phase, 'navigating')
+  assert.equal(state.targetId, 'stop-library')
+})
+
+test('leaving home (not a stop) starts directions to the next stop', () => {
+  const home = offsetPoint(university, 200, 2000)
+  let state = feed(initialTrip, [home], { now: LATER })
+  assert.deepEqual(state.origin, { lat: home.lat, lng: home.lng }, 'DayMap settles where it first sees you')
+  state = feed(state, [offsetPoint(home, 90, 30), offsetPoint(home, 90, 100)], { now: LATER })
+  assert.equal(state.phase, 'idle', 'moving about at home is not leaving')
+  state = feed(state, [offsetPoint(home, 90, 200), offsetPoint(home, 90, 260), offsetPoint(home, 90, 320)], { now: LATER })
+  assert.equal(state.phase, 'navigating')
+  assert.equal(state.targetId, 'stop-library', 'the lecture has ended, so the library is next')
+  assert.equal(state.origin, null)
+})
+
+test('Go at the place you already are records it and starts no trip', () => {
+  const byPosition = tripReducer(initialTrip, { type: 'go', stopId: 'stop-library', plan: demoPlan, reading: reading(library) })
+  assert.equal(byPosition.phase, 'idle')
+  assert.equal(byPosition.atStopId, 'stop-library')
+
+  // Two stops at the same place: from the first, Go to the second changes nothing on the map.
+  const plan = structuredClone(demoPlan)
+  plan.stops.find((s) => s.id === 'stop-library').location = { ...university }
+  const sameSpot = tripReducer({ ...initialTrip, atStopId: 'stop-university' }, { type: 'go', stopId: 'stop-library', plan, reading: null })
+  assert.equal(sameSpot.phase, 'idle')
+  assert.equal(sameSpot.atStopId, 'stop-library')
+
+  const elsewhere = tripReducer(initialTrip, { type: 'go', stopId: 'stop-library', plan: demoPlan, reading: reading(university) })
+  assert.equal(elsewhere.phase, 'navigating')
+})
+
+test('Go heads to an event just added into a gap', () => {
+  const plan = structuredClone(demoPlan)
+  const lecture = plan.stops[0]
+  plan.stops.splice(1, 0, { ...structuredClone(lecture), id: 'stop-coffee', title: 'Coffee', timing: {
+    ...lecture.timing, kind: 'flexible', fixedStartAt: null, fixedEndAt: null,
+    scheduledStartAt: '2026-09-26T00:35:00Z', scheduledEndAt: '2026-09-26T00:55:00Z',
+  }, location: { label: 'Cafe', placeId: null, lat: -34.9215, lng: 138.604 } })
+  assert.equal(nextStopFor(plan, { atStopId: 'stop-university', now: LATER - 30 * 60000 }).id, 'stop-coffee')
 })
 
 test('arriving at the next stop without a trip still records where you are', () => {
@@ -144,7 +176,6 @@ test('nothing starts after the last stop', () => {
   const state = feed({ ...initialTrip, atStopId: 'stop-square' },
     [away(square, 300), away(square, 300), away(square, 300)], { now: LATER })
   assert.equal(state.phase, 'idle')
-  assert.equal(state.ask, null)
 })
 
 test('sync ends a trip whose destination was removed and forgets a removed stop', () => {
@@ -173,34 +204,29 @@ test('directions link hands off to Google Maps walking directions', () => {
   assert.equal(url.searchParams.get('travelmode'), 'walking')
 })
 
-test('the demo morning end to end: Go, walk, arrive, leave, automatic directions, arrive', async () => {
-  const { stepToward, simulatedStart } = await import('./useSimulatedWalk.js')
+test('a morning end to end: leave home, arrive, leave, automatic directions, arrive', () => {
+  // Straight-line steps of about 15 m, like readings a few seconds apart on a walk.
   const walk = (state, from, to, now) => {
-    let position = from
     const seen = [state]
-    for (let step = 0; step < 200 && (position.lat !== to.lat || position.lng !== to.lng); step++) {
-      position = stepToward(position, to)
-      seen.push(feed(seen.at(-1), [position], { now }))
+    const steps = Math.ceil(distanceMeters(from, to) / 15)
+    for (let step = 1; step <= steps; step++) {
+      const f = step / steps
+      seen.push(feed(seen.at(-1), [{ lat: from.lat + (to.lat - from.lat) * f, lng: from.lng + (to.lng - from.lng) * f }], { now }))
     }
-    // The simulator repeats the destination while it dwells there.
     seen.push(feed(seen.at(-1), [to, to], { now }))
-    return { states: seen, position }
+    return seen
   }
-
-  let state = tripReducer(initialTrip, { type: 'go', stopId: nextStopFor(demoPlan, { now: NOW }).id })
-  let run = walk(state, simulatedStart(university), university, NOW)
-  state = run.states.at(-1)
-  assert.equal(state.phase, 'idle')
+  const home = offsetPoint(university, 160, 1500)
+  let run = walk(feed(initialTrip, [home], { now: NOW }), home, university, NOW)
+  assert.ok(run.some((s) => s.phase === 'navigating' && s.startedBy === 'auto' && s.targetId === 'stop-university'),
+    'leaving home started directions to the lecture')
+  let state = run.at(-1)
   assert.equal(state.atStopId, 'stop-university')
-  assert.ok(run.states.some((s) => s.notice?.kind === 'arrived'))
+  assert.equal(state.notice?.kind, 'arrived')
 
-  const next = nextStopFor(demoPlan, { atStopId: state.atStopId, now: NOW })
-  assert.equal(next.id, 'stop-library')
-  run = walk(state, run.position, next.location, NOW)
-  assert.ok(run.states.some((s) => s.phase === 'navigating' && s.startedBy === 'auto' && s.targetId === 'stop-library'),
-    'leaving the lecture started directions by itself')
-  state = run.states.at(-1)
+  run = walk(state, university, library, LATER)
+  assert.ok(run.some((s) => s.phase === 'navigating' && s.targetId === 'stop-library'), 'leaving the lecture started directions')
+  state = run.at(-1)
   assert.equal(state.phase, 'idle')
   assert.equal(state.atStopId, 'stop-library')
-  assert.equal(state.notice?.kind, 'arrived')
 })
