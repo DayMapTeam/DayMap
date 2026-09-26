@@ -1,6 +1,6 @@
 # DayMap architecture
 
-**Status:** proposed, September 2026. No application code exists yet. Everything here is the target for the starter issues (DM-01 onward), not a description of working features. Who builds what, and when, is in [CONTRIBUTING.md](CONTRIBUTING.md).
+**Status:** initial implementation, September 2026. The React frontend now has a shared sample day and selection demo (issue #5). Backend, live integrations, map rendering, and the remaining architecture are proposed. Current run commands and the selection interface are in [client/README.md](client/README.md). Who builds what, and when, is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 This is the technical source of truth. Changing the data contract (§5), the API (§6), or the security rules (§7, §8, §10) needs team agreement. When an [open decision](#12-open-decisions) is resolved, record it in the relevant section and remove it from §12.
 
@@ -177,7 +177,7 @@ The map sits behind a single adapter:
 
 ### Demo and live modes
 
-- Demo mode must keep working without login or Calendar credentials. Its data comes from `GET /api/demo-plan`, which makes no external API calls.
+- Demo mode must keep working without login or Calendar credentials. Issue #5 imports `shared/fixtures/demoPlan.js` directly so the frontend runs before the backend exists. Once DM-04 is implemented, the demo service will read the same fixture through `GET /api/demo-plan`, which makes no external API calls.
 - Simulated data, including sample route geometry and disruptions, is clearly labelled in the UI (`dataMode: 'demo'`).
 
 ## 5. Shared data contract

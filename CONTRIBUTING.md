@@ -2,7 +2,7 @@
 
 DayMap turns a day's activities into a geographic map and a linked planner. This guide covers who owns what, the shared kickoff, the milestone plan, the starter issues, and how we work. Technical contracts are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
-**Status:** initial plan, September 2026. The repository contains documentation only. Directories, commands, endpoints, and environment variables mentioned here are targets for the starter issues, not working features.
+**Status:** initial implementation, September 2026. The React frontend scaffold and shared sample-day selection demo are implemented. Run commands from `client/`; see [client/README.md](client/README.md). Root workspace scripts, backend endpoints, authentication, and external integrations below remain planned.
 
 ## Contents
 
