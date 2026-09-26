@@ -336,3 +336,25 @@ test('Calendar routes require a verified session and callback never returns toke
   assert.equal(callback.headers.get('location'), 'http://localhost:5173/?calendar=connected')
   assert.equal(callback.headers.get('cache-control'), 'no-store')
 })
+
+test('listDayEvents refreshes on the server and sends the access token only to Google Calendar', async () => {
+  const db = fakeDb()
+  const calls = []
+  const service = createCalendarService({ env, db, fetchImpl: async (url, options) => {
+    calls.push({ url: String(url), options })
+    if (String(url).startsWith('https://www.googleapis.com/calendar/')) {
+      return new Response(JSON.stringify({ items: [{ id: 'event-1' }] }))
+    }
+    return new URLSearchParams(options.body).get('grant_type') === 'refresh_token'
+      ? new Response(JSON.stringify({ access_token: 'short-lived' }))
+      : tokenResponse()
+  } })
+  const state = await beginState(service)
+  await service.callback({ state, code: 'code' })
+  const events = await service.listDayEvents(userId, { timeMin: 0, timeMax: 86400000 })
+  assert.deepEqual(events, [{ id: 'event-1' }])
+  const calendarCall = calls.at(-1)
+  assert.match(calendarCall.url, /^https:\/\/www\.googleapis\.com\/calendar\/v3\/calendars\/primary\/events\?/)
+  assert.equal(calendarCall.options.headers.Authorization, 'Bearer short-lived')
+  assert.ok(!calendarCall.url.includes('short-lived'))
+})

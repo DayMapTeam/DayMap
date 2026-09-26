@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { Pool } from 'pg'
 import { ApiError } from '../middleware/apiError.js'
 import { createTokenCipher } from './tokenCipher.js'
+import { listCalendarEvents } from '../integrations/googleCalendar.js'
 
 const SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly'
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -143,6 +144,11 @@ export function createCalendarService({
         [userId, result.rows[0].refresh_token_ciphertext])
       if (!current.rows.length) throw new ApiError(409, 'CALENDAR_RECONNECT_REQUIRED', 'Calendar connection changed. Try again.')
       return tokens.access_token // Server integration only; never send this through an API route.
+    },
+    /** The primary calendar's events between two instants. The access token never leaves this service. */
+    async listDayEvents(userId, { timeMin, timeMax }) {
+      const accessToken = await this.getAccessToken(userId)
+      return listCalendarEvents({ accessToken, calendarId: 'primary', timeMin, timeMax, fetchImpl })
     },
     async disconnect(userId) {
       const result = await pool.query(
