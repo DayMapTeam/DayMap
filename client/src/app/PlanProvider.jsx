@@ -28,8 +28,8 @@ export function PlanProvider({ initialPlan, children }) {
   const discardDraft = useCallback(() => {
     dispatch({ type: 'discard-draft' })
   }, [])
-  const addStop = useCallback(({ newStop, afterStopId, baseVersion, now }) => {
-    dispatch({ type: 'add-stop', newStop, afterStopId, baseVersion, now })
+  const addStop = useCallback(({ newStop, afterStopId, baseVersion, now, ctx }) => {
+    dispatch({ type: 'add-stop', newStop, afterStopId, baseVersion, now, ctx })
   }, [])
   const undoAdd = useCallback((stopId) => {
     dispatch({ type: 'undo-add', stopId })

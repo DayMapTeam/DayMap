@@ -200,6 +200,8 @@ route polylines and authenticated server validation are separate increments.
 
 **Getting around** in the planner sets how journeys are estimated: *Walk + transit* (default), *Car* or *Walk only*, remembered per device. Journeys up to 1.5 km straight-line are always walked. Otherwise *Car* drives (Route Matrix `DRIVING`, no live traffic) and *Walk + transit* requests `TRANSIT` at the leg's exact departure plus `WALKING`, choosing public transport only when it saves at least 5 minutes and walking when there is no transit route. Transit results are keyed by departure time, so the engine's exact-departure rule holds. Buffers: walk 5, transit 5, car 10 minutes. Suggested moves verify walking or driving legs at new times; a public-transport leg at a new time is unknown until that departure is fetched. The Google Maps handoff in trip mode uses the leg's mode.
 
+**Adding a stop (issue #42)** uses the same estimates. A flexible stop starts once you can get there from the stop before it (travel + buffer, rounded to five minutes); later flexible stops move only as far as their own journeys need, and fixed stops never move. A fixed new stop keeps its time and says how late the journey there would make you. The add sheet requests missing journeys, says "Checking travel time…" while they load, and names what it allowed for. The reducer commits with the same planning context as the preview, so the result is what was shown. Unknown travel counts as zero only in the fit and is always reported.
+
 ### Trip mode (issue #29)
 
 `client/src/trip/` guides the person from stop to stop. The rules in `tripRules.js` are pure and unit-tested; `useTrip` feeds each position reading through them once.

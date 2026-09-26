@@ -1,10 +1,12 @@
 // Fitting a new stop into the day. Pure: the planner previews with it and the
-// reducer commits with it, so the preview always equals the result.
+// reducer commits with it (with the same planning context), so the preview
+// always equals the result.
 //
-// Travel is not included. The plan has no legs until routes are calculated
-// (DM-07), and unknown travel is never treated as zero (ARCHITECTURE §5), so
-// slots are checked on clock times only and the UI says so. Once
-// POST /api/plans/:id/preview exists this belongs in server/src/planning/.
+// Travel comes from the planning context's journey estimates (mode chosen as
+// in the planner). A journey that isn't known yet counts as zero minutes but
+// is reported as unknown, so the UI never presents it as checked
+// (ARCHITECTURE §5). Once POST /api/plans/:id/preview exists this belongs in
+// server/src/planning/.
 
 const MINUTE = 60000
 
@@ -42,6 +44,16 @@ const MAX_TITLE = 120
  */
 
 /**
+ * @typedef {object} Journey
+ * @property {string} fromStopId
+ * @property {string} toStopId
+ * @property {'ready' | 'pending' | 'unavailable' | 'no-place'} status
+ * @property {number} minutes Travel plus buffer; 0 unless ready.
+ * @property {'walk' | 'transit' | 'drive' | null} mode
+ * @property {string} [departAt] For a pending estimate: the departure to request.
+ */
+
+/**
  * @typedef {object} FitOption
  * @property {string | null} afterStopId The stop the new one follows; null when it comes first.
  * @property {string} startAt
@@ -54,6 +66,8 @@ const MAX_TITLE = 120
  * @property {StopChange[]} changes From the stop before the new one to the end of the day.
  * @property {object | null} plan The resulting plan, when ok.
  * @property {boolean} recommended
+ * @property {Journey[]} journeys The journeys to and from the new stop that the fit allowed for.
+ * @property {number | null} lateArrivalMinutes For a fixed new stop: how late you'd arrive from the stop before.
  */
 
 function toTimestamp(ms) {
@@ -82,6 +96,38 @@ function roundUpToFive(ms) {
 }
 
 /**
+ * Journey time (travel + buffer) between two timed stops, from a planning
+ * context (`modeFor`, `buffers`, `travel`). Null context: no travel at all.
+ *
+ * @returns {null | ((from: object, to: object) => Journey)}
+ */
+export function journeyTimes(ctx) {
+  if (!ctx) return null
+  return (from, to) => {
+    const base = { fromStopId: from.id, toStopId: to.id, minutes: 0, mode: null }
+    if (!from.location || !to.location) return { ...base, status: 'no-place' }
+    if (from.location.placeId && from.location.placeId === to.location.placeId) return { ...base, status: 'ready' }
+    const choice = ctx.modeFor?.(from, to)
+    const mode = typeof choice === 'string' ? choice : choice?.mode ?? null
+    const buffer = ctx.buffers?.[mode]
+    const departAt = new Date(endOf(from)).toISOString()
+    const estimate = ctx.travel?.(from, to, { mode, departAt })
+    const exact = !(mode === 'transit' || estimate?.timeDependent) || Date.parse(estimate?.departAt) === Date.parse(departAt)
+    if (estimate?.status !== 'ready' || !Number.isFinite(estimate.travelSeconds) || !Number.isFinite(buffer) || !exact) {
+      const status = estimate?.status === 'unavailable' ? 'unavailable' : 'pending'
+      // A pending journey carries what's needed to request it.
+      return { ...base, mode, departAt, status, ...(status === 'pending' ? { request: { from, to, departAt } } : {}) }
+    }
+    return { ...base, mode, status: 'ready', minutes: Math.ceil(estimate.travelSeconds / 60) + buffer }
+  }
+}
+
+// A copy of a stop at new times, so journeys from it depart when it ends.
+function atTimes(stop, start, end) {
+  return { ...stop, timing: { ...stop.timing, scheduledStartAt: toTimestamp(start), scheduledEndAt: toTimestamp(end) } }
+}
+
+/**
  * Check the parts of a new stop that don't depend on the day.
  *
  * @param {NewStop} newStop
@@ -101,29 +147,36 @@ export function validateNewStop(newStop) {
   return null
 }
 
-// Move flexible stops from `fromIndex` later until they start at or after
-// `cursor`, keeping their durations and order. Stops that can't move are
-// never touched: running into one is a conflict.
-function reflow(timed, fromIndex, cursor) {
+// Move flexible stops from `fromIndex` later until each starts once you can
+// get there from the stop before it (`previous`, which ends at `cursor`),
+// keeping their durations and order. Stops that can't move are never
+// touched: running into one is a conflict.
+function reflow(timed, fromIndex, cursor, previous, journey) {
   const shifts = []
+  const journeys = []
   for (let index = fromIndex; index < timed.length; index++) {
     const stop = timed[index]
     const start = startOf(stop)
-    if (start >= cursor) {
-      return { ok: true, reason: null, shifts, spareMinutes: Math.floor((start - cursor) / MINUTE), nextStopId: stop.id }
+    const leg = journey?.(previous, stop) ?? null
+    if (leg) journeys.push(leg)
+    const ready = cursor + (leg?.minutes ?? 0) * MINUTE
+    if (start >= ready) {
+      return { ok: true, reason: null, shifts, journeys, spareMinutes: Math.floor((start - ready) / MINUTE), nextStopId: stop.id }
     }
     if (!canShift(stop)) {
-      return { ok: false, reason: { code: 'late', stopId: stop.id, minutesLate: Math.ceil((cursor - start) / MINUTE) }, shifts }
+      return { ok: false, reason: { code: 'late', stopId: stop.id, minutesLate: Math.ceil((ready - start) / MINUTE) }, shifts, journeys }
     }
-    const end = cursor + (endOf(stop) - start)
+    const shiftedStart = roundUpToFive(ready)
+    const end = shiftedStart + (endOf(stop) - start)
     const { latestEndAt } = stop.timing
     if (latestEndAt !== null && end > Date.parse(latestEndAt)) {
-      return { ok: false, reason: { code: 'outside-window', stopId: stop.id }, shifts }
+      return { ok: false, reason: { code: 'outside-window', stopId: stop.id }, shifts, journeys }
     }
-    shifts.push({ stopId: stop.id, start: cursor, end })
+    shifts.push({ stopId: stop.id, start: shiftedStart, end })
+    previous = atTimes(stop, shiftedStart, end)
     cursor = end
   }
-  return { ok: true, reason: null, shifts, spareMinutes: null, nextStopId: null }
+  return { ok: true, reason: null, shifts, journeys, spareMinutes: null, nextStopId: null }
 }
 
 function makeStop(newStop, start, end) {
@@ -183,8 +236,12 @@ function listChanges(plan, preview, newStopId, afterStopId, shifts) {
   })
 }
 
-function makeOption(plan, newStop, afterStopId, start, end, flow) {
+function makeOption(plan, newStop, afterStopId, start, end, flow, inbound = null, lateArrivalMinutes = null) {
+  const journeys = [inbound, ...(flow.journeys ?? [])]
+    .filter((leg) => leg && (leg.fromStopId === newStop.id || leg.toStopId === newStop.id))
   const base = {
+    journeys,
+    lateArrivalMinutes,
     afterStopId,
     startAt: toTimestamp(start),
     endAt: toTimestamp(end),
@@ -202,29 +259,38 @@ function makeOption(plan, newStop, afterStopId, start, end, flow) {
   return { ...base, plan: preview, changes: listChanges(plan, preview, newStop.id, afterStopId, flow.shifts) }
 }
 
-// Flexible: straight after `timed[index]`, or from now if that stop is over.
-function fitAfter(plan, timed, index, newStop, now) {
-  const start = Math.max(endOf(timed[index]), roundUpToFive(now.getTime()))
-  const end = start + newStop.durationMinutes * MINUTE
-  return makeOption(plan, newStop, timed[index].id, start, end, reflow(timed, index + 1, end))
+// Flexible: once you can get there after `timed[index]` (or from now if that
+// stop is over), then later stops leave room for the journeys after it.
+function fitAfter(plan, timed, index, newStop, now, journey) {
+  const previous = timed[index]
+  const duration = newStop.durationMinutes * MINUTE
+  const earliest = Math.max(endOf(previous), roundUpToFive(now.getTime()))
+  const inbound = journey?.(previous, makeStop(newStop, earliest, earliest + duration)) ?? null
+  const start = inbound?.minutes ? Math.max(earliest, roundUpToFive(endOf(previous) + inbound.minutes * MINUTE)) : earliest
+  const end = start + duration
+  const flow = reflow(timed, index + 1, end, makeStop(newStop, start, end), journey)
+  return makeOption(plan, newStop, previous.id, start, end, flow, inbound)
 }
 
 // Fixed: exactly at the given time. It may push later flexible stops back,
 // but never overlaps anything that can't move or that has already started.
-function fitAt(plan, timed, newStop, now) {
+function fitAt(plan, timed, newStop, now, journey) {
   const start = Date.parse(newStop.startAt)
   const end = Date.parse(newStop.endAt)
   const index = timed.findIndex((stop) => startOf(stop) >= start)
   const after = index === -1 ? timed.length : index
   const afterStopId = after > 0 ? timed[after - 1].id : null
-  const fail = (reason) => makeOption(plan, newStop, afterStopId, start, end, { ok: false, reason, shifts: [] })
+  const stop = makeStop(newStop, start, end)
+  const inbound = after > 0 ? journey?.(timed[after - 1], stop) ?? null : null
+  const late = inbound?.minutes ? Math.ceil((endOf(timed[after - 1]) + inbound.minutes * MINUTE - start) / MINUTE) : 0
+  const fail = (reason) => makeOption(plan, newStop, afterStopId, start, end, { ok: false, reason, shifts: [] }, inbound)
 
   if (start < now.getTime()) return fail({ code: 'in-past' })
   const blocking = timed.find((stop) =>
     startOf(stop) < end && endOf(stop) > start && (!canShift(stop) || startOf(stop) < start),
   )
   if (blocking) return fail({ code: 'overlaps', stopId: blocking.id })
-  return makeOption(plan, newStop, afterStopId, start, end, reflow(timed, after, end))
+  return makeOption(plan, newStop, afterStopId, start, end, reflow(timed, after, end, stop, journey), inbound, late > 0 ? late : null)
 }
 
 // The soonest slot that moves the fewest stops. (Most spare time would always
@@ -247,17 +313,19 @@ function compareOptions(a, b) {
  *
  * @param {object} plan Accepted plan in the §5 shape.
  * @param {NewStop} newStop
- * @param {{ afterStopId?: string | null, now: Date }} options
+ * @param {{ afterStopId?: string | null, now: Date, ctx?: object }} options
+ *   `ctx` is the planning context whose journey estimates to allow for.
  * @returns {{ error: ReturnType<typeof validateNewStop>, options: FitOption[] }}
  */
-export function fitNewStop(plan, newStop, { afterStopId = null, now }) {
+export function fitNewStop(plan, newStop, { afterStopId = null, now, ctx = null }) {
+  const journey = journeyTimes(ctx)
   const error = validateNewStop(newStop)
   if (error !== null) return { error, options: [] }
 
   const timed = timedStops(plan)
   let options
   if (newStop.kind === 'fixed') {
-    options = [fitAt(plan, timed, newStop, now)]
+    options = [fitAt(plan, timed, newStop, now, journey)]
   } else if (timed.length === 0) {
     const start = roundUpToFive(now.getTime())
     const end = start + newStop.durationMinutes * MINUTE
@@ -271,7 +339,7 @@ export function fitNewStop(plan, newStop, { afterStopId = null, now }) {
         // Never squeeze in before a stop that has already started.
         (index + 1 >= timed.length || startOf(timed[index + 1]) > now.getTime()),
       )
-      .map(({ index }) => fitAfter(plan, timed, index, newStop, now))
+      .map(({ index }) => fitAfter(plan, timed, index, newStop, now, journey))
     options.sort(compareOptions)
   }
   if (options[0]?.ok) options[0] = { ...options[0], recommended: true }
@@ -282,10 +350,11 @@ export function fitNewStop(plan, newStop, { afterStopId = null, now }) {
  * The option a commit applies: the fixed slot, or the flexible slot after
  * `afterStopId`. Null when it doesn't fit.
  */
-export function chooseOption(plan, newStop, { afterStopId, now }) {
+export function chooseOption(plan, newStop, { afterStopId, now, ctx = null }) {
   const { options } = fitNewStop(plan, newStop, {
     afterStopId: newStop.kind === 'flexible' ? afterStopId : null,
     now,
+    ctx,
   })
   return options.find((option) => option.ok) ?? null
 }
