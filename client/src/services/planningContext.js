@@ -45,7 +45,8 @@ export function demoWalkingEstimate(from, to) {
 }
 
 /**
- * The mode for one journey. Short hops are walked. Otherwise "drive" drives,
+ * The mode for one journey: the one chosen for the destination, if any.
+ * Otherwise short hops are walked. Otherwise "drive" drives,
  * "walk" walks, and "auto" compares public transport at the real departure
  * with walking: transit wins only when it saves five minutes, and a missing
  * transit route means walking. While estimates load it asks for transit.
@@ -53,6 +54,8 @@ export function demoWalkingEstimate(from, to) {
  * @returns {{ mode: 'walk' | 'transit' | 'drive', source: string }}
  */
 export function chooseMode(from, to, preference, travel) {
+  // A way of travelling the person chose for this journey always wins.
+  if (['walk', 'transit', 'drive'].includes(to.travelMode)) return { mode: to.travelMode, source: 'chosen' }
   const meters = straightLineMeters(from.location, to.location)
   if (preference === 'walk' || (meters !== null && meters <= WALK_ONLY_METERS)) return { mode: 'walk', source: 'auto' }
   if (preference === 'drive') return { mode: 'drive', source: 'auto' }

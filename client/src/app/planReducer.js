@@ -1,5 +1,5 @@
 import { chooseOption } from './planAdd.js'
-import { listStopChanges, validateStopEdit, withStopKind } from './planEdits.js'
+import { listStopChanges, validateStopEdit, withStopKind, withTravelMode } from './planEdits.js'
 import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
 import { planFingerprint } from '../../../shared/planning/fingerprint.js'
@@ -172,6 +172,28 @@ function setKind(state, { stopId, kind }) {
 }
 
 /**
+ * Choose how to travel to a stop (null: automatic). The choice is the explicit
+ * accept, so it changes the accepted plan and a pending draft alike.
+ */
+function setTravelMode(state, { stopId, mode }) {
+  if (state.draft?.suggestion) return setTravelMode(revertSuggestion(state), { stopId, mode })
+  const apply = (plan) => {
+    const stop = plan.stops.find((candidate) => candidate.id === stopId)
+    const next = stop && withTravelMode(stop, mode)
+    return next ? { ...plan, stops: plan.stops.map((candidate) => (candidate.id === stopId ? next : candidate)) } : plan
+  }
+  const plan = apply(state.plan)
+  if (plan === state.plan) return state
+  const version = state.plan.version + 1
+  const draft = state.draft === null ? null : {
+    ...state.draft,
+    plan: apply(state.draft.plan),
+    baseVersion: state.draft.baseVersion === state.plan.version ? version : state.draft.baseVersion,
+  }
+  return { ...state, plan: { ...plan, version }, draft }
+}
+
+/**
  * Selection is UI state: it never modifies accepted plan data. Edits go into
  * a draft, and only 'accept-draft' replaces the accepted plan.
  */
@@ -216,6 +238,8 @@ export function planReducer(state, action) {
       return addStop(state, action)
     case 'undo-add':
       return undoAdd(state, action)
+    case 'set-stop-travel-mode':
+      return setTravelMode(state, action)
     case 'set-stop-kind':
       return setKind(state, action)
     case 'set-stop-location':

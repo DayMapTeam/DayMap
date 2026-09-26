@@ -94,3 +94,10 @@ test('a long demo day with the car setting drives and uses the car buffer', () =
   const walked = analyzePlan(demoPlan, createPlanningContext(demoPlan, now, [], undefined, 'drive'))
   assert.ok(walked.legs.every((candidate) => candidate.mode === 'walk'), 'the compact demo day is walked')
 })
+
+test('a mode chosen for the journey overrides the automatic choice, even for a short hop', () => {
+  const uni = { location: { lat: -34.9206, lng: 138.6062 }, timing: { kind: 'fixed', scheduledStartAt: '2026-09-26T00:00:00Z', scheduledEndAt: '2026-09-26T01:00:00Z' } }
+  const library = { location: { lat: -34.9204, lng: 138.6029 }, travelMode: 'drive' }
+  assert.deepEqual(chooseMode(uni, library, 'auto', () => ({ status: 'pending' })), { mode: 'drive', source: 'chosen' })
+  assert.equal(chooseMode(uni, { ...library, travelMode: null }, 'auto', () => ({ status: 'pending' })).mode, 'walk')
+})

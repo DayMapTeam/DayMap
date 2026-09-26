@@ -247,7 +247,7 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
 
         {step === 3 && (
           <>
-            {draft.canCommit ? (
+            {option?.ok ? (
               <>
                 <FitVerdict
                   title="Your day still works"

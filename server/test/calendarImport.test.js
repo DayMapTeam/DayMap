@@ -272,3 +272,17 @@ test('a Calendar event the person made flexible keeps DayMap times on re-import'
   assert.equal(plan.stops[0].timing.kind, 'fixed', 'other events stay fixed')
   validateSave(plan.id, { baseVersion: plan.version, plan })
 })
+
+test('the chosen way to travel to a Calendar event survives re-import and validation', () => {
+  const saved = structuredClone(planWith(eventsToStops([lecture, standup], day)).plan)
+  saved.stops[1].travelMode = 'drive'
+  const { plan } = planWith(eventsToStops([lecture, standup], day), saved)
+  assert.equal(plan.stops[1].travelMode, 'drive')
+  validateSave(plan.id, { baseVersion: plan.version, plan })
+  const bad = structuredClone(plan)
+  bad.stops[1].travelMode = 'helicopter'
+  assert.throws(() => validateSave(bad.id, { baseVersion: bad.version, plan: bad }), { code: 'INVALID_PLAN' })
+  const none = structuredClone(plan)
+  none.stops[1].travelMode = null
+  validateSave(none.id, { baseVersion: none.version, plan: none })
+})

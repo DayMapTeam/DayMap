@@ -100,9 +100,10 @@ export function nextStopFor(plan, { atStopId = null, now }) {
 /** Google Maps directions for the journey's mode: a plain link, no API request. */
 const MAPS_TRAVEL_MODES = { walk: 'walking', transit: 'transit', drive: 'driving' }
 
-export function directionsUrl(location, mode = 'walk') {
+export function directionsUrl(location, mode = 'walk', origin = null) {
   const url = new URL('https://www.google.com/maps/dir/')
   url.searchParams.set('api', '1')
+  if (origin) url.searchParams.set('origin', `${origin.lat},${origin.lng}`)
   url.searchParams.set('destination', `${location.lat},${location.lng}`)
   if (location.placeId) url.searchParams.set('destination_place_id', location.placeId.replace(/^places\//, ''))
   url.searchParams.set('travelmode', MAPS_TRAVEL_MODES[mode] ?? 'walking')

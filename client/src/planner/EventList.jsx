@@ -3,6 +3,7 @@ import { usePlan } from '../app/planContext.js'
 import { listStopChanges } from '../app/planEdits.js'
 import { calendarLocationText, locationQuestionFor, placeStatus } from '../app/planLocations.js'
 import EventRow from './EventRow.jsx'
+import JourneyPopup from './JourneyPopup.jsx'
 import TravelConnector from './TravelConnector.jsx'
 import FreeTimeGap, { GapPreview } from './FreeTimeGap.jsx'
 import './EventList.css'
@@ -35,6 +36,8 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
   const reviewAfterSave = useRef(false)
   const lastPreview = useRef(null)
   const [activeGap, setActiveGap] = useState(null)
+  // The journey popup: { fromId, toId } or null.
+  const [journey, setJourney] = useState(null)
   const gapProposal = draft?.suggestion?.strategy === 'fill-gap' ? draft.suggestion : null
   const shown = draft?.plan ?? plan
   const needle = filter.trim().toLocaleLowerCase()
@@ -94,6 +97,11 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
     onOpenStopChange(null)
   }
 
+  // Looked up by ID each render, so the popup shows the current plan (for example after choosing a mode).
+  const journeyFrom = journey && shown.stops.find((candidate) => candidate.id === journey.fromId)
+  const journeyTo = journey && shown.stops.find((candidate) => candidate.id === journey.toId)
+  const journeyStops = journeyFrom?.location && journeyTo?.location ? { from: journeyFrom, to: journeyTo } : null
+
   return (
     <>
       <p className="event-list-count" role="status">
@@ -105,12 +113,15 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
           const gap = index > 0 && !filtering && planning.displayGaps.find((g) => g.fromStopId === stops[index - 1].id && g.toStopId === stop.id)
           return <li key={stop.id}>
             {/* While filtering, neighbours in the list may not be neighbours in the day. */}
-            {gap ? <FreeTimeGap gap={gap} planning={planning}
+            {index > 0 && !filtering && <TravelConnector
+              leg={analysis.legs.find((leg) => leg.fromStopId === stops[index - 1].id && leg.toStopId === stop.id)}
+              onOpen={stops[index - 1].location && stop.location && stops[index - 1].timing.kind !== 'all-day' && stop.timing.kind !== 'all-day'
+                ? () => setJourney({ fromId: stops[index - 1].id, toId: stop.id }) : null} />}
+            {gap && <FreeTimeGap gap={gap} planning={planning}
               open={activeGap?.id === gap.id && activeGap.fingerprint === planning.fingerprint}
               onOpen={() => setActiveGap({ id: gap.id, fingerprint: planning.fingerprint })}
               onClose={() => setActiveGap(null)}
-              onPreview={() => { setActiveGap(null); onOpenStopChange(null); onGapPreview() }} />
-              : index > 0 && !filtering && <TravelConnector leg={analysis.legs.find((leg) => leg.fromStopId === stops[index - 1].id && leg.toStopId === stop.id)} />}
+              onPreview={() => { setActiveGap(null); onOpenStopChange(null); onGapPreview() }} />}
             {gapProposal?.changes[0].stopId === stop.id ? <GapPreview planning={planning} /> : <EventRow
               stop={stop}
               conflict={analysis.conflicts.some((c) => c.stopIds.includes(stop.id))}
@@ -135,6 +146,7 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
         })}
       </ol>
       {gapProposal && !stops.some((s) => s.id === gapProposal.changes[0].stopId) && <GapPreview planning={planning} />}
+      {journeyStops && <JourneyPopup from={journeyStops.from} to={journeyStops.to} planning={planning} onClose={() => setJourney(null)} />}
     </>
   )
 }

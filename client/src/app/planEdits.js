@@ -69,3 +69,15 @@ export function withStopKind(stop, kind) {
     },
   }
 }
+
+const TRAVEL_MODES = ['walk', 'transit', 'drive']
+
+/**
+ * The stop with a chosen way of getting to it ('walk' | 'transit' | 'drive'),
+ * or null for automatic. Returns null when nothing would change.
+ */
+export function withTravelMode(stop, mode) {
+  const next = TRAVEL_MODES.includes(mode) ? mode : null
+  if ((stop.travelMode ?? null) === next) return null
+  return { ...stop, travelMode: next }
+}
