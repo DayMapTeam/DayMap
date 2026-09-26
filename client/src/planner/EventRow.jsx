@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { formatDuration, formatTimeRange } from '../components/formatTime.js'
 import EventEditForm from './EventEditForm.jsx'
+import PlacePicker from './PlacePicker.jsx'
 import { KIND_LABELS } from './stopLabels.js'
 
 const KIND_NOTES = {
@@ -26,16 +28,23 @@ const KIND_NOTES = {
  * @param {(stopId: string) => void} props.onToggle
  * @param {(stopId: string, edit: object) => void} props.onSave
  * @param {(stopId: string) => void} props.onDelete
+ * @param {'set' | 'needed' | 'none'} props.placeState Whether the stop has a place, needs one, or needs none.
+ * @param {string | null} props.calendarPlace The location text from Google Calendar, if any.
+ * @param {(stopId: string, location: object | null) => void} props.onSetPlace Sets a place, or null for "no place needed".
  */
-export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onDelete, conflict }) {
+export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onDelete, conflict,
+  placeState, calendarPlace, onSetPlace }) {
+  const [picking, setPicking] = useState(false)
+  if (!open && picking) setPicking(false)
   const { timing } = stop
+  const placeText = placeState === 'set' ? stop.location.label : placeState === 'none' ? 'No place' : 'Location needed'
   const detailsId = `stop-details-${stop.id}`
   const hasTimes = timing.scheduledStartAt !== null && timing.scheduledEndAt !== null
   const duration = timing.kind === 'all-day' ? null : formatDuration(timing.durationMinutes)
   const details = [
     past ? 'Finished' : null,
     KIND_LABELS[timing.kind],
-    stop.location?.label ?? 'Location needed',
+    placeText,
     duration,
   ].filter(Boolean)
 
@@ -76,8 +85,26 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
       </button>
       {open && (
         <div id={detailsId} className="event-details">
+          {picking ? (
+            <PlacePicker
+              initialQuery={placeState === 'set' ? '' : calendarPlace ?? ''}
+              onPick={(place) => { setPicking(false); onSetPlace(stop.id, place) }}
+              onNoPlace={placeState === 'none' ? null : () => { setPicking(false); onSetPlace(stop.id, null) }}
+              onCancel={() => setPicking(false)}
+            />
+          ) : (
+            <div className="event-place">
+              <span className="event-place-label"><strong>Place:</strong> {placeText}</span>
+              <button type="button" className="button-text" onClick={() => setPicking(true)}>
+                {placeState === 'set' ? 'Change place' : 'Set place'}
+              </button>
+              {placeState === 'needed' && calendarPlace && (
+                <span className="event-place-hint">Google Calendar says “{calendarPlace}”.</span>
+              )}
+            </div>
+          )}
           <p className="event-details-info">
-            {[duration, stop.location?.label ?? 'Location needed'].filter(Boolean).join(' · ')}. {KIND_NOTES[timing.kind]}
+            {[duration, placeText].filter(Boolean).join(' · ')}. {KIND_NOTES[timing.kind]}
           </p>
           {timing.kind === 'flexible' ? (
             <EventEditForm

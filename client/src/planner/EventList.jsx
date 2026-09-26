@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePlan } from '../app/planContext.js'
 import { listStopChanges } from '../app/planEdits.js'
+import { calendarLocationText, locationQuestionFor, placeStatus } from '../app/planLocations.js'
 import EventRow from './EventRow.jsx'
 import TravelConnector from './TravelConnector.jsx'
 import FreeTimeGap, { GapPreview } from './FreeTimeGap.jsx'
@@ -29,7 +30,7 @@ function matchesFilter(stop, needle) {
  */
 export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, planning, onGapPreview, emptyState = null }) {
   const { analysis } = planning
-  const { plan, draft, selectedStopId, selectStop, editStopDraft } = usePlan()
+  const { plan, draft, selectedStopId, selectStop, editStopDraft, setStopLocation } = usePlan()
   const listRef = useRef(null)
   const reviewAfterSave = useRef(false)
   const lastPreview = useRef(null)
@@ -124,6 +125,9 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
               onToggle={toggle}
               onSave={save}
               onDelete={onRequestDelete}
+              placeState={placeStatus(shown, stop)}
+              calendarPlace={calendarLocationText(locationQuestionFor(shown, stop.id))}
+              onSetPlace={setStopLocation}
             />}
           </li>
         })}

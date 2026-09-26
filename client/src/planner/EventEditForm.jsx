@@ -85,7 +85,7 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel, 
         </label>
         <div className="event-form-field">
           <span className="event-form-label">Place</span>
-          <span className="event-form-value">{stop.location?.label ?? 'Location needed'}</span>
+          <span className="event-form-value">{stop.location?.label ?? 'Not set'}</span>
         </div>
         <label className="event-form-field" htmlFor={`${id}-start`}>
           <span className="event-form-label">Starts</span>
@@ -114,8 +114,7 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel, 
       </div>
       {earliestStartAt !== null && latestEndAt !== null && (
         <p className="event-form-hint">
-          Can move between {formatClock(earliestStartAt, timezone)} and {formatClock(latestEndAt, timezone)}. Changing the
-          place comes with place search.
+          Can move between {formatClock(earliestStartAt, timezone)} and {formatClock(latestEndAt, timezone)}.
         </p>
       )}
       {error !== null && (

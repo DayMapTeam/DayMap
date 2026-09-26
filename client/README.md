@@ -39,6 +39,10 @@ What to expect:
 - Signed out, demo-day edits survive a refresh in this tab (sessionStorage) and never reach the server. **Reset demo day** in the account menu restores the fixture.
 - Without the Supabase variables the account menu says sign-in isn't set up, and the demo still works.
 
+## Setting an event's place
+
+Open an event in the planner and choose **Set place** (or **Change place**). For an imported Calendar event the search starts with the Calendar's location text, so one tap usually confirms it. **No place needed** is for online meetings; the row then says "No place", and re-imports keep that. Choosing is the explicit accept: it updates the accepted plan (and any pending draft), answers the location question, and is saved. Times never change. The helpers are in `src/app/planLocations.js`.
+
 ## Google setup and place search
 
 1. In the DayMap Google Cloud project, enable **Maps JavaScript API** and **Places API (New)**.
