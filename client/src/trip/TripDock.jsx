@@ -33,8 +33,9 @@ function SimulateButton({ sim, to }) {
 }
 
 /** The trip in progress: distance, rough ETA against the stop's start, and the ways out. */
-function NavigatingCard({ trip, plan, now, reading, location, following, onRecenter, sim }) {
+function NavigatingCard({ trip, plan, now, reading, legs, location, following, onRecenter, sim }) {
   const { target, atStop, state } = trip
+  const mode = legs.find((leg) => leg.toStopId === target.id && leg.status === 'ready')?.mode ?? 'walk'
   const start = Date.parse(target.timing.scheduledStartAt)
   const distance = reading ? distanceMeters(reading, target.location) : null
   const seconds = distance === null ? null : walkingSecondsEstimate(distance)
@@ -61,7 +62,7 @@ function NavigatingCard({ trip, plan, now, reading, location, following, onRecen
       {distance !== null && <p className="trip-hint">Straight-line estimate. Open Google Maps for turn-by-turn directions.</p>}
       <div className="trip-actions">
         <button type="button" className="button-filled" onClick={trip.arrive}>I’m here</button>
-        <a className="button-text trip-link" href={directionsUrl(target.location)} target="_blank" rel="noreferrer">
+        <a className="button-text trip-link" href={directionsUrl(target.location, mode)} target="_blank" rel="noreferrer">
           Google Maps<span className="visually-hidden"> (opens in a new tab)</span>
         </a>
         {reading && !following && <button type="button" className="button-text" onClick={onRecenter}>Recenter</button>}
@@ -166,7 +167,7 @@ function TripToast({ trip }) {
 export default function TripDock({ trip, plan, now, reading, legs, location, onGo, following, onRecenter, sim }) {
   let card = null
   if (trip.target) {
-    card = <NavigatingCard {...{ trip, plan, now, reading, location, following, onRecenter, sim }} />
+    card = <NavigatingCard {...{ trip, plan, now, reading, legs, location, following, onRecenter, sim }} />
   } else if (trip.askStop) {
     card = <AskCard trip={trip} plan={plan} />
   } else if (trip.next) {

@@ -387,3 +387,7 @@
 .segmented[aria-disabled='true'] {
   opacity: 0.6;
 }
+
+.travel-connector[data-mode='walk'] .travel-connector-line { background: var(--mode-walk); }
+.travel-connector[data-mode='transit'] .travel-connector-line { background: var(--mode-bus); }
+.travel-connector[data-mode='drive'] .travel-connector-line { background: var(--mode-drive); }
