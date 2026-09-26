@@ -4,7 +4,8 @@
   position: absolute;
   bottom: calc(var(--overlay-inset) + 28px);
   left: var(--overlay-inset);
-  z-index: 4;
+  /* Above the planner, so Go stays reachable even when the phone sheet is open. */
+  z-index: 6;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -34,14 +35,6 @@
   transform: scale(var(--press-scale));
 }
 
-.nav-card {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--radius-panel);
-  animation: trip-in var(--duration-popup) var(--ease-spring);
-}
-
 @keyframes trip-in {
   from {
     opacity: 0;
@@ -49,25 +42,39 @@
   }
 }
 
-/* The current step, like a sat-nav banner. */
+/* Navigation mode: the turn at the top, like a sat-nav. */
+.nav-banner {
+  position: absolute;
+  top: var(--overlay-inset);
+  left: var(--overlay-inset);
+  z-index: 15;
+  width: min(480px, calc(100% - 2 * var(--overlay-inset)));
+  overflow: hidden;
+  color: var(--on-accent);
+  background: var(--blue);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-glass);
+  animation: trip-in var(--duration-popup) var(--ease-spring);
+}
+
 .nav-step {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  color: var(--on-accent);
-  background: var(--blue);
+  padding: var(--space-4);
 }
 
 .nav-step-icon {
   display: grid;
   flex: none;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
 }
 
 .nav-step-icon svg {
+  width: 36px;
+  height: 36px;
   transition: transform var(--duration-press) var(--ease-spring);
 }
 
@@ -79,7 +86,7 @@
 }
 
 .nav-distance {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -90,66 +97,113 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
-.nav-detail,
+.nav-detail {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
 .nav-then {
-  font-size: 13px;
-  opacity: 0.85;
+  padding: var(--space-2) var(--space-4);
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .nav-waiting {
-  padding: var(--space-3) var(--space-4);
-  font-size: 14px;
+  padding: var(--space-4);
+  font-size: 16px;
   font-weight: 600;
 }
 
-.nav-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-3) var(--space-4) 0;
+/* Navigation mode: time left and controls at the bottom. */
+.trip-dock-navigating {
+  right: var(--overlay-inset);
+  width: auto;
+  max-width: 720px;
 }
 
-.nav-destination {
+.nav-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-panel);
+  animation: trip-in var(--duration-popup) var(--ease-spring);
+}
+
+.nav-bar-info {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.nav-bar-time {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--green-ink);
+}
+
+.nav-bar-detail {
+  font-size: 14px;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-bar-destination {
   overflow: hidden;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.nav-remaining {
-  font-size: 13px;
-  color: var(--label-2);
-  font-variant-numeric: tabular-nums;
-}
-
-.nav-remaining strong {
-  color: var(--green-ink);
-}
-
 .nav-late {
   color: var(--red-ink);
-  font-weight: 600;
 }
 
-.nav-on-time {
-  color: var(--green-ink);
-}
-
-.nav-actions {
+.nav-bar-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2) var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.nav-end {
-  color: var(--red);
+.nav-round,
+.nav-exit {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+  color: var(--label);
+  background: var(--fill);
+  border: 0;
+  border-radius: 50%;
+}
+
+.nav-exit {
+  color: var(--on-accent);
+  background: var(--red);
+}
+
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: none;
+  background: var(--fill);
+  border: 0;
+  border-radius: var(--radius-pill);
 }
 
 .trip-toast {

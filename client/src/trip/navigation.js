@@ -74,8 +74,12 @@ export function routeProgress(route, position) {
   const stepLength = Math.max(1, stepEnd - stepStart)
   const step = route.steps[stepIndex]
   const laterSeconds = route.steps.slice(stepIndex + 1).reduce((sum, s) => sum + s.seconds, 0)
+  const snapped = pointAt(segments, along)
   return {
     stepIndex,
+    along,
+    snapped,
+    segmentIndex: segments.indexOf(best.segment),
     toStepEndMeters: Math.max(0, stepEnd - along),
     remainingMeters: Math.max(0, total - along),
     remainingSeconds: step.seconds * ((stepEnd - along) / stepLength) + laterSeconds,
@@ -124,16 +128,23 @@ export function navigationReducer(state, action) {
     case 'target': {
       if (!action.target) return initialNavigation
       if (action.target.id === state.targetId) return state
+      // If Google has no route this way from here, try driving, then walking.
+      const fallbacks = ['drive', 'walk'].filter((mode) => mode !== action.mode)
       const base = { ...initialNavigation, requestId: state.requestId, targetId: action.target.id,
-        request: { from: null, to: action.target.location, mode: action.mode } }
+        request: { from: null, to: action.target.location, mode: action.mode, fallbacks } }
       return requestFrom(base, action.from, action.at)
     }
     case 'routed':
       if (action.requestId !== state.requestId) return state
       return { ...state, status: 'ready', route: action.route, routedAt: action.at, offCount: 0 }
-    case 'failed':
+    case 'failed': {
       if (action.requestId !== state.requestId) return state
+      const [next, ...rest] = state.request?.fallbacks ?? []
+      if (next && !state.route) {
+        return { ...state, requestId: state.requestId + 1, request: { ...state.request, mode: next, fallbacks: rest } }
+      }
       return { ...state, status: state.route ? 'ready' : 'error' }
+    }
     case 'reading': {
       const { reading, at } = action
       if (!isValidPoint(reading) || state.targetId === null) return state
@@ -149,4 +160,74 @@ export function navigationReducer(state, action) {
     default:
       return state
   }
+}
+
+/**
+ * The route split at your position: the path already travelled, and what is
+ * left of each step (empty for steps behind you).
+ */
+export function splitRoute(route, progress) {
+  if (!progress) return { travelled: [], remaining: route.steps.map((step) => step.path) }
+  const segments = routeSegments(route)
+  const current = segments[progress.segmentIndex]
+  const travelled = [...segments.slice(0, progress.segmentIndex).map((segment) => segment.a), current.a, progress.snapped]
+  const remaining = route.steps.map((step, index) => {
+    if (index < progress.stepIndex) return []
+    if (index > progress.stepIndex) return step.path
+    const later = segments.filter((segment, i) => segment.stepIndex === index && i > progress.segmentIndex).map((segment) => segment.b)
+    return [progress.snapped, current.b, ...later]
+  })
+  return { travelled, remaining }
+}
+
+function spokenDistance(meters) {
+  if (meters >= 950) return `${(Math.round(meters / 100) / 10).toString()} kilometres`
+  const rounded = meters >= 200 ? Math.round(meters / 50) * 50 : Math.max(10, Math.round(meters / 10) * 10)
+  return `${rounded} metres`
+}
+
+const lowerFirst = (text) => text.charAt(0).toLowerCase() + text.slice(1)
+
+function stepPhrase(step) {
+  if (step.kind === 'ride' && step.ride) {
+    const { ride } = step
+    return `Board ${ride.vehicle.toLowerCase()} ${ride.name}${ride.headsign ? ` towards ${ride.headsign}` : ''}${ride.fromStop ? ` at ${ride.fromStop}` : ''}`
+  }
+  return step.instruction ?? 'Continue'
+}
+
+/**
+ * The next thing to say, if any, like a sat-nav: the first step when the
+ * route starts, "In 150 metres, turn right…" before a turn, the turn itself
+ * as you reach it, and "Get off at the next stop" near the end of a ride.
+ * `spoken` holds the keys already said.
+ *
+ * @returns {{ key: string, text: string } | null}
+ */
+export function nextAnnouncement(route, progress, spoken, destination) {
+  if (!route || !progress) return null
+  const { stepIndex, toStepEndMeters } = progress
+  const step = route.steps[stepIndex]
+  const next = route.steps[stepIndex + 1]
+  if (!spoken.has('start')) {
+    return { key: 'start', text: `Starting route to ${destination}. ${stepPhrase(step)}.` }
+  }
+  const driving = step.kind === 'drive'
+  const far = driving ? 500 : 150
+  const near = driving ? 60 : 25
+  if (step.kind === 'ride' && step.ride?.toStop && toStepEndMeters <= 400 && !spoken.has(`off:${stepIndex}`)) {
+    return { key: `off:${stepIndex}`, text: `Get off soon, at ${step.ride.toStop}.` }
+  }
+  if (!next) {
+    if (toStepEndMeters <= near * 2 && !spoken.has('arrive')) return { key: 'arrive', text: `${destination} is ahead.` }
+    return null
+  }
+  if (step.kind === 'ride') return null
+  if (toStepEndMeters <= near && !spoken.has(`now:${stepIndex + 1}`)) {
+    return { key: `now:${stepIndex + 1}`, text: `${stepPhrase(next)}.` }
+  }
+  if (toStepEndMeters <= far && toStepEndMeters > near && !spoken.has(`far:${stepIndex + 1}`)) {
+    return { key: `far:${stepIndex + 1}`, text: `In ${spokenDistance(toStepEndMeters)}, ${lowerFirst(stepPhrase(next))}.` }
+  }
+  return null
 }

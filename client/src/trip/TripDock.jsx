@@ -1,4 +1,5 @@
 import { formatClock } from '../components/formatTime.js'
+import { directionsUrl } from './tripRules.js'
 import '../components/buttons.css'
 import LineBadge from '../planner/LineBadge.jsx'
 import TravelModeIcon from '../planner/TravelModeIcon.jsx'
@@ -32,8 +33,9 @@ function StepText({ step, distance, timezone }) {
     const { ride } = step
     return (
       <>
+        <p className="nav-distance">{distance === null ? '' : formatDistance(distance)}</p>
         <p className="nav-instruction">
-          <LineBadge ride={ride} /> {ride.vehicle}{ride.headsign ? ` to ${ride.headsign}` : ''}
+          Board <LineBadge ride={ride} /> {ride.vehicle.toLowerCase()}{ride.headsign ? ` to ${ride.headsign}` : ''}
         </p>
         <p className="nav-detail">
           {ride.fromStop ? `Board at ${ride.fromStop}` : 'Board'}{ride.departAt ? ` · ${formatClock(ride.departAt, timezone)}` : ''}
@@ -58,52 +60,6 @@ const WAITING = {
   idle: 'Finding the route…',
 }
 
-/** Turn-by-turn guidance for the trip in progress. */
-function NavigationCard({ trip, navigation, now, timezone, following, hasPosition, onRecenter }) {
-  const { target } = trip
-  const { route, progress } = navigation
-  const stepIndex = progress?.stepIndex ?? 0
-  const step = route?.steps[stepIndex] ?? null
-  const upcoming = route?.steps[stepIndex + 1] ?? null
-  const remainingSeconds = progress?.remainingSeconds ?? route?.seconds ?? null
-  const remainingMeters = progress?.remainingMeters ?? route?.distanceMeters ?? null
-  const eta = remainingSeconds === null ? null : now.getTime() + remainingSeconds * 1000
-  const start = Date.parse(target.timing.scheduledStartAt)
-  const late = eta === null || !Number.isFinite(start) ? null : Math.ceil((eta - start) / 60000)
-
-  return (
-    <section className="nav-card glass" aria-label={`Navigating to ${target.title}`}>
-      {step ? (
-        <div className="nav-step" aria-live="polite">
-          <StepIcon step={step} />
-          <div className="nav-step-text">
-            <StepText step={step} distance={progress ? progress.toStepEndMeters : null} timezone={timezone} />
-            {upcoming && <p className="nav-then">Then: {upcoming.kind === 'ride' && upcoming.ride ? `${upcoming.ride.vehicle} ${upcoming.ride.name}` : upcoming.instruction}</p>}
-          </div>
-        </div>
-      ) : (
-        <p className="nav-waiting" role="status">{WAITING[navigation.status] ?? WAITING.loading}</p>
-      )}
-      <div className="nav-summary">
-        <span className="nav-destination">{target.title}</span>
-        {remainingSeconds !== null && (
-          <span className="nav-remaining">
-            <strong>{Math.max(1, Math.round(remainingSeconds / 60))} min</strong>
-            {remainingMeters !== null ? ` · ${formatDistance(remainingMeters)}` : ''}
-            {` · arrive ${formatClock(eta, timezone)}`}
-            {late !== null && <span className={late > 0 ? 'nav-late' : 'nav-on-time'}>{late > 0 ? ` · ${late} min late` : ' · on time'}</span>}
-          </span>
-        )}
-      </div>
-      <div className="nav-actions">
-        {hasPosition && !following && <button type="button" className="button-text" onClick={onRecenter}>Recenter</button>}
-        <button type="button" className="button-text" onClick={trip.arrive}>I’m here</button>
-        <button type="button" className="button-text nav-end" onClick={trip.end}>{trip.state.startedBy === 'auto' ? 'Cancel' : 'End'}</button>
-      </div>
-    </section>
-  )
-}
-
 function TripToast({ trip }) {
   const { notice } = trip.state
   const stop = trip.noticeStop
@@ -120,6 +76,123 @@ function TripToast({ trip }) {
   )
 }
 
+function FlagIcon() {
+  return (
+    <span className="nav-step-icon">
+      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 21V4m0 1h11l-2.5 4L17 13H6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  )
+}
+
+const stepName = (step) => (step.kind === 'ride' && step.ride ? `${step.ride.vehicle.toLowerCase()} ${step.ride.name}` : step.instruction ?? 'continue')
+
+/**
+ * Top of the screen while navigating, like Google Maps: the next turn and how
+ * far away it is (or, on a bus or train, where to get off), and the one after.
+ */
+function NavBanner({ navigation, timezone, destination }) {
+  const { route, progress } = navigation
+  const stepIndex = progress?.stepIndex ?? 0
+  const current = route?.steps[stepIndex] ?? null
+  const next = route?.steps[stepIndex + 1] ?? null
+  const distance = progress ? progress.toStepEndMeters : current?.distanceMeters ?? 0
+  let body = <p className="nav-waiting" role="status">{WAITING[navigation.status] ?? WAITING.loading}</p>
+  let then = null
+  if (current?.kind === 'ride' && current.ride) {
+    body = (
+      <div className="nav-step">
+        <StepIcon step={current} />
+        <div className="nav-step-text">
+          <p className="nav-instruction"><LineBadge ride={current.ride} /> Get off at {current.ride.toStop ?? 'your stop'}</p>
+          <p className="nav-detail">{formatDistance(distance)}{current.ride.arriveAt ? ` · ${formatClock(current.ride.arriveAt, timezone)}` : ''}</p>
+        </div>
+      </div>
+    )
+    then = next
+  } else if (current && next) {
+    body = (
+      <div className="nav-step">
+        <StepIcon step={next} />
+        <div className="nav-step-text">
+          <StepText step={next} distance={distance} timezone={timezone} />
+        </div>
+      </div>
+    )
+    then = route.steps[stepIndex + 2] ?? null
+  } else if (current) {
+    body = (
+      <div className="nav-step">
+        <FlagIcon />
+        <div className="nav-step-text">
+          <p className="nav-distance">{formatDistance(distance)}</p>
+          <p className="nav-instruction">Arrive at {destination}</p>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <section className="nav-banner" aria-live="polite" aria-label="Directions">
+      {body}
+      {then && <p className="nav-then">Then {stepName(then)}</p>}
+    </section>
+  )
+}
+
+function SpeakerIcon({ muted }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M3 8v4h3l4 3.5v-11L6 8H3Z" fill="currentColor" />
+      {muted
+        ? <path d="m13.5 7.5 5 5m0-5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        : <path d="M13.5 7.2a4 4 0 0 1 0 5.6M15.8 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />}
+    </svg>
+  )
+}
+
+/** Bottom of the screen while navigating: time left, arrival, and controls. */
+function NavBar({ trip, navigation, voice, now, timezone, reading, following, hasPosition, onRecenter }) {
+  const { target } = trip
+  const { route, progress } = navigation
+  const remainingSeconds = progress?.remainingSeconds ?? route?.seconds ?? null
+  const remainingMeters = progress?.remainingMeters ?? route?.distanceMeters ?? null
+  const eta = remainingSeconds === null ? null : now.getTime() + remainingSeconds * 1000
+  const start = Date.parse(target.timing.scheduledStartAt)
+  const late = eta === null || !Number.isFinite(start) ? null : Math.ceil((eta - start) / 60000)
+  const mapsUrl = directionsUrl(target.location, navigation.mode ?? 'walk', reading, { navigate: true })
+
+  return (
+    <section className="nav-bar glass" aria-label={`Navigating to ${target.title}`}>
+      <div className="nav-bar-info">
+        {remainingSeconds !== null ? (
+          <>
+            <p className={`nav-bar-time${late > 0 ? ' nav-late' : ''}`}>{Math.max(1, Math.round(remainingSeconds / 60))} min</p>
+            <p className="nav-bar-detail">
+              {remainingMeters !== null ? `${formatDistance(remainingMeters)} · ` : ''}arrive {formatClock(eta, timezone)}
+              {late !== null && (late > 0 ? ` · ${late} min late` : ' · on time')}
+            </p>
+          </>
+        ) : <p className="nav-bar-time">…</p>}
+        <p className="nav-bar-destination">{target.title}</p>
+      </div>
+      <div className="nav-bar-actions">
+        {voice.supported && (
+          <button type="button" className="nav-round" aria-pressed={!voice.muted} aria-label={voice.muted ? 'Turn voice on' : 'Mute voice'} onClick={voice.toggleMuted}>
+            <SpeakerIcon muted={voice.muted} />
+          </button>
+        )}
+        {hasPosition && !following && <button type="button" className="nav-pill" onClick={onRecenter}>Re-centre</button>}
+        <button type="button" className="nav-pill" onClick={trip.arrive}>I’m here</button>
+        <a className="nav-pill" href={mapsUrl} target="_blank" rel="noreferrer">
+          Google Maps<span className="visually-hidden"> (opens Google Maps navigation)</span>
+        </a>
+        <button type="button" className="nav-exit" aria-label={trip.state.startedBy === 'auto' ? 'Cancel trip' : 'Exit navigation'} onClick={trip.end}>×</button>
+      </div>
+    </section>
+  )
+}
+
 /**
  * Bottom left of the map: just Go, which heads to the next stop in the
  * planner. During a trip, live turn-by-turn guidance. Trips also start by
@@ -128,6 +201,8 @@ function TripToast({ trip }) {
  * @param {object} props
  * @param {ReturnType<import('./useTrip.js').useTrip>} props.trip
  * @param {ReturnType<import('./useNavigation.js').useNavigation>} props.navigation
+ * @param {ReturnType<import('./useVoiceGuidance.js').useVoiceGuidance>} props.voice
+ * @param {{ lat: number, lng: number } | null} props.reading Your position, for the Google Maps handoff.
  * @param {Date} props.now
  * @param {string} props.timezone
  * @param {(stopId: string) => void} props.onGo
@@ -135,14 +210,23 @@ function TripToast({ trip }) {
  * @param {boolean} props.hasPosition Whether your location is known.
  * @param {() => void} props.onRecenter
  */
-export default function TripDock({ trip, navigation, now, timezone, onGo, following, hasPosition, onRecenter }) {
+export default function TripDock({ trip, navigation, voice, now, timezone, reading, onGo, following, hasPosition, onRecenter }) {
   const { target, next } = trip
+  if (target) {
+    return (
+      <>
+        <NavBanner navigation={navigation} timezone={timezone} destination={target.title} />
+        <div className="trip-dock trip-dock-navigating">
+          <TripToast trip={trip} />
+          <NavBar {...{ trip, navigation, voice, now, timezone, reading, following, hasPosition, onRecenter }} />
+        </div>
+      </>
+    )
+  }
   return (
     <div className="trip-dock">
       <TripToast trip={trip} />
-      {target ? (
-        <NavigationCard {...{ trip, navigation, now, timezone, following, hasPosition, onRecenter }} />
-      ) : next && (
+      {next && (
         <button type="button" className="trip-go" aria-label={`Go to ${next.title}`} title={`Go to ${next.title}`} onClick={() => onGo(next.id)}>
           Go
         </button>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { numberStops } from '../app/stopNumbers.js'
 import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
 import { markerColors, markerTemplate, stopMarkerSvg } from './stopMarker.js'
-import { userMarkerSvg } from './userMarker.js'
+import { navigationArrowSvg, userMarkerSvg } from './userMarker.js'
 import './MapView.css'
 
 // A pointer press older than this is not the one that clicked the pin.
@@ -12,10 +12,10 @@ const PIN_CLICK_GRACE_MS = 300
 // Above this tilt the pins use a shorter stem.
 const STEEP_TILT = 45
 const CAMERA_EVENTS = ['gmp-centerchange', 'gmp-rangechange', 'gmp-headingchange', 'gmp-tiltchange']
-// Trip camera: close behind the person, looking where they are heading.
-const FOLLOW_RANGE = 450
-const FOLLOW_TILT = 55
-const FOLLOW_FLY_MS = 900
+// Navigation camera: low and close behind the person, looking where they are heading.
+const FOLLOW_RANGE = 320
+const FOLLOW_TILT = 62
+const FOLLOW_FLY_MS = 1000
 // A drag shorter than this is a click, not a camera move.
 const DRAG_PX = 6
 const CAMERA_KEYS = /^(Arrow|Page|Home$|End$|[-+=_]$)/
@@ -47,10 +47,11 @@ function isFinished(stop, now) {
  *   or null. Only trips move the camera like this; nothing in the background does.
  * - onUserCameraMove(): the person dragged, scrolled or used keys on the map.
  * - route: the trip's route ({ steps: [{ kind, path, ride }] }) drawn on the ground, or null.
+ * - routeSplit: { travelled, remaining } from splitRoute, to grey out what's behind you.
  */
 export default function MapView({
   stops, selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, stopStates = {},
-  userPosition = null, tripActive = false, follow = null, onUserCameraMove, route = null,
+  userPosition = null, tripActive = false, follow = null, onUserCameraMove, route = null, routeSplit = null,
 }) {
   const containerRef = useRef(null)
   const markersRef = useRef(new Map())
@@ -265,13 +266,13 @@ export default function MapView({
       drawsWhenOccluded: true,
       zIndex: 30,
     })
-    marker.append(markerTemplate(userMarkerSvg(runtime.colors, { simulated })))
+    marker.append(markerTemplate(tripActive ? navigationArrowSvg(runtime.colors) : userMarkerSvg(runtime.colors, { simulated })))
     userMarkerRef.current = marker
     return () => {
       marker.remove()
       userMarkerRef.current = null
     }
-  }, [runtime, simulated])
+  }, [runtime, simulated, tripActive])
 
   useEffect(() => {
     const marker = userMarkerRef.current
@@ -282,7 +283,7 @@ export default function MapView({
     }
     marker.position = { lat: userPosition.lat, lng: userPosition.lng }
     if (!marker.isConnected) runtime.map.append(marker)
-  }, [runtime, userPosition, simulated])
+  }, [runtime, userPosition, simulated, tripActive])
 
   // Save the camera when a trip starts and fly back to it when the trip ends.
   useEffect(() => {
@@ -297,29 +298,42 @@ export default function MapView({
     }
   }, [runtime, tripActive])
 
-  // The trip's route, one line per step: walking, driving, or each ride in its line colour.
+  // The trip's route, one line per step: walking, driving, or each ride in its
+  // line colour; the part already travelled is grey, like Google Maps.
+  const routeLinesRef = useRef(null)
   useEffect(() => {
     if (!runtime?.Polyline || !route) return undefined
     const style = getComputedStyle(document.documentElement)
     const token = (name) => style.getPropertyValue(name).trim()
-    const colors = { walk: token('--mode-walk'), drive: token('--mode-drive'), ride: token('--mode-bus') }
-    const lines = route.steps.filter((step) => step.path.length >= 2).map((step) => {
-      const line = new runtime.Polyline({
-        path: step.path.map(({ lat, lng }) => ({ lat, lng, altitude: 0 })),
-        altitudeMode: 'CLAMP_TO_GROUND',
-        strokeColor: (step.kind === 'ride' && step.ride?.color) || colors[step.kind] || colors.walk,
-        strokeWidth: step.kind === 'walk' ? 14 : 18,
-        outerColor: '#ffffff',
-        outerWidth: 0.3,
-        drawsOccludedSegments: true,
-      })
-      runtime.map.append(line)
-      return line
+    // Like Google Maps navigation: a bold blue line on foot and by car; rides in their line colour.
+    const colors = { walk: token('--blue'), drive: token('--blue'), ride: token('--mode-bus') }
+    const make = (strokeColor, strokeWidth) => new runtime.Polyline({
+      altitudeMode: 'CLAMP_TO_GROUND', strokeColor, strokeWidth, outerColor: '#ffffff', outerWidth: 0.3, drawsOccludedSegments: true,
     })
+    const steps = route.steps.map((step) => make((step.kind === 'ride' && step.ride?.color) || colors[step.kind] || colors.walk,
+      step.kind === 'walk' ? 20 : 24))
+    const travelled = make('#9aa0a6', 20)
+    routeLinesRef.current = { steps, travelled }
     return () => {
-      for (const line of lines) line.remove()
+      for (const line of [...steps, travelled]) line.remove()
+      routeLinesRef.current = null
     }
   }, [runtime, route])
+  useEffect(() => {
+    const lines = routeLinesRef.current
+    if (!runtime || !lines || !route) return
+    const show = (line, path) => {
+      if (path.length < 2) {
+        line.remove()
+        return
+      }
+      line.path = path.map(({ lat, lng }) => ({ lat, lng, altitude: 0 }))
+      if (!line.isConnected) runtime.map.append(line)
+    }
+    const remaining = routeSplit?.remaining ?? route.steps.map((step) => step.path)
+    lines.steps.forEach((line, index) => show(line, remaining[index] ?? []))
+    show(lines.travelled, routeSplit?.travelled ?? [])
+  }, [runtime, route, routeSplit])
 
   // Follow the person during a trip, heading-up.
   useEffect(() => {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { normalizeRoute } from '../services/navigationRoute.js'
-import { NAV_RULES, initialNavigation, navigationMode, navigationReducer, routeProgress } from './navigation.js'
+import { NAV_RULES, initialNavigation, navigationMode, navigationReducer, nextAnnouncement, routeProgress, splitRoute } from './navigation.js'
 import { distanceMeters, offsetPoint } from './tripRules.js'
 
 // An L-shaped walk: 300 m north, then 200 m east.
@@ -39,7 +39,7 @@ test('a trip starts loading a route from where you are, or waits for a position'
   const target = { id: 'lecture', location: end }
   const loading = navigationReducer(initialNavigation, { type: 'target', target, from: start, mode: 'walk', at: 0 })
   assert.equal(loading.status, 'loading')
-  assert.deepEqual(loading.request, { from: start, to: end, mode: 'walk' })
+  assert.deepEqual(loading.request, { from: start, to: end, mode: 'walk', fallbacks: ['drive'] })
   const ready = navigationReducer(loading, { type: 'routed', requestId: loading.requestId, route, at: 1000 })
   assert.equal(ready.status, 'ready')
   assert.equal(navigationReducer(ready, { type: 'routed', requestId: 99, route: null, at: 0 }), ready, 'late answers are ignored')
@@ -95,4 +95,45 @@ test('Google routes become steps with instructions, paths and rides', () => {
   assert.deepEqual(normalized.steps.map((s) => s.kind), ['walk', 'ride'], 'steps without a path are dropped')
   assert.equal(normalized.steps[1].instruction, 'Tram GLNELG towards Glenelg')
   assert.equal(normalized.steps[1].ride.fromStop, 'Pirie St')
+})
+
+test('the route splits at your position into travelled and remaining', () => {
+  const p = routeProgress(route, offsetPoint(start, 0, 100))
+  const { travelled, remaining } = splitRoute(route, p)
+  assert.equal(travelled.length, 2)
+  assert.ok(distanceMeters(travelled.at(-1), offsetPoint(start, 0, 100)) < 2)
+  assert.equal(remaining[0].length, 2, 'from here to the corner')
+  assert.deepEqual(remaining[1], route.steps[1].path)
+  const later = splitRoute(route, routeProgress(route, offsetPoint(corner, 90, 50)))
+  assert.deepEqual(later.remaining[0], [], 'steps behind you are gone')
+  assert.deepEqual(splitRoute(route, null).remaining, route.steps.map((step) => step.path))
+})
+
+test('announcements: the start, before the turn, the turn, and arrival — each once', () => {
+  const spoken = new Set()
+  const at = (meters) => routeProgress(route, meters <= 300 ? offsetPoint(start, 0, meters) : offsetPoint(corner, 90, meters - 300))
+  const say = (meters) => {
+    const next = nextAnnouncement(route, at(meters), spoken, 'Morning lecture')
+    if (next) spoken.add(next.key)
+    return next?.text ?? null
+  }
+  assert.equal(say(0), 'Starting route to Morning lecture. Head north on King William St.')
+  assert.equal(say(10), null)
+  assert.equal(say(155), 'In 150 metres, turn right onto North Tce.')
+  assert.equal(say(170), null, 'said once')
+  assert.equal(say(285), 'Turn right onto North Tce.')
+  assert.equal(say(420), null)
+  assert.equal(say(460), 'Morning lecture is ahead.')
+})
+
+test('if there is no route this way, driving then walking are tried', () => {
+  const target = { id: 'far', location: end }
+  let state = navigationReducer(initialNavigation, { type: 'target', target, from: start, mode: 'transit', at: 0 })
+  state = navigationReducer(state, { type: 'failed', requestId: state.requestId })
+  assert.equal(state.request.mode, 'drive')
+  assert.equal(state.status, 'loading')
+  state = navigationReducer(state, { type: 'failed', requestId: state.requestId })
+  assert.equal(state.request.mode, 'walk')
+  state = navigationReducer(state, { type: 'failed', requestId: state.requestId })
+  assert.equal(state.status, 'error')
 })

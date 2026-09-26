@@ -23,3 +23,19 @@ export function userMarkerSvg(colors, { simulated = false } = {}) {
     '</svg>',
   ].join('')
 }
+
+/**
+ * While navigating: a heading arrow, like Google Maps. The camera is
+ * heading-up, so "up" on screen is the way you are going.
+ *
+ * @param {Record<string, string>} colors From markerColors().
+ */
+export function navigationArrowSvg(colors) {
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">`,
+    `<defs><filter id="dm-nav-shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="${colors.shadow}"/></filter></defs>`,
+    `<circle cx="22" cy="22" r="20" fill="${colors.dotHalo}"/>`,
+    `<g filter="url(#dm-nav-shadow)"><path d="M22 7 34 35 22 28 10 35Z" fill="${colors.accent}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/></g>`,
+    '</svg>',
+  ].join('')
+}
