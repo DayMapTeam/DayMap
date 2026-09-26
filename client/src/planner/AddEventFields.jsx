@@ -1,5 +1,4 @@
 import { useId } from 'react'
-import { DURATION_CHOICES } from '../app/planAdd.js'
 
 const WHEN_OPTIONS = [
   ['flexible', 'Fit it in for me'],
@@ -41,44 +40,18 @@ export function WhenModeToggle({ value, onChange, options = WHEN_OPTIONS, label:
 
 /**
  * @param {object} props
- * @param {number} props.value Minutes.
- * @param {(minutes: number) => void} props.onChange
- * @param {string} [props.label]
- */
-export function DurationChips({ value, onChange, label = 'How long' }) {
-  const name = useId()
-  return (
-    <div className="chips" role="radiogroup" aria-label={label}>
-      {DURATION_CHOICES.map((minutes) => (
-        <label key={minutes} className="chip">
-          <input
-            className="visually-hidden"
-            type="radio"
-            name={name}
-            value={minutes}
-            checked={value === minutes}
-            onChange={() => onChange(minutes)}
-          />
-          <span className="chip-label">{minutes} min</span>
-        </label>
-      ))}
-    </div>
-  )
-}
-
-/**
- * @param {object} props
  * @param {string} props.start "HH:MM"
  * @param {string} props.end "HH:MM"
  * @param {(value: string) => void} props.onStartChange
  * @param {(value: string) => void} props.onEndChange
+ * @param {[string, string]} [props.labels]
  */
-export function TimeRangeInputs({ start, end, onStartChange, onEndChange }) {
+export function TimeRangeInputs({ start, end, onStartChange, onEndChange, labels = ['Start', 'End'] }) {
   const id = useId()
   return (
     <div className="time-range">
       <label className="time-range-field" htmlFor={`${id}-start`}>
-        <span className="time-range-label">Start</span>
+        <span className="time-range-label">{labels[0]}</span>
         <input
           id={`${id}-start`}
           className="time-range-input"
@@ -88,7 +61,7 @@ export function TimeRangeInputs({ start, end, onStartChange, onEndChange }) {
         />
       </label>
       <label className="time-range-field" htmlFor={`${id}-end`}>
-        <span className="time-range-label">End</span>
+        <span className="time-range-label">{labels[1]}</span>
         <input
           id={`${id}-end`}
           className="time-range-input"

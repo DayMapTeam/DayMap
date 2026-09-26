@@ -86,12 +86,6 @@ function describeLateArrival(option, plan) {
   return `You’d arrive about ${option.lateArrivalMinutes} min late from ${findStop(plan, option.afterStopId).title}.`
 }
 
-/** "After Morning lecture. 10 min spare before Library study." */
-export function describeSlot(option, plan) {
-  const after = option.afterStopId === null ? 'First in your day.' : `After ${findStop(plan, option.afterStopId).title}.`
-  return [after, describeMoves(option, plan) || describeSpare(option, plan)].filter(Boolean).join(' ')
-}
-
 /**
  * The live line under an add form.
  *
@@ -117,17 +111,6 @@ export function describeVerdict(fit, option, plan, kind) {
 function nextFixedStop(option, stopId) {
   const stops = option.plan.stops
   return stops.slice(stops.findIndex((stop) => stop.id === stopId) + 1).find((stop) => stop.timing.kind === 'fixed')
-}
-
-/** Step 3 of the guided sheet: "Your day still works" and what that means. */
-export function describeDayCheck(option, plan, stopId) {
-  const fixed = nextFixedStop(option, stopId)
-  return [
-    fixed ? `${fixed.title} stays at ${formatClock(fixed.timing.scheduledStartAt, plan.timezone)}.` : '',
-    describeLateArrival(option, plan),
-    describeMoves(option, plan) || describeSpare(option, plan),
-    describeTravel(option, plan),
-  ].filter(Boolean).join(' ')
 }
 
 /** Toast after adding: "Added Coffee. Moved Library study later." */

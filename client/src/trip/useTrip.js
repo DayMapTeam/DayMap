@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
-import { initialTrip, nextStopFor, tripReducer, tripStops } from './tripRules.js'
+import { dayEndStop, initialTrip, nextStopFor, tripReducer, tripStops } from './tripRules.js'
 
 const NOTICE_MS = 5000
 
@@ -36,7 +36,10 @@ export function useTrip({ plan, now, reading }) {
     return () => clearTimeout(id)
   }, [noticeKey])
 
-  const stops = useMemo(() => new Map(plan.stops.map((stop) => [stop.id, stop])), [plan.stops])
+  const stops = useMemo(() => {
+    const end = dayEndStop(plan)
+    return new Map([...plan.stops, ...(end ? [end] : [])].map((stop) => [stop.id, stop]))
+  }, [plan])
   const next = useMemo(() => nextStopFor(plan, { atStopId: state.atStopId, now }), [plan, state.atStopId, now])
   const target = state.phase === 'navigating'
     ? tripStops(plan).find((stop) => stop.id === state.targetId) ?? null

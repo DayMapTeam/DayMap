@@ -24,7 +24,7 @@ export function validateSave(id, body) {
   keys(body, ['baseVersion', 'plan'])
   const { baseVersion, plan } = body
   check(Number.isInteger(baseVersion) && baseVersion >= 0 && baseVersion < 2147483647, 'Invalid baseVersion.')
-  keys(plan, ['id', 'date', 'timezone', 'version', 'dataMode', 'stops', 'legs', 'conflicts', 'questions'])
+  keys(plan, ['id', 'date', 'timezone', 'version', 'dataMode', 'stops', 'legs', 'conflicts', 'questions', 'startPlace', 'endPlace'])
   check(plan.id === id && plan.version === baseVersion, 'Plan ID and version must match the request.')
   validateDay(plan.date, plan.timezone)
   check(['demo', 'live'].includes(plan.dataMode), 'Invalid dataMode.')
@@ -33,6 +33,14 @@ export function validateSave(id, body) {
   }
   // DM-07 will define provider retention and journey validation before persisting routes.
   check(plan.legs.length === 0, 'Journey persistence is not enabled yet; omit provider route data.')
+  // Where the day starts and ends (home, a hotel): a place without times, or absent/null.
+  for (const field of ['startPlace', 'endPlace']) {
+    const place = plan[field]
+    if (place === undefined || place === null) continue
+    keys(place, ['label', 'placeId', 'lat', 'lng'])
+    check(text(place.label) && place.placeId === null && Number.isFinite(place.lat) && Math.abs(place.lat) <= 90
+      && Number.isFinite(place.lng) && Math.abs(place.lng) <= 180, `Invalid ${field}.`)
+  }
   const ids = new Set()
   for (const stop of plan.stops) {
     keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode'])

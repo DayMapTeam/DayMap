@@ -97,6 +97,8 @@ export default function Planner({ now, revealRequest, planning, emptyState }) {
   function committed({ stopId, message }) {
     setSheetKey(null)
     setFilter('')
+    // Where the day starts or ends is shown at the ends of the planner; there is no row to reveal.
+    if (stopId === null) return
     setRecentAdd((previous) => ({ stopId, message, key: (previous?.key ?? 0) + 1, showNew: true }))
     setReveal({ stopId, key: `added-${stopId}` })
   }

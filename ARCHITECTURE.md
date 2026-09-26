@@ -204,6 +204,8 @@ The journey line between two planner rows opens the **journey popup**: Walk, Pub
 
 Each journey line reads like a Google Maps route summary (issue #46): the mode icon and "Leave 10:00am" for walking or driving, and for public transport the steps walk › rides (line badges in their colours) › walk with the time to leave for the first stop. The service shown arrives earliest, unless one with fewer changes arrives within 10 minutes of it. `services/transitStore.js` requests each journey's services once per departure; the line and the popup share it.
 
+**Adding (issue #52)** is one screen: find a place (or type a name), then choose *An event* (From–To times, pre-filled with the soonest free half hour that allows for travel until the person edits them; added as flexible) or *My day starts / ends / starts and ends here* (no times; sets `startPlace`/`endPlace`). Home suggests starts-and-ends, a hotel suggests ends. The planner shows *Day starts* above the first stop with when to leave for it, and *Day ends* after the last with the journey there; after the last stop the end place is the final trip destination.
+
 **Adding a stop (issue #42)** uses the same estimates. A flexible stop starts once you can get there from the stop before it (travel + buffer, rounded to five minutes); later flexible stops move only as far as their own journeys need, and fixed stops never move. A fixed new stop keeps its time and says how late the journey there would make you. The add sheet requests missing journeys, says "Checking travel time…" while they load, and names what it allowed for. The reducer commits with the same planning context as the preview, so the result is what was shown. Unknown travel counts as zero only in the fit and is always reported.
 
 ### Trip mode (issues #29, #48)
@@ -286,7 +288,10 @@ const dayPlan = {
   }],
   legs: [],
   conflicts: [],
-  questions: []
+  questions: [],
+  // Where the day starts and ends (home, a hotel): a place without times, or null (issue #52).
+  startPlace: null, // { label, placeId: null, lat, lng }
+  endPlace: null
 };
 ```
 

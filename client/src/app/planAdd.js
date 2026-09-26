@@ -23,7 +23,7 @@ const MAX_TITLE = 120
  * @property {string} title
  * @property {{ label: string, placeId: string | null, lat: number, lng: number } | null} location
  *   null adds it without a place; it then shows "Location needed" like any unresolved stop.
- * @property {'flexible' | 'fixed'} kind
+ * @property {'flexible' | 'fixed' | 'timed'} kind 'timed': at the given times, and flexible afterwards.
  * @property {number} [durationMinutes] Flexible only.
  * @property {string | null} [startAt] Fixed only, UTC timestamp.
  * @property {string | null} [endAt] Fixed only, UTC timestamp.
@@ -138,7 +138,7 @@ export function validateNewStop(newStop) {
   if (title === '') return 'missing-title'
   if (title.length > MAX_TITLE) return 'title-too-long'
   let minutes = newStop.durationMinutes
-  if (newStop.kind === 'fixed') {
+  if (newStop.kind === 'fixed' || newStop.kind === 'timed') {
     if (!newStop.startAt || !newStop.endAt) return 'missing-time'
     minutes = (Date.parse(newStop.endAt) - Date.parse(newStop.startAt)) / MINUTE
     if (!(minutes > 0)) return 'end-before-start'
@@ -181,6 +181,7 @@ function reflow(timed, fromIndex, cursor, previous, journey) {
 
 function makeStop(newStop, start, end) {
   const fixed = newStop.kind === 'fixed'
+  const kind = newStop.kind === 'timed' ? 'flexible' : newStop.kind
   return {
     id: newStop.id,
     title: newStop.title.trim(),
@@ -189,7 +190,7 @@ function makeStop(newStop, start, end) {
     sourceCalendarId: null,
     location: newStop.location === null ? null : { ...newStop.location },
     timing: {
-      kind: newStop.kind,
+      kind,
       durationMinutes: (end - start) / MINUTE,
       fixedStartAt: fixed ? toTimestamp(start) : null,
       fixedEndAt: fixed ? toTimestamp(end) : null,
@@ -324,7 +325,7 @@ export function fitNewStop(plan, newStop, { afterStopId = null, now, ctx = null 
 
   const timed = timedStops(plan)
   let options
-  if (newStop.kind === 'fixed') {
+  if (newStop.kind === 'fixed' || newStop.kind === 'timed') {
     options = [fitAt(plan, timed, newStop, now, journey)]
   } else if (timed.length === 0) {
     const start = roundUpToFive(now.getTime())

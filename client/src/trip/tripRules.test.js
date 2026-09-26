@@ -230,3 +230,16 @@ test('a morning end to end: leave home, arrive, leave, automatic directions, arr
   assert.equal(state.phase, 'idle')
   assert.equal(state.atStopId, 'stop-library')
 })
+
+test('after the last event, the next stop is where the day ends', () => {
+  const home = { label: 'Home', placeId: null, lat: -34.95, lng: 138.62 }
+  const plan = { ...demoPlan, endPlace: home }
+  const end = nextStopFor(plan, { atStopId: 'stop-square', now: LATER })
+  assert.equal(end.id, 'day-end')
+  assert.equal(end.title, 'Home')
+  assert.equal(end.timing.scheduledStartAt, '2026-09-26T04:00:00.000Z', 'from when the last stop ends')
+  const square = stop('stop-square').location
+  const left = feed({ ...initialTrip, atStopId: 'stop-square' }, [away(square, 300), away(square, 300), away(square, 300)], { plan, now: LATER })
+  assert.equal(left.targetId, 'day-end', 'leaving the last stop heads home')
+  assert.equal(nextStopFor(demoPlan, { atStopId: 'stop-square', now: LATER }), null)
+})

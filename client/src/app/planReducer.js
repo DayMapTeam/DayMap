@@ -1,5 +1,5 @@
 import { chooseOption } from './planAdd.js'
-import { listStopChanges, validateStopEdit, withStopKind, withTravelMode } from './planEdits.js'
+import { listStopChanges, validateStopEdit, withDayPlace, withStopKind, withTravelMode } from './planEdits.js'
 import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
 import { planFingerprint } from '../../../shared/planning/fingerprint.js'
@@ -193,6 +193,20 @@ function setTravelMode(state, { stopId, mode }) {
   return { ...state, plan: { ...plan, version }, draft }
 }
 
+/** Set where the day starts and/or ends. An explicit accept, applied to a pending draft too. */
+function setDayPlace(state, { which, location }) {
+  if (state.draft?.suggestion) return setDayPlace(revertSuggestion(state), { which, location })
+  const plan = withDayPlace(state.plan, which, location)
+  if (plan === state.plan) return state
+  const version = state.plan.version + 1
+  const draft = state.draft === null ? null : {
+    ...state.draft,
+    plan: withDayPlace(state.draft.plan, which, location),
+    baseVersion: state.draft.baseVersion === state.plan.version ? version : state.draft.baseVersion,
+  }
+  return { ...state, plan: { ...plan, version }, draft }
+}
+
 /**
  * Selection is UI state: it never modifies accepted plan data. Edits go into
  * a draft, and only 'accept-draft' replaces the accepted plan.
@@ -238,6 +252,8 @@ export function planReducer(state, action) {
       return addStop(state, action)
     case 'undo-add':
       return undoAdd(state, action)
+    case 'set-day-place':
+      return setDayPlace(state, action)
     case 'set-stop-travel-mode':
       return setTravelMode(state, action)
     case 'set-stop-kind':
