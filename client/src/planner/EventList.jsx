@@ -4,6 +4,7 @@ import { listStopChanges } from '../app/planEdits.js'
 import EventRow from './EventRow.jsx'
 import TravelConnector from './TravelConnector.jsx'
 import './EventList.css'
+import { sortStopsForDisplay } from '../../../shared/planning/timeline.js'
 
 function matchesFilter(stop, needle) {
   return [stop.title, stop.location?.label ?? '']
@@ -25,14 +26,26 @@ function matchesFilter(stop, needle) {
  * @param {string | null} props.newStopId A just-added stop, labelled New.
  * @param {(stopId: string) => void} props.onRequestDelete Ask before deleting this stop.
  */
-export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete }) {
+export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, analysis }) {
   const { plan, draft, selectedStopId, selectStop, editStopDraft } = usePlan()
   const listRef = useRef(null)
+  const reviewAfterSave = useRef(false)
   const shown = draft?.plan ?? plan
   const needle = filter.trim().toLocaleLowerCase()
   const filtering = needle !== ''
-  const stops = filtering ? shown.stops.filter((stop) => matchesFilter(stop, needle)) : shown.stops
+  const ordered = sortStopsForDisplay(shown.stops)
+  const stops = filtering ? ordered.filter((stop) => matchesFilter(stop, needle)) : ordered
   const changedIds = new Set(draft ? listStopChanges(plan, draft.plan).map(({ after }) => after.id) : [])
+
+  useEffect(() => {
+    if (!reviewAfterSave.current) return
+    reviewAfterSave.current = false
+    const body = listRef.current?.closest('.planner-body')
+    if (body?.querySelector('.draft-card')) {
+      body.scrollTo({ top: 0, behavior: 'instant' })
+      body.querySelector('.draft-card').focus({ preventScroll: true })
+    }
+  }, [draft])
 
   // Scroll the panel body itself (offsetTop is relative to it); scrollIntoView
   // would also scroll the page and the map.
@@ -56,6 +69,7 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
   }
 
   function save(stopId, edit) {
+    reviewAfterSave.current = true
     editStopDraft(stopId, edit)
     onOpenStopChange(null)
   }
@@ -69,9 +83,10 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
         {stops.map((stop, index) => (
           <li key={stop.id}>
             {/* While filtering, neighbours in the list may not be neighbours in the day. */}
-            {index > 0 && !filtering && <TravelConnector />}
+            {index > 0 && !filtering && <TravelConnector leg={analysis.legs.find((leg) => leg.fromStopId === stops[index - 1].id && leg.toStopId === stop.id)} />}
             <EventRow
               stop={stop}
+              conflict={analysis.conflicts.some((c) => c.stopIds.includes(stop.id))}
               date={shown.date}
               timezone={shown.timezone}
               selected={stop.id === selectedStopId}

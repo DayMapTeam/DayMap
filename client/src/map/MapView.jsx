@@ -32,7 +32,7 @@ function isFinished(stop, now) {
  * - now: stops that ended before it are drawn faded.
  */
 export default function MapView({
-  stops, selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null,
+  stops, selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, stopStates = {},
 }) {
   const containerRef = useRef(null)
   const markersRef = useRef(new Map())
@@ -121,8 +121,21 @@ export default function MapView({
     if (!runtime) return
     const markers = markersRef.current
 
+    for (const [id, { marker, handleClick }] of markers) {
+      if (stops.some((stop) => stop.id === id && isValidLocation(stop.location))) continue
+      marker.removeEventListener('gmp-click', handleClick)
+      marker.remove()
+      markers.delete(id)
+    }
+
     for (const stop of stops) {
       if (!isValidLocation(stop.location)) continue
+      const existing = markers.get(stop.id)
+      if (existing) {
+        existing.marker.position = { lat: stop.location.lat, lng: stop.location.lng }
+        existing.marker.label = stop.title
+        continue
+      }
       const marker = new runtime.Marker({
         position: { lat: stop.location.lat, lng: stop.location.lng },
         altitudeMode: 'CLAMP_TO_GROUND',
@@ -147,6 +160,10 @@ export default function MapView({
       markers.set(stop.id, { marker, handleClick })
     }
 
+  }, [runtime, stops])
+
+  useEffect(() => {
+    const markers = markersRef.current
     return () => {
       for (const { marker, handleClick } of markers.values()) {
         marker.removeEventListener('gmp-click', handleClick)
@@ -154,7 +171,7 @@ export default function MapView({
       }
       markers.clear()
     }
-  }, [runtime, stops])
+  }, [runtime])
 
   // Draw each pin for its current state. Updating in place keeps the markers
   // (and keyboard focus on them) when only selection or tilt changes.
@@ -168,14 +185,14 @@ export default function MapView({
       const svg = stopMarkerSvg({
         number: numbers.get(stop.id),
         type: stop.timing.kind,
-        state: { selected, past: isFinished(stop, now) },
+        state: { ...stopStates[stop.id], selected, past: isFinished(stop, now) },
         steep,
       }, runtime.colors)
       entry.marker.replaceChildren(markerTemplate(svg))
       entry.marker.zIndex = selected ? 10 : 0
-      entry.marker.title = `${numbers.get(stop.id)}. ${stop.title}${selected ? ' (selected)' : ''}`
+      entry.marker.title = `${numbers.get(stop.id)}. ${stop.title}${selected ? ' (selected)' : ''}${stopStates[stop.id]?.note ? ` · ${stopStates[stop.id].note}` : ''}`
     }
-  }, [runtime, stops, selectedStopId, now, steep])
+  }, [runtime, stops, selectedStopId, now, steep, stopStates])
 
   useEffect(() => {
     if (!runtime || !previewPlace) return

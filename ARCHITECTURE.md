@@ -89,8 +89,8 @@ flowchart TD
 | From | To | Rule |
 | --- | --- | --- |
 | Browser | Supabase | **Auth only.** All app data reads and writes go through the Express `/api`. |
-| Browser | Google Maps JavaScript API | The map renderer and Places autocomplete/preview load directly in the browser, using a website- and API-restricted browser key. |
-| Server | Google Calendar, Routes | The server calls these providers and normalises their responses. Places autocomplete/preview is the browser exception approved by Rafid for issue #16. Google-specific Places objects stay inside the client service adapter. |
+| Browser | Google Maps JavaScript API | The renderer, Places autocomplete/preview and walking Route Matrix estimates load in the browser using a website- and API-restricted key. Google objects stay inside client adapters. |
+| Server | Google Calendar; future server routing | Calendar credentials and persistence remain server-side. Rafid approved browser Places (#16) and walking Routes for the current planning flow; future authenticated server routing remains separate. |
 | Frontend services | Demo or live data | Both modes sit behind the same service interface ([§4](#demo-and-live-modes)). |
 
 ## 3. Repository layout
@@ -165,9 +165,32 @@ stateDiagram-v2
 
 ### Browser place search (issue #16)
 
-Rafid approved browser Places autocomplete and selected-place details so search can work before the backend is merged. `client/src/services/places.js` owns session tokens and Google prediction objects, returning plain place data. Suggestions are biased toward Adelaide and restricted to Australia. The selected preview lives in App UI state, separate from the accepted plan; it never creates an activity. Requests are debounced and late results ignored. The planned server Places endpoints below are deferred for this flow; Calendar, Routes, and persistence retain their server boundaries.
+Rafid approved browser Places autocomplete and selected-place details so search can work before the backend is merged. `client/src/services/places.js` owns session tokens and Google prediction objects, returning plain place data. Suggestions are biased toward Adelaide and restricted to Australia. The selected preview lives in App UI state, separate from the accepted plan; it never creates an activity. Requests are debounced and late results ignored. The planned server Places endpoints below are deferred for this flow; Calendar and persistence retain their server boundaries.
 
 Enable Places API (New) and Maps JavaScript API for the restricted browser key. Results are transient, not persisted.
+
+### Browser walking estimates (issue #20)
+
+The current planning flow uses the Maps JavaScript `routes` library and
+`RouteMatrix.computeRouteMatrix` with `WALKING`. Enable Routes API on the same
+project and allow it on the website-restricted browser key. The adapter requests
+only duration, distance and condition, and returns plain seconds to the pure
+shared engine. It does not request or draw route geometry.
+
+The client fetches missing adjacent journeys outside render, grouping destinations
+by origin (up to 25 per request), with two requests running at a time. Existing
+walking results are reused for unchanged location pairs during the active session;
+time-only edits of those journeys need no new request. Alternative-order pairs
+are fetched on explicit request when a suggested move cannot be verified.
+Results are not stored in localStorage or the database. Late results fill only
+their original location keys and never overwrite plan edits. A transient failure
+retries once; authorization, quota and timeout failures require explicit Retry.
+
+With a browser key, Google estimates are used for the fictional day too.
+`VITE_TRAVEL_PROVIDER=demo` selects labelled simulation for demo plans only.
+Live plans and failed Google requests never silently switch to simulation.
+Application and acceptance both recheck current estimates. Transit, driving,
+route polylines and authenticated server validation are separate increments.
 
 ### `MapView` adapter
 
@@ -395,7 +418,8 @@ Weather first annotates relevant times and stops. Turning rain into schedule cha
 | `VITE_API_BASE_URL` | Client | Express API base URL |
 | `VITE_SUPABASE_URL` | Client | Supabase project URL for Auth |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Client | Supabase publishable key for Auth |
-| `VITE_GOOGLE_MAPS_API_KEY` | Client | Browser map renderer; restricted by website and API |
+| `VITE_GOOGLE_MAPS_API_KEY` | Client | Browser map, Places and walking Routes; restricted by website and API |
+| `VITE_TRAVEL_PROVIDER` | Client | Optional `google` or `demo`; simulation is only available for demo plans |
 | `PORT` | Server | Express port (3001 locally) |
 | `CLIENT_ORIGIN` | Server | Exact allowed frontend origin |
 | `SUPABASE_URL` | Server | Supabase project URL |
@@ -407,7 +431,7 @@ Weather first annotates relevant times and stops. Turning rain into schedule cha
 | `GOOGLE_OAUTH_REDIRECT_URI` | Server | Exact Calendar callback URL |
 | `TOKEN_ENCRYPTION_KEY` | Server | Encrypts stored Google refresh tokens |
 
-- Anything prefixed `VITE_` is visible in the browser. Only the four client variables above belong there. Server secrets never get a `VITE_` prefix.
+- Anything prefixed `VITE_` is visible in the browser. Only client configuration belongs there. Server secrets never get a `VITE_` prefix.
 - Add every new variable to the matching `client/.env.example` or `server/.env.example` as a placeholder. Real values live in git-ignored local files (`client/.env.local`, `server/.env`) and in deployment settings, and are shared privately.
 - The Supabase publishable key and the browser Maps key are designed for client use with access policies and restrictions. Server credentials are not. Restrict the browser Maps key by allowed websites and APIs. Give the server its own Maps key, with API restrictions and deployment-appropriate application restrictions.
 

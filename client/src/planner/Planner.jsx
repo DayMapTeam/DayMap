@@ -4,6 +4,7 @@ import AddEventSheet from './AddEventSheet.jsx'
 import AddToast from './AddToast.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import DraftCard from './DraftCard.jsx'
+import PlanningFeedback from './PlanningFeedback.jsx'
 import EventList from './EventList.jsx'
 import PlannerFilter from './PlannerFilter.jsx'
 import PlannerPanel from './PlannerPanel.jsx'
@@ -27,7 +28,7 @@ function isTyping(target) {
  * @param {Date} props.now The planner's current time.
  * @param {{ stopId: string, key: number } | null} props.revealRequest Set by "View in planner" in the map popup.
  */
-export default function Planner({ now, revealRequest }) {
+export default function Planner({ now, revealRequest, planning }) {
   const { plan, draft, undoAdd, removeStop } = usePlan()
   const [filter, setFilter] = useState('')
   const [open, setOpen] = usePlannerOpen()
@@ -117,6 +118,7 @@ export default function Planner({ now, revealRequest }) {
   return (
     <>
       <PlannerPanel
+        analysis={planning.analysis}
         open={open}
         onOpenChange={setOpen}
         toolbar={<PlannerFilter value={filter} onChange={setFilter} />}
@@ -155,8 +157,10 @@ export default function Planner({ now, revealRequest }) {
           />
         )}
       >
-        <DraftCard />
+        <DraftCard planning={planning} />
+        <PlanningFeedback planning={planning} />
         <EventList
+          analysis={planning.analysis}
           now={now}
           filter={filter}
           openStopId={openStopId}

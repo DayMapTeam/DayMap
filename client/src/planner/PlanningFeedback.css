@@ -1,0 +1,11 @@
+.planning-feedback { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); font-size: 13px; }
+.planning-source { color: var(--label-2); font-size: 12px; }
+.planning-conflict { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-card); background: var(--orange-tint); }
+.planning-conflict[data-muted] { background: var(--fill); color: var(--label-2); }
+.planning-conflict-title { font-weight: 600; color: var(--orange-ink); }
+.planning-proposal { display: grid; gap: var(--space-2); }
+.planning-actions, .draft-card-actions { flex-wrap: wrap; }
+.planning-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.planning-free summary { cursor: pointer; min-height: var(--hit-target); padding-top: var(--space-2); }
+.planning-free ul { padding-left: var(--space-4); display: grid; gap: var(--space-2); }
+.event-row-conflict { font-size: 12px; font-weight: 600; color: var(--orange-ink); }

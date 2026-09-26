@@ -20,8 +20,8 @@ const SHEET_QUERY = '(max-width: 719px)'
  * @param {import('react').ReactNode} props.overlay A dialog over the whole panel; the rest is inert while it shows.
  * @param {import('react').ReactNode} props.children Scrollable body content.
  */
-export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction, takeover, overlay, children }) {
-  const { plan } = usePlan()
+export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction, takeover, overlay, children, analysis }) {
+  const { plan, draft } = usePlan()
   const isSheet = useMediaQuery(SHEET_QUERY)
   const toggleRef = useRef(null)
   const reopenRef = useRef(null)
@@ -86,7 +86,7 @@ export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction
               <div className="planner-top">
                 <div className="planner-title-row">
                   <h2 id="planner-title" className="planner-title">Planner</h2>
-                  <StatusPill plan={plan} />
+                  <StatusPill plan={draft?.plan ?? plan} analysis={analysis} />
                   {headerAction}
                   {!isSheet && (
                     <button
