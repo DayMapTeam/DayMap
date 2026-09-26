@@ -27,7 +27,7 @@ const KIND_NOTES = {
  * @param {(stopId: string, edit: object) => void} props.onSave
  * @param {(stopId: string) => void} props.onDelete
  */
-export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onDelete }) {
+export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onDelete, conflict }) {
   const { timing } = stop
   const detailsId = `stop-details-${stop.id}`
   const hasTimes = timing.scheduledStartAt !== null && timing.scheduledEndAt !== null
@@ -65,6 +65,7 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
             {added && <span className="event-row-new">New</span>}
           </span>
           <span className="event-row-details">{details.join(' · ')}</span>
+          {conflict && <span className="event-row-conflict">Schedule conflict</span>}
         </span>
         <span className="event-row-time">
           {hasTimes ? formatTimeRange(timing.scheduledStartAt, timing.scheduledEndAt, timezone) : 'Time not set'}

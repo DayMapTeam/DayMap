@@ -33,7 +33,44 @@ There are no root npm scripts yet. Tests use Node's built-in test runner and int
 
 Search waits 300ms after typing and requires two characters. Results favour Adelaide and are restricted to Australia. Loading, no-results and provider errors appear below the field. Session tokens group autocomplete with the selected place details; only coordinates and formatted address are requested. No Places data is persisted. Live verification requires the Cloud setup above; unit tests cover debouncing, stale responses, clearing during details loading and disposal.
 
-## Sample day
+## Walking estimates from Google
+
+The existing `VITE_GOOGLE_MAPS_API_KEY` now also loads Google's browser `routes`
+library. Enable **Routes API** in the project and allow it in that key's API
+restrictions, alongside Maps JavaScript and Places API (New). Website restrictions
+remain in place. There is no new key or server secret to copy.
+
+With a key configured, the planner uses Google walking estimates even for the
+fictional demo day. It shows loading/unresolved states and **Retry routes** on
+failure. Failed routes are never replaced with simulation. For repeatable offline
+demo testing, set `VITE_TRAVEL_PROVIDER=demo` in ignored `client/.env.local` and
+restart Vite; this applies to demo plans only. The default with a key is Google.
+
+`walkingRoutes.js` normalises `RouteMatrix.computeRouteMatrix` responses into
+seconds. `walkingRouteStore.js` holds active-session results in memory, deduplicates
+location-pair requests, groups destinations per origin, and limits concurrency to
+two. It retries transient failures once, bounds waiting to 15 seconds and leaves
+failures unavailable until Retry. No durations or geometry are persisted.
+The hook requests only missing adjacent journeys initially. If a proposed
+relocation needs other pairs, **Check alternative walking routes** fetches them
+on demand. Walking estimates do not depend on event times; editing times without
+changing the journey pairs makes no additional Routes requests.
+
+Manual verification with the existing key:
+
+1. Reload. Travel connectors should change from Loading to **Google Maps · … min
+   walk**, or explain an unresolved request with Retry.
+2. Change lunch to **12:15–13:00**. A verified break suggestion should appear;
+   its time depends on Google's result (the development check suggested 13:15).
+3. Apply, Revert and Accept should preserve the same explicit draft flow.
+4. In Network, filter `routes.googleapis.com`: the four-stop day initially needs
+   three adjacent-journey requests. Repeating the above time edit should not add
+   calls while those walking results are available. No route polyline is drawn
+   in this increment.
+
+Reference: [Google Route Matrix](https://developers.google.com/maps/documentation/javascript/routes/get-a-route-matrix).
+
+## Sample day fixture
 
 `shared/fixtures/demoPlan.js` exports `demoPlan`, following ARCHITECTURE.md's stop contract. It contains four fictional activities at approximate public Adelaide locations, stable IDs, UTC times, and the `Australia/Adelaide` display timezone. The first event is fixed; the rest have flexible windows. `legs`, `questions`, and `conflicts` are empty. Gaps between activities are sample spacing, not calculated travel times.
 
@@ -78,22 +115,40 @@ export function EventButtons() {
 | `selectedStop` | Derived stop object, or `null`; never a separate stored copy |
 | `selectStop(id)` | Select a known ID; unknown IDs leave selection unchanged |
 | `clearSelection()` | Reset selection without changing plan data |
-| `draft` | `{ baseVersion, plan, stale }` holding saved but unaccepted edits, or `null` |
+| `draft` | `{ baseVersion, plan, stale, editedStopIds }` holding saved but unaccepted edits, or `null`; an active suggestion also stores `suggestion`, `beforeSuggestion` and `suggestionInvalid` |
 | `editStopDraft(id, edit)` | Put an edit to a flexible stop (`{ title, scheduledStartAt, scheduledEndAt }`) into the draft; invalid edits and fixed stops are ignored (rules in `src/app/planEdits.js`) |
 | `removeStop(id)` | Delete a flexible stop (and its legs) the user confirmed; bumps `version`. A pending draft keeps its other edits. Fixed and unknown stops are ignored |
-| `acceptDraft()` | Replace the accepted plan with the draft and bump `version`, only if the draft's `baseVersion` still matches; otherwise mark the draft `stale` |
+| `applySuggestion(proposal, ctx)` | Revalidate one suggested move against the shown plan and current analysis context, then put it in the draft. Stale/invalid proposals and a second active suggestion are ignored |
+| `revertSuggestion()` | Remove the active suggestion, restoring the user's draft from before it |
+| `acceptDraft(ctx?)` | Replace the accepted plan with the draft and bump `version`, only if the draft's `baseVersion` still matches; otherwise mark `stale`. A draft containing a suggestion additionally requires current `ctx` and repeats feasibility checks; failure sets `suggestionInvalid` and leaves the accepted plan untouched |
 | `discardDraft()` | Keep the current plan and drop the draft |
 | `addStop({ newStop, afterStopId, baseVersion, now })` | Add a stop confirmed in an add flow. Re-runs `fitNewStop` (`src/app/planAdd.js`) and applies it only if it still fits, `baseVersion` matches and no edit draft is pending; bumps `version` and selects the new stop |
 | `undoAdd(stopId)` | Restore the day from before that add (including stops it moved), only if nothing else changed the plan since |
 
+The planner now shows conflicts, free-time gaps and suggestion controls. The
+shared `usePlanAnalysis` hook supplies `ctx` as documented in
+[`shared/planning/README.md`](../shared/planning/README.md): explicit current
+`now`, synchronous travel lookup, mode choices and buffers. Build fresh context
+on Apply and Accept; do not reuse a generation-time clock or estimates. The
+reducer adds `draft.editedStopIds` to the supplied locks itself. A failed
+acceptance leaves the suggestion reversible; UI should offer Revert/refresh
+when `draft.suggestionInvalid` is true; the draft card now offers this.
+
+A new valid manual edit removes the active suggestion and applies that edit to
+the saved user draft. Deleting an event also removes the suggestion, then keeps
+the existing deletion behaviour and other user edits. Invalid edits leave the
+suggestion untouched. This prevents outdated suggested moves from being accepted
+as ordinary edits. The ordinary edit/accept flow still works without `ctx`.
+
 For the map adapter:
 
 ```jsx
-const { plan, selectedStopId, selectStop } = usePlan()
-return <MapView stops={plan.stops} legs={plan.legs} selectedStopId={selectedStopId} onSelectStop={selectStop} />
+const { plan, draft, selectedStopId, selectStop } = usePlan()
+const shown = draft?.plan ?? plan
+return <MapView stops={shown.stops} selectedStopId={selectedStopId} onSelectStop={selectStop} />
 ```
 
-Every map pin is drawn by `stopMarkerSvg()` in `src/map/stopMarker.js`: a numbered head on a stem above a ground dot, where the ground dot is the stop's exact position. Numbers come from `numberStops()` in `src/app/stopNumbers.js` (plan order, starting at 1), which the popup badge also uses. Fixed stops are dark, flexible blue, all-day grey, and search previews dashed. Selected pins get a smaller head and a blue halo, finished stops fade, and the stem shortens above 45° tilt. Colours come from `src/theme/tokens.css`. The SVG function also supports clash and preview-shifted states, which stay off until scheduling and proposals exist.
+Every map pin is drawn by `stopMarkerSvg()` in `src/map/stopMarker.js`: a numbered head on a stem above a ground dot, where the ground dot is the stop's exact position. Numbers come from `numberStops()` in `src/app/stopNumbers.js` (plan order, starting at 1), which the popup badge also uses. Fixed stops are dark, flexible blue, all-day grey, and search previews dashed. Selected pins get a smaller head and a blue halo, finished stops fade, and the stem shortens above 45° tilt. Colours come from `src/theme/tokens.css`. Clash and preview-shifted states now come from the same analysis as the planner. Marker titles describe their state too. Existing markers update in place when drafts change.
 
 Besides the documented props, `MapView` takes:
 
@@ -104,6 +159,7 @@ Besides the documented props, `MapView` takes:
 | `onCameraMove()` | The camera moved. The popup is placed on screen and cannot follow it, so `App.jsx` closes it (the stop stays selected). |
 | `now` | Stops that ended before this are drawn faded. |
 | `previewPlace` | The place-search preview, drawn as a dashed search pin. |
+| `stopStates` | Per-stop `{ clash, previewShifted, note }` from shared analysis; updates pin appearance and title without moving the camera |
 
 `App.jsx` opens the popup only from a pin click, never from the planner or search.
 
@@ -111,8 +167,70 @@ Besides the documented props, `MapView` takes:
 
 ## Verify the planner
 
+### Conflict and suggestion flow
+
+For the deterministic walkthrough below, set `VITE_TRAVEL_PROVIDER=demo` and restart
+Vite. This uses **labelled simulated walking estimates**, based on straight-line
+distance with a 1.3 detour factor, walking at 1.3 m/s, plus a 5-minute buffer.
+These are not Google routes. With the default Google provider, the same controls
+use fetched walking durations instead, so suggested times may differ.
+
+1. Open Lunch at the market. Set Start to **12:15** and End to **13:00**, then Save.
+2. A late-arrival conflict appears with a suggestion to move Afternoon break from
+   **13:00–13:30** to **13:10–13:40**. Lunch stays locked as your own edit.
+3. Choose **Apply suggestion to draft**. Both changes are previewed; the conflict
+   clears under the demo estimates. The map marks draft changes without moving
+   its camera.
+4. Choose **Revert suggestion**. Lunch remains at 12:15–13:00; the break returns
+   to 13:00–13:30. Apply again, then **Keep current plan** to discard both edits.
+5. Repeat and choose **Accept changes** to keep both. Reopen the event rows to
+   confirm the times; acceptance rechecks the current clock and estimates.
+6. Free-time gaps of at least 15 minutes appear between events after travel and
+   buffer. Tap the **+** to check one existing flexible activity that fits. The
+   default demo's short morning gap may have no suitable activity; **Keep free**
+   closes the card without changing the plan.
+7. Dismiss a suggestion: its conflict stays visible, muted. **Suggest a fix**
+   brings it back. Existing conflicts need this click; a newly introduced error
+   gets one automatic suggestion. A bounded search may report no one-event fix.
+
+Automated coverage: `node --test src/services/planningContext.test.js` from
+`client/` runs this fixture's edit/apply/revert/accept sequence without a Maps key.
+The existing add-event fit remains time-only; the day checks show any resulting
+travel issues after adding. Refresh still resets to the fixture.
+
+### Compact gap preview
+
+Gaps live in the timeline, not in a separate free-time panel. Tapping a gap checks
+only eligible activities and their required journeys. One recommendation shows
+its name and proposed time. **Preview →** makes a dashed card in the timeline,
+highlights its map marker, and shows remaining space around it. **Details** holds
+the before/after times, affected journeys and exact remaining minutes.
+
+**Cancel** removes the suggestion while keeping earlier manual edits. **Confirm**
+accepts the draft after revalidation; if it includes earlier manual edits, the
+button says **Confirm N changes** and Details lists them. A changed clock, plan,
+window or travel estimate can block confirmation; cancel and preview again.
+Only one preview is active. Filtering hides gap controls because filtered events
+may not be neighbours. The preview's controls stay accessible even if its event
+is filtered out. Existing scheduled activities are supported; this is not a
+nearby-places recommender or an unscheduled task list.
+
+To try a successful move with the Google provider in the demo:
+
+1. Add a fictional **Coffee break** at State Library of South Australia, choose
+   **15 min**, and select the 11:30–11:45 slot. Add-event fitting is still time-only;
+   the day checks will flag the resulting travel shortfalls.
+2. Edit **Library study** to **11:00–11:30**, then Save. Leave that edit in the draft.
+3. Tap the larger free-time gap before Library study. Once routes resolve, the
+   coffee activity can be previewed in that gap (exact times depend on Google).
+4. Preview, then Cancel: coffee returns to 11:30–11:45 and the library edit stays.
+5. Preview again and **Confirm 2 changes**. Both events update in the planner and
+   map; the preview is gone. Verify Details on desktop and a narrow screen.
+
+### Existing planner interactions
+
 1. Open the page. The header shows the plan date and `9:50am · demo time`; demo mode uses a fixed clock on the plan date so finished stops look the same whenever the demo runs.
-2. The planner lists four stops in order, each with its time range, Fixed/Flexible, location and duration. Stops that ended before the demo time are greyed out (none in the current fixture; Morning lecture runs until 10:00am). Between rows, travel shows as *Travel unknown* until routes exist.
+2. The planner lists four stops by time, each with its time range, Fixed/Flexible, location and duration. Stops that ended before the demo time are greyed out (none in the current fixture; Morning lecture runs until 10:00am). Between rows, demo travel and buffer minutes are labelled as simulated; missing or ambiguous journeys stay unresolved.
 3. Select a row by click, or with Tab and Enter/Space. It highlights; selecting another row moves the highlight. Selection lives in `PlanProvider`, so the map will follow it.
 4. Type `market` in *Filter your day*: one row remains, *Showing 1 of 4 stops* appears, and the travel lines hide. Clear it and all four return. Use *Search places* (top left) for Google location suggestions; it is independent of the planner filter.
 5. Expand *Morning lecture*: details only, with "DayMap will never move a fixed event." Expand *Library study*: the edit form opens and the lecture row closes. An end before the start, or times outside 10:00am–12:00pm, show an error and nothing is saved.

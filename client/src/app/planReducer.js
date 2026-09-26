@@ -1,5 +1,7 @@
 import { chooseOption } from './planAdd.js'
 import { listStopChanges, validateStopEdit } from './planEdits.js'
+import { applyProposal } from '../../../shared/planning/proposals.js'
+import { planFingerprint } from '../../../shared/planning/fingerprint.js'
 
 /** Initialise an isolated plan snapshot for each provider. */
 export function createPlanState(initialPlan) {
@@ -43,6 +45,13 @@ function undoAdd(state, { stopId }) {
  * Timing changes mark the stop's legs stale until they are recalculated.
  */
 function editStopDraft(state, { stopId, edit }) {
+  if (state.draft?.suggestion) {
+    const shown = state.draft.plan.stops.find((stop) => stop.id === stopId)
+    if (!shown || validateStopEdit(shown, edit) !== null) return state
+    // A new manual edit invalidates the suggestion. Rebase that edit onto the
+    // user's own draft so suggested moves cannot become silently accepted.
+    return editStopDraft(revertSuggestion(state), { stopId, edit })
+  }
   const base = state.draft?.plan ?? state.plan
   const stop = base.stops.find((candidate) => candidate.id === stopId)
   if (!stop || validateStopEdit(stop, edit) !== null) return state
@@ -66,8 +75,33 @@ function editStopDraft(state, { stopId, edit }) {
   if (listStopChanges(state.plan, plan).length === 0) return { ...state, draft: null }
   return {
     ...state,
-    draft: { baseVersion: state.draft?.baseVersion ?? state.plan.version, plan, stale: false },
+    draft: {
+      baseVersion: state.draft?.baseVersion ?? state.plan.version, plan, stale: false,
+      editedStopIds: [...new Set([...(state.draft?.editedStopIds ?? []), stopId])],
+    },
   }
+}
+
+function suggestionContext(ctx, draft) {
+  return { ...ctx, lockedStopIds: [...new Set([...(ctx?.lockedStopIds ?? []), ...(draft?.editedStopIds ?? [])])] }
+}
+
+function applySuggestion(state, { proposal, ctx }) {
+  const { draft } = state
+  if (draft?.suggestion || (draft && draft.baseVersion !== state.plan.version)) return state
+  const base = draft?.plan ?? state.plan
+  const plan = applyProposal(base, proposal, suggestionContext(ctx, draft))
+  if (!plan) return state
+  return { ...state, draft: {
+    baseVersion: draft?.baseVersion ?? state.plan.version, plan, stale: false,
+    editedStopIds: draft?.editedStopIds ?? [],
+    beforeSuggestion: structuredClone(draft), suggestion: structuredClone(proposal),
+    suggestionInvalid: false,
+  } }
+}
+
+function revertSuggestion(state) {
+  return state.draft?.suggestion ? { ...state, draft: state.draft.beforeSuggestion } : state
 }
 
 function withoutStop(plan, stopId) {
@@ -86,6 +120,7 @@ function withoutStop(plan, stopId) {
 function removeStop(state, { stopId }) {
   const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
   if (!stop || stop.timing.kind !== 'flexible') return state
+  if (state.draft?.suggestion) return removeStop(revertSuggestion(state), { stopId })
 
   const version = state.plan.version + 1
   const plan = { ...withoutStop(state.plan, stopId), version }
@@ -121,6 +156,10 @@ export function planReducer(state, action) {
         : { ...state, selectedStopId: null }
     case 'edit-stop-draft':
       return editStopDraft(state, action)
+    case 'apply-suggestion':
+      return applySuggestion(state, action)
+    case 'revert-suggestion':
+      return revertSuggestion(state)
     case 'remove-stop':
       return removeStop(state, action)
     case 'accept-draft': {
@@ -129,6 +168,13 @@ export function planReducer(state, action) {
       // A draft built on an older version must not overwrite newer changes.
       if (draft.baseVersion !== state.plan.version) {
         return draft.stale ? state : { ...state, draft: { ...draft, stale: true } }
+      }
+      if (draft.suggestion) {
+        const base = draft.beforeSuggestion?.plan ?? state.plan
+        const checked = applyProposal(base, draft.suggestion, suggestionContext(action.ctx, draft.beforeSuggestion))
+        if (!checked || planFingerprint(checked) !== planFingerprint(draft.plan)) {
+          return draft.suggestionInvalid ? state : { ...state, draft: { ...draft, suggestionInvalid: true } }
+        }
       }
       return { ...state, plan: { ...draft.plan, version: state.plan.version + 1 }, draft: null }
     }

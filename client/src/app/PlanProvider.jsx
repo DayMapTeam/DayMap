@@ -16,8 +16,14 @@ export function PlanProvider({ initialPlan, children }) {
   const removeStop = useCallback((stopId) => {
     dispatch({ type: 'remove-stop', stopId })
   }, [])
-  const acceptDraft = useCallback(() => {
-    dispatch({ type: 'accept-draft' })
+  const applySuggestion = useCallback((proposal, ctx) => {
+    dispatch({ type: 'apply-suggestion', proposal, ctx })
+  }, [])
+  const revertSuggestion = useCallback(() => {
+    dispatch({ type: 'revert-suggestion' })
+  }, [])
+  const acceptDraft = useCallback((ctx) => {
+    dispatch({ type: 'accept-draft', ctx })
   }, [])
   const discardDraft = useCallback(() => {
     dispatch({ type: 'discard-draft' })
@@ -36,12 +42,14 @@ export function PlanProvider({ initialPlan, children }) {
     selectStop,
     clearSelection,
     editStopDraft,
+    applySuggestion,
+    revertSuggestion,
     removeStop,
     acceptDraft,
     discardDraft,
     addStop,
     undoAdd,
-  }), [state, selectStop, clearSelection, editStopDraft, removeStop, acceptDraft, discardDraft, addStop, undoAdd])
+  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd])
 
   return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>
 }

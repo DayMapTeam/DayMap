@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { usePlan } from './app/planContext.js'
+import { usePlanAnalysis } from './app/usePlanAnalysis.js'
 import AppHeader from './components/AppHeader.jsx'
 import PlaceSearch from './components/PlaceSearch.jsx'
 import { usePlanClock } from './components/usePlanClock.js'
@@ -9,9 +10,10 @@ import StopPopup from './planner/StopPopup.jsx'
 import './App.css'
 
 function App() {
-  const { plan, selectedStopId, selectStop, clearSelection } = usePlan()
+  const { plan, draft, selectedStopId, selectStop, clearSelection } = usePlan()
   const [previewPlace, setPreviewPlace] = useState(null)
   const { now, isDemoTime } = usePlanClock(plan)
+  const planning = usePlanAnalysis(plan, draft, now)
   // The popup opens only from a pin click on the map: { stopId, anchor } or null.
   const [popup, setPopup] = useState(null)
   const [revealRequest, setRevealRequest] = useState(null)
@@ -46,8 +48,8 @@ function App() {
   return (
     <div className="app">
       <MapView
-        stops={plan.stops}
-        legs={plan.legs}
+        stops={planning.shown.stops}
+        stopStates={planning.stopStates}
         selectedStopId={selectedStopId}
         onSelectStop={selectFromMap}
         onClearSelection={dismiss}
@@ -65,7 +67,7 @@ function App() {
       <div className="app-controls-top-left">
         <PlaceSearch onPlaceSelect={setPreviewPlace} />
       </div>
-      <Planner now={now} revealRequest={revealRequest} />
+      <Planner now={now} revealRequest={revealRequest} planning={planning} />
       {popup !== null && (
         <StopPopup
           key={popup.stopId}

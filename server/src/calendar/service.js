@@ -56,9 +56,11 @@ export function createCalendarService({
   return {
     async begin(userId) {
       const state = randomBytes(32).toString('base64url')
-      await pool.query('delete from private.calendar_oauth_states where user_id = $1 or expires_at < now()', [userId])
-      await pool.query('insert into private.calendar_oauth_states (state_hash, user_id, expires_at) values ($1, $2, $3)',
-        [stateHash(state), userId, new Date(now() + 10 * 60_000)])
+      // Cleanup runs outside the per-user transaction so it cannot hold other
+      // users' state rows while waiting for this user's advisory lock.
+      await pool.query('delete from private.calendar_oauth_states where expires_at <= now()')
+      await pool.query('select private.begin_calendar_connection($1, $2, $3)',
+        [userId, stateHash(state), new Date(now() + 10 * 60_000)])
       const url = new URL(AUTH_URL)
       url.search = new URLSearchParams({
         client_id: env.GOOGLE_OAUTH_CLIENT_ID,
@@ -76,7 +78,8 @@ export function createCalendarService({
         throw new ApiError(400, 'INVALID_OAUTH_STATE', 'Calendar connection expired. Start again.')
       }
       const result = await pool.query(
-        'delete from private.calendar_oauth_states where state_hash = $1 and expires_at > now() returning user_id',
+        `update private.calendar_oauth_states set claimed_at = now()
+          where state_hash = $1 and expires_at > now() and claimed_at is null returning user_id`,
         [stateHash(state)])
       const userId = result.rows[0]?.user_id
       if (!userId) throw new ApiError(400, 'INVALID_OAUTH_STATE', 'Calendar connection expired. Start again.')
@@ -96,11 +99,13 @@ export function createCalendarService({
           !tokens.refresh_token) {
         throw new ApiError(400, 'CALENDAR_RECONNECT_REQUIRED', 'Calendar permission or offline access was not granted. Reconnect.')
       }
-      await pool.query(`insert into private.calendar_credentials
-        (user_id, refresh_token_ciphertext, scopes) values ($1, $2, $3)
-        on conflict (user_id) do update set refresh_token_ciphertext = excluded.refresh_token_ciphertext,
-          scopes = excluded.scopes, updated_at = now()`,
-      [userId, cipher.encrypt(tokens.refresh_token), grantedScopes])
+      // This atomic database operation serializes with begin/disconnect across
+      // server instances. Network I/O above never holds a database lock.
+      const saved = await pool.query('select private.finish_calendar_connection($1, $2, $3, $4) as connected',
+        [userId, stateHash(state), cipher.encrypt(tokens.refresh_token), grantedScopes])
+      if (!saved.rows[0]?.connected) {
+        throw new ApiError(409, 'CALENDAR_CONNECTION_CANCELLED', 'Calendar connection was cancelled or replaced. Start again.')
+      }
       return 'connected'
     },
     async status(userId) {
@@ -124,20 +129,25 @@ export function createCalendarService({
         })
       } catch (error) {
         if (error.code === 'CALENDAR_RECONNECT_REQUIRED') {
-          await pool.query('delete from private.calendar_credentials where user_id = $1', [userId])
+          // A delayed failure from an old token must not remove a newer grant.
+          await pool.query('delete from private.calendar_credentials where user_id = $1 and refresh_token_ciphertext = $2',
+            [userId, result.rows[0].refresh_token_ciphertext])
         }
         throw error
       }
       if (typeof tokens.access_token !== 'string' || !tokens.access_token) {
         throw new ApiError(502, 'GOOGLE_AUTH_FAILED', 'Google Calendar returned an invalid response.')
       }
+      const current = await pool.query(
+        'select 1 from private.calendar_credentials where user_id = $1 and refresh_token_ciphertext = $2',
+        [userId, result.rows[0].refresh_token_ciphertext])
+      if (!current.rows.length) throw new ApiError(409, 'CALENDAR_RECONNECT_REQUIRED', 'Calendar connection changed. Try again.')
       return tokens.access_token // Server integration only; never send this through an API route.
     },
     async disconnect(userId) {
-      await pool.query('delete from private.calendar_oauth_states where user_id = $1', [userId])
       const result = await pool.query(
-        'delete from private.calendar_credentials where user_id = $1 returning refresh_token_ciphertext', [userId])
-      if (!result.rows.length) return { disconnected: true, revoked: false }
+        'select private.disconnect_calendar($1) as refresh_token_ciphertext', [userId])
+      if (!result.rows[0]?.refresh_token_ciphertext) return { disconnected: true, revoked: false }
       let revoked = false
       try {
         const token = cipher.decrypt(result.rows[0].refresh_token_ciphertext)

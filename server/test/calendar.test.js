@@ -22,29 +22,33 @@ function fakeDb() {
   return {
     states, credentials,
     async query(sql, params) {
-      if (sql.startsWith('delete from private.calendar_oauth_states where user_id')) {
+      if (sql.startsWith('delete from private.calendar_oauth_states where expires_at')) {
+        for (const [digest, state] of states) if (state.expires_at <= new Date()) states.delete(digest)
+        return { rows: [] }
+      }
+      if (sql.startsWith('select private.begin_calendar_connection')) {
         for (const [digest, state] of states) {
-          if (state.user_id === params[0] || (sql.includes('expires_at') && state.expires_at < new Date())) {
-            states.delete(digest)
-          }
+          if (state.user_id === params[0]) states.delete(digest)
         }
+        states.set(params[1], { user_id: params[0], expires_at: params[2], claimed_at: null })
         return { rows: [] }
       }
-      if (sql.startsWith('insert into private.calendar_oauth_states')) {
-        states.set(params[0], { user_id: params[1], expires_at: params[2] })
-        return { rows: [] }
-      }
-      if (sql.startsWith('delete from private.calendar_oauth_states')) {
+      if (sql.startsWith('update private.calendar_oauth_states')) {
         const row = states.get(params[0])
-        states.delete(params[0])
-        return { rows: row && row.expires_at > new Date() ? [row] : [] }
+        if (!row || row.claimed_at || row.expires_at <= new Date()) return { rows: [] }
+        row.claimed_at = new Date()
+        return { rows: [row] }
       }
-      if (sql.startsWith('insert into private.calendar_credentials')) {
-        credentials.set(params[0], { refresh_token_ciphertext: params[1], scopes: params[2] })
-        return { rows: [] }
+      if (sql.startsWith('select private.finish_calendar_connection')) {
+        const state = states.get(params[1])
+        if (!state || state.user_id !== params[0] || !state.claimed_at || state.expires_at <= new Date()) return { rows: [{ connected: false }] }
+        states.delete(params[1])
+        credentials.set(params[0], { refresh_token_ciphertext: params[2], scopes: params[3] })
+        return { rows: [{ connected: true }] }
       }
       if (sql.startsWith('select 1 from private.calendar_credentials')) {
-        return { rows: credentials.has(params[0]) ? [{ '?column?': 1 }] : [] }
+        const row = credentials.get(params[0])
+        return { rows: row && (params.length === 1 || row.refresh_token_ciphertext === params[1]) ? [{ '?column?': 1 }] : [] }
       }
       if (sql.startsWith('select refresh_token_ciphertext from private.calendar_credentials')) {
         const row = credentials.get(params[0])
@@ -52,13 +56,150 @@ function fakeDb() {
       }
       if (sql.startsWith('delete from private.calendar_credentials')) {
         const row = credentials.get(params[0])
+        if (!row || row.refresh_token_ciphertext !== params[1]) return { rows: [] }
         credentials.delete(params[0])
-        return { rows: row ? [row] : [] }
+        return { rows: [row] }
+      }
+      if (sql.startsWith('select private.disconnect_calendar')) {
+        for (const [digest, state] of states) if (state.user_id === params[0]) states.delete(digest)
+        const row = credentials.get(params[0])
+        credentials.delete(params[0])
+        return { rows: [{ refresh_token_ciphertext: row?.refresh_token_ciphertext ?? null }] }
       }
       throw new Error(`Unexpected query: ${sql}`)
     },
   }
 }
+
+function deferred() {
+  let resolve
+  const promise = new Promise(done => { resolve = done })
+  return { promise, resolve }
+}
+
+const userId = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+const tokenResponse = (refresh = 'refresh') => new Response(JSON.stringify({ refresh_token: refresh, scope }))
+const beginState = async service => new URL(await service.begin(userId)).searchParams.get('state')
+
+test('disconnect on another server cancels an exchange already waiting for Google', async () => {
+  const db = fakeDb()
+  const started = deferred()
+  const response = deferred()
+  const service = createCalendarService({ env, db, fetchImpl: async () => {
+    started.resolve()
+    return response.promise
+  } })
+  const otherServer = createCalendarService({ env, db })
+  const state = await beginState(service)
+  const callback = service.callback({ state, code: 'code' })
+  const rejected = assert.rejects(callback, { status: 409, code: 'CALENDAR_CONNECTION_CANCELLED' })
+  await started.promise
+  await otherServer.disconnect(userId)
+  response.resolve(tokenResponse())
+  await rejected
+  assert.equal((await otherServer.status(userId)).connected, false)
+  assert.equal(db.states.size, 0)
+})
+
+test('a replacement connection wins over an older in-flight exchange', async () => {
+  const db = fakeDb()
+  const started = deferred()
+  const response = deferred()
+  const oldServer = createCalendarService({ env, db, fetchImpl: async () => {
+    started.resolve()
+    return response.promise
+  } })
+  const newServer = createCalendarService({ env, db, fetchImpl: async () => tokenResponse('new-token') })
+  const oldState = await beginState(oldServer)
+  const callback = oldServer.callback({ state: oldState, code: 'old-code' })
+  const rejected = assert.rejects(callback, { code: 'CALENDAR_CONNECTION_CANCELLED' })
+  await started.promise
+  const newState = await beginState(newServer)
+  await newServer.callback({ state: newState, code: 'new-code' })
+  response.resolve(tokenResponse('old-token'))
+  await rejected
+  assert.equal(createTokenCipher(key).decrypt(db.credentials.get(userId).refresh_token_ciphertext), 'new-token')
+})
+
+test('claimed state cannot be replayed while its first exchange is in flight', async () => {
+  const db = fakeDb()
+  const started = deferred()
+  const response = deferred()
+  let exchanges = 0
+  const service = createCalendarService({ env, db, fetchImpl: async () => {
+    exchanges++
+    started.resolve()
+    return response.promise
+  } })
+  const state = await beginState(service)
+  const callback = service.callback({ state, code: 'code' })
+  await started.promise
+  await assert.rejects(service.callback({ state, code: 'replay' }), { code: 'INVALID_OAUTH_STATE' })
+  response.resolve(tokenResponse())
+  assert.equal(await callback, 'connected')
+  assert.equal(exchanges, 1)
+})
+
+test('an attempt expiring during the exchange cannot save its token', async () => {
+  const db = fakeDb()
+  const service = createCalendarService({ env, db, fetchImpl: async () => {
+    for (const state of db.states.values()) state.expires_at = new Date(0)
+    return tokenResponse()
+  } })
+  const state = await beginState(service)
+  await assert.rejects(service.callback({ state, code: 'code' }), { code: 'CALENDAR_CONNECTION_CANCELLED' })
+  assert.equal((await service.status(userId)).connected, false)
+})
+
+for (const outcome of ['invalid_grant', 'success']) {
+  test(`late refresh ${outcome} cannot replace or delete a newer connection`, async () => {
+    const db = fakeDb()
+    const started = deferred()
+    const response = deferred()
+    const service = createCalendarService({ env, db, fetchImpl: async (_url, options) => {
+      if (new URLSearchParams(options.body).get('grant_type') === 'refresh_token') {
+        started.resolve()
+        return response.promise
+      }
+      return tokenResponse()
+    } })
+    const initialState = await beginState(service)
+    await service.callback({ state: initialState, code: 'code' })
+    const refresh = service.getAccessToken(userId)
+    const rejected = assert.rejects(refresh, { code: 'CALENDAR_RECONNECT_REQUIRED' })
+    await started.promise
+    const newServer = createCalendarService({ env, db, fetchImpl: async () => tokenResponse('new-token') })
+    const newState = await beginState(newServer)
+    await newServer.callback({ state: newState, code: 'new-code' })
+    response.resolve(outcome === 'success'
+      ? new Response(JSON.stringify({ access_token: 'old-grant-access' }))
+      : new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 }))
+    await rejected
+    assert.equal(createTokenCipher(key).decrypt(db.credentials.get(userId).refresh_token_ciphertext), 'new-token')
+  })
+}
+
+test('successful refresh arriving after disconnect cannot return an access token', async () => {
+  const db = fakeDb()
+  const started = deferred()
+  const response = deferred()
+  const service = createCalendarService({ env, db, fetchImpl: async (_url, options) => {
+    if (new URLSearchParams(options.body).get('grant_type') === 'refresh_token') {
+      started.resolve()
+      return response.promise
+    }
+    return tokenResponse()
+  } })
+  const state = await beginState(service)
+  await service.callback({ state, code: 'code' })
+  const refresh = service.getAccessToken(userId)
+  const rejected = assert.rejects(refresh, { code: 'CALENDAR_RECONNECT_REQUIRED' })
+  await started.promise
+  await service.disconnect(userId)
+  response.resolve(new Response(JSON.stringify({ access_token: 'late-access' })))
+  await rejected
+  assert.equal((await service.status(userId)).connected, false)
+})
 
 test('Calendar connection binds one-time state to the signed-in user and encrypts tokens', async () => {
   const db = fakeDb()
