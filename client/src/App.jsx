@@ -9,22 +9,34 @@ import StopPopup from './planner/StopPopup.jsx'
 import './App.css'
 
 function App() {
-  const { plan, selectedStopId, selectStop } = usePlan()
+  const { plan, selectedStopId, selectStop, clearSelection } = usePlan()
   const [previewPlace, setPreviewPlace] = useState(null)
   const { now, isDemoTime } = usePlanClock(plan)
   // The popup opens only from a pin click on the map: { stopId, anchor } or null.
   const [popup, setPopup] = useState(null)
   const [revealRequest, setRevealRequest] = useState(null)
 
-  const selectFromMap = useCallback((stopId, options) => {
-    selectStop(stopId)
-    if (options?.anchor) setPopup({ stopId, anchor: options.anchor })
-  }, [selectStop])
+  // Esc, ×, clicking the open pin again, or clicking the empty map: close and deselect.
+  const dismiss = useCallback(() => {
+    setPopup(null)
+    clearSelection()
+  }, [clearSelection])
 
+  const selectFromMap = useCallback((stopId, { anchor }) => {
+    if (popup?.stopId === stopId) {
+      dismiss()
+      return
+    }
+    selectStop(stopId)
+    setPopup({ stopId, anchor })
+  }, [popup, dismiss, selectStop])
+
+  // The popup is placed on screen and cannot follow the camera, so it closes when
+  // the camera moves. The stop stays selected.
   const closePopup = useCallback(() => setPopup(null), [])
 
+  // The popup stays open while the planner reveals the row.
   const viewInPlanner = useCallback((stopId) => {
-    setPopup(null)
     setRevealRequest((previous) => ({ stopId, key: (previous?.key ?? 0) + 1 }))
   }, [])
 
@@ -33,16 +45,16 @@ function App() {
 
   return (
     <div className="app">
-      {/* The popup cannot follow the camera, so any drag or zoom on the map closes it. */}
-      <div onPointerDownCapture={closePopup} onWheelCapture={closePopup}>
-        <MapView
-          stops={plan.stops}
-          legs={plan.legs}
-          selectedStopId={selectedStopId}
-          onSelectStop={selectFromMap}
-          previewPlace={previewPlace}
-        />
-      </div>
+      <MapView
+        stops={plan.stops}
+        legs={plan.legs}
+        selectedStopId={selectedStopId}
+        onSelectStop={selectFromMap}
+        onClearSelection={dismiss}
+        onCameraMove={closePopup}
+        now={now}
+        previewPlace={previewPlace}
+      />
       <AppHeader
         date={plan.date}
         timezone={plan.timezone}
@@ -59,7 +71,7 @@ function App() {
           key={popup.stopId}
           stopId={popup.stopId}
           anchor={popup.anchor}
-          onClose={closePopup}
+          onClose={dismiss}
           onViewInPlanner={viewInPlanner}
         />
       )}

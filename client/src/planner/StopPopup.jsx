@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { usePlan } from '../app/planContext.js'
+import { numberStops } from '../app/stopNumbers.js'
 import { formatTimeRange } from '../components/formatTime.js'
 import PlacePopup from '../components/PlacePopup.jsx'
 import { getPlaceDetails } from '../services/placesService.js'
@@ -41,7 +42,13 @@ export default function StopPopup({ stopId, anchor, onClose, onViewInPlanner }) 
     : 'Time not set'
 
   return (
-    <PlacePopup anchor={anchor} title={stop.title} photoUrl={details?.photoUrl ?? null} onClose={onClose}>
+    <PlacePopup
+      anchor={anchor}
+      title={stop.title}
+      badge={{ number: numberStops(shown.stops).get(stop.id), kind: timing.kind }}
+      photoUrl={details?.photoUrl ?? null}
+      onClose={onClose}
+    >
       {details && (
         <p className="place-popup-meta">
           {details.rating !== null && <strong>{details.rating} ★</strong>}

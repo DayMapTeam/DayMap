@@ -27,7 +27,7 @@ There are no root npm scripts yet. Tests use Node's built-in test runner and int
 1. In the DayMap Google Cloud project, enable **Maps JavaScript API** and **Places API (New)**.
 2. Edit the browser key: keep **Websites** restrictions for `http://localhost:5173/*` and `http://127.0.0.1:5173/*`; allow both APIs under **API restrictions**. Billing must be enabled on the project.
 3. Set `VITE_GOOGLE_MAPS_API_KEY` in ignored `client/.env.local`, using `.env.example` as the template. Restart Vite after changing it. Never commit the real key.
-4. Search for `State Library` in the top-left field. Choose a suggestion by pointer or ArrowDown/Enter. A purple P pin previews the location and the camera moves there.
+4. Search for `State Library` in the top-left field. Choose a suggestion by pointer or ArrowDown/Enter. A dashed search pin (not in your day) previews the location and the camera moves there.
 5. Choose another place: the previous preview is replaced. Clear search or press Escape: the preview disappears. It never changes the day's activities or selected itinerary stop.
 6. Confirm itinerary pin/card selection still works. Try a query with no matches and check that the status is clear.
 
@@ -93,7 +93,19 @@ const { plan, selectedStopId, selectStop } = usePlan()
 return <MapView stops={plan.stops} legs={plan.legs} selectedStopId={selectedStopId} onSelectStop={selectStop} />
 ```
 
-A pin click calls `onSelectStop(stopId, { anchor })`, where `anchor` is the click point in map pixels (`{ x, y }`). The 3D map has no lat/lng-to-pixel API, so this is how the place popup knows where to point. Callers that only select can ignore it. `App.jsx` opens the popup only from this call, never from the planner or search, and closes it when the map is dragged or zoomed, because it cannot follow the camera.
+Every map pin is drawn by `stopMarkerSvg()` in `src/map/stopMarker.js`: a numbered head on a stem above a ground dot, where the ground dot is the stop's exact position. Numbers come from `numberStops()` in `src/app/stopNumbers.js` (plan order, starting at 1), which the popup badge also uses. Fixed stops are dark, flexible blue, all-day grey, and search previews dashed. Selected pins get a smaller head and a blue halo, finished stops fade, and the stem shortens above 45° tilt. Colours come from `src/theme/tokens.css`. The SVG function also supports clash and preview-shifted states, which stay off until scheduling and proposals exist.
+
+Besides the documented props, `MapView` takes:
+
+| Prop | Meaning |
+| --- | --- |
+| `onSelectStop(stopId, { anchor })` | A pin was clicked. `anchor` is the click point in map pixels; the 3D map has no lat/lng-to-pixel API, so this is how the popup knows where to point. |
+| `onClearSelection()` | The empty map was clicked. |
+| `onCameraMove()` | The camera moved. The popup is placed on screen and cannot follow it, so `App.jsx` closes it (the stop stays selected). |
+| `now` | Stops that ended before this are drawn faded. |
+| `previewPlace` | The place-search preview, drawn as a dashed search pin. |
+
+`App.jsx` opens the popup only from a pin click, never from the planner or search.
 
 `usePlan()` throws a descriptive error outside the provider. Context/hook, reducer, and provider live in separate files to support React Fast Refresh. Edits follow ARCHITECTURE §4: they create a draft, and only `acceptDraft()` changes the accepted plan. Preview (conflicts and routes), persistence, loading data from `/api/demo-plan`, and server-held proposals are later work.
 
@@ -106,7 +118,7 @@ A pin click calls `onSelectStop(stopId, { anchor })`, where `anchor` is the clic
 5. Expand *Morning lecture*: details only, with "DayMap will never move a fixed event." Expand *Library study*: the edit form opens and the lecture row closes. An end before the start, or times outside 10:00am–12:00pm, show an error and nothing is saved.
 6. Change Library study to 10:45–11:45 and Save. The row shows the new time marked *Changed*, and a card lists the change. *Keep current plan* restores 10:30–11:30; *Accept changes* applies it.
 7. Collapse the planner with the › button; the *Planner* pill reopens it. Below 720px the planner is a bottom sheet; its handle switches between peek and full height. Open/collapsed is remembered per browser.
-8. With a Maps key in `.env.local`, click a pin: a popup opens above it (below it near the top), never under the planner, with the stop's time, Fixed/Flexible and address. There is no photo yet ("No photo yet") until place details exist (DM-07). Selecting rows or searching never opens it. Esc, ×, selecting another stop, or dragging the map closes it. *View in planner* opens the panel if collapsed, clears the filter, expands that row, scrolls to it and briefly highlights it.
+8. With a Maps key in `.env.local`, click a pin: a popup opens above it (below it near the top), never under the planner, with the stop's time, Fixed/Flexible and address. There is no photo yet ("No photo yet") until place details exist (DM-07). Selecting rows or searching never opens it. The popup shows the pin's number and points at the pin head. Esc, ×, clicking the same pin again, or clicking the empty map closes it and clears the selection; moving the camera or selecting another stop in the planner only closes it. *View in planner* keeps it open, opens the panel if collapsed, clears the filter, expands that row, scrolls to it and briefly highlights it.
 9. Expand *Library study* and press the red *Delete* on the left of Cancel and Save. A dialog over the planner asks "Are you sure you want to delete this event?". *Cancel* (or Esc) changes nothing and returns focus to Delete; *Confirm* removes the stop. Only flexible stops show Delete.
 10. The round *+* button in the planner header (or the N key) opens the add sheet: *Where?* (a place, or *Use “…”* without one), *When?* (duration and the best times, or a set time), then *Check your day* listing what is new, moved or unchanged. Nothing changes until *Add to day*. The new row is marked *New* and selected, and a toast offers *Undo* for 5 seconds. Try *At a set time* 11:00–11:20am: it overlaps Library study and *Next* stays disabled. Without a Maps key, place search says it is unavailable and events can still be added without a place (shown as *Location needed*).
 11. Adding is disabled while an edit is waiting to be accepted. Fits use clock times only: travel is unknown until routes exist, and every message says so. The fit logic is local (`src/app/planAdd.js`) until the planning endpoint exists.

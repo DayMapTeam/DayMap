@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef } from 'react'
 import { placePopup } from './popupPosition.js'
 import './PlacePopup.css'
 
-const MARGIN = 16
+const MARGIN = 12
 
 // The visible map area inside the popup's container: below the header and
 // clear of the planner (docked right on desktop, a bottom sheet on mobile).
@@ -18,11 +18,12 @@ function mapBounds(container) {
 }
 
 /**
- * Glass popup pointing at `anchor` ({ x, y } in container pixels). Esc or ×
- * closes it. Focus moves in on open and goes back where it was on close.
- * `onClose` should be stable (useCallback) so focus is not reset each render.
+ * Glass popup whose pointer points at the pin at `anchor` ({ x, y } in
+ * container pixels). Esc or × closes it. Focus moves in on open and goes back
+ * where it was on close. `onClose` should be stable (useCallback) so focus is
+ * not reset each render. `badge` ({ number, kind }) repeats the pin's number.
  */
-export default function PlacePopup({ anchor, title, photoUrl, onClose, children }) {
+export default function PlacePopup({ anchor, title, badge = null, photoUrl, onClose, children }) {
   const titleId = useId()
   const popupRef = useRef(null)
 
@@ -38,7 +39,7 @@ export default function PlacePopup({ anchor, title, photoUrl, onClose, children 
       })
       popup.style.left = `${layout.left}px`
       popup.style.top = `${layout.top}px`
-      popup.style.setProperty('--tail-x', `${layout.tailX}px`)
+      popup.style.setProperty('--pointer-x', `${layout.pointerX}px`)
       popup.dataset.placement = layout.placement
     }
     position()
@@ -70,10 +71,15 @@ export default function PlacePopup({ anchor, title, photoUrl, onClose, children 
         </button>
       </div>
       <div className="place-popup-body">
-        <h2 id={titleId} className="place-popup-title">{title}</h2>
+        <div className="place-popup-heading">
+          {badge && (
+            <span className="place-popup-badge" data-kind={badge.kind} aria-hidden="true">{badge.number}</span>
+          )}
+          <h2 id={titleId} className="place-popup-title">{title}</h2>
+        </div>
         {children}
       </div>
-      <span className="place-popup-tail" aria-hidden="true" />
+      <span className="place-popup-pointer" aria-hidden="true" />
     </div>
   )
 }
