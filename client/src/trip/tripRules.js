@@ -97,13 +97,15 @@ export function nextStopFor(plan, { atStopId = null, now }) {
     .find((stop) => stop.status === 'planned' && Date.parse(stop.timing.scheduledEndAt) > time) ?? null
 }
 
-/** Google Maps walking directions: a plain link, no API request. */
-export function directionsUrl(location) {
+/** Google Maps directions for the journey's mode: a plain link, no API request. */
+const MAPS_TRAVEL_MODES = { walk: 'walking', transit: 'transit', drive: 'driving' }
+
+export function directionsUrl(location, mode = 'walk') {
   const url = new URL('https://www.google.com/maps/dir/')
   url.searchParams.set('api', '1')
   url.searchParams.set('destination', `${location.lat},${location.lng}`)
   if (location.placeId) url.searchParams.set('destination_place_id', location.placeId.replace(/^places\//, ''))
-  url.searchParams.set('travelmode', 'walking')
+  url.searchParams.set('travelmode', MAPS_TRAVEL_MODES[mode] ?? 'walking')
   return url.toString()
 }
 

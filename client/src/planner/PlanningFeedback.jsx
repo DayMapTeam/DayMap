@@ -2,7 +2,15 @@ import { useMemo, useState } from 'react'
 import { suggestFix } from '../../../shared/planning/proposals.js'
 import { usePlan } from '../app/planContext.js'
 import { formatTimeRange } from '../components/formatTime.js'
+import { WhenModeToggle } from './AddEventFields.jsx'
 import './PlanningFeedback.css'
+
+const PREFERENCE_OPTIONS = [['auto', 'Walk + transit'], ['drive', 'Car'], ['walk', 'Walk only']]
+const PREFERENCE_TEXT = {
+  auto: 'Short trips are walked; longer ones use public transport when it’s quicker.',
+  drive: 'Short trips are walked; longer ones are driven (no live traffic).',
+  walk: 'Every journey is walked.',
+}
 
 const unresolvedText = {
   'ambiguous-order': 'Overlapping events need a clear order before travel can be checked.',
@@ -11,12 +19,13 @@ const unresolvedText = {
   'missing-coordinates': 'Coordinates are needed for a demo estimate.',
   'progress-unknown': 'The planned departure has passed; your actual progress is unknown.',
   'routes-not-connected': 'Live route estimates are not connected yet.',
-  'pending': 'Loading walking time from Google Maps.',
+  'pending': 'Loading travel time from Google Maps.',
   'routes-access-denied': 'Google denied this request. Check Routes API, billing and the browser key restrictions, then Retry routes.',
   'routes-quota': 'Google route quota was reached. Try again later.',
   'routes-timeout': 'Google took too long to respond. Retry routes.',
-  'routes-unavailable': 'Google walking estimates are unavailable. Retry routes.',
-  'no-route': 'Google could not find a walking route between these places.',
+  'routes-unavailable': 'Google travel estimates are unavailable. Retry routes.',
+  'no-route': 'Google could not find a route between these places for this way of travelling.',
+  'departure-unverified': 'Checking public transport for this departure time.',
   'invalid-time': 'Set a valid start and end time.',
 }
 
@@ -46,7 +55,7 @@ function Conflict({ conflict, planning, automatic }) {
         {result?.status === 'noFit' && <>
           <p role="status">{planning.loadingRoutes ? 'Checking journey times…' : 'No verified one-event fix found. Your edited events stay locked; try another time or adjust the window.'}</p>
           {planning.provider === 'google' && result.blockers.some((b) => b.reason === 'travel-unknown') && <button
-            type="button" className="button-text" disabled={planning.loadingRoutes} onClick={planning.checkAlternatives}>Check alternative walking routes</button>}
+            type="button" className="button-text" disabled={planning.loadingRoutes} onClick={planning.checkAlternatives}>Check alternative routes</button>}
         </>}
         {!draft?.suggestion && <div className="planning-actions">
           {(!result || dismissed) && <button type="button" className="button-text" onClick={() => { setDismissed(false); setRequested(fingerprint) }}>Suggest a fix</button>}
@@ -61,11 +70,14 @@ export default function PlanningFeedback({ planning }) {
   const { shown, analysis, introduced } = planning
   const urgent = introduced.find((c) => c.severity === 'error')?.id
   return <section className="planning-feedback" aria-label="Day checks">
-    <p className="planning-source">{planning.provider === 'demo'
-      ? 'Simulated walking estimates · 5 min buffer. No live routes.'
-      : 'Walking estimates by Google Maps · 5 min buffer.'}</p>
-    {planning.provider === 'google' && <p className="planning-source">Walking routes may be missing sidewalks or pedestrian paths.</p>}
-    {planning.loadingRoutes && <p role="status">Loading walking routes…</p>}
+    <div className="planning-travel">
+      <span className="planning-travel-label">Getting around</span>
+      <WhenModeToggle value={planning.preference} onChange={planning.setPreference} options={PREFERENCE_OPTIONS} label="Getting around" />
+    </div>
+    <p className="planning-source">{PREFERENCE_TEXT[planning.preference]} {planning.provider === 'demo'
+      ? 'Simulated estimates, no live routes.'
+      : 'Estimates by Google Maps.'} Buffers: walk 5 min, transit 5 min, car 10 min.</p>
+    {planning.loadingRoutes && <p role="status">Loading travel times…</p>}
     {planning.failedRoutes && <button type="button" className="button-text" disabled={planning.loadingRoutes} onClick={planning.retryRoutes}>Retry routes</button>}
     <p role="status">{analysis.conflicts.length ? `${analysis.conflicts.length} schedule issue${analysis.conflicts.length === 1 ? '' : 's'}` : 'No schedule conflicts detected'}
       {analysis.unresolved.length > 0 && ` · ${analysis.unresolved.length} unresolved check${analysis.unresolved.length === 1 ? '' : 's'}`}</p>

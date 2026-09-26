@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createWalkingRoutesProvider, routeLocation, walkingPairKey } from './walkingRoutes.js'
+import { createRoutesProvider, createWalkingRoutesProvider, routeLocation, routePairKey, walkingPairKey } from './walkingRoutes.js'
 import { createWalkingRouteStore } from './walkingRouteStore.js'
 import { chooseTravelProvider } from './planningContext.js'
 
@@ -25,6 +25,7 @@ test('adapter uses WALKING, minimal fields and converts milliseconds to seconds'
   const result = await provider(a, [b, c, d])
   assert.deepEqual(request, { origins: [{ lat: 1, lng: 2 }], destinations: [b.location, c.location, d.location],
     travelMode: 'WALKING', fields: ['durationMillis', 'distanceMeters', 'condition'] })
+  assert.equal(result[0].timeDependent, false)
   assert.equal(result[0].travelSeconds, 125.5)
   assert.equal(result[0].provider, 'google')
   assert.equal(result[1].reason, 'no-route')
@@ -133,7 +134,7 @@ test('snapshots are stable until a result changes; reads are pure and missing lo
   await tick()
   assert.equal(updates, 2)
   assert.equal(old.size, 0)
-  assert.equal(store.lookup(a, b, old).status, 'pending')
+  assert.equal(store.lookup(a, b, { results: old }).status, 'pending')
   unsubscribe()
 })
 
@@ -151,4 +152,46 @@ test('Google is used with an existing key; simulation is explicit and demo-only'
   assert.equal(chooseTravelProvider({ dataMode: 'live' }, 'demo', false), 'google')
   assert.equal(chooseTravelProvider({ dataMode: 'demo' }, undefined, false), 'demo')
   assert.equal(chooseTravelProvider({ dataMode: 'demo' }, 'google', false), 'google')
+})
+
+test('public transport requests carry the departure time and are keyed by it; driving is not', async () => {
+  const requests = []
+  const provider = createRoutesProvider(async () => ({ RouteMatrix: { async computeRouteMatrix(input) {
+    requests.push(input)
+    return { matrix: { rows: [{ items: [{ condition: 'ROUTE_EXISTS', durationMillis: 600000 }] }] } }
+  } } }))
+  const departAt = '2026-09-26T03:00:00Z'
+  const [transit] = await provider(a, [b], { mode: 'transit', departAt })
+  assert.equal(requests[0].travelMode, 'TRANSIT')
+  assert.equal(requests[0].departureTime.toISOString(), '2026-09-26T03:00:00.000Z')
+  assert.deepEqual({ timeDependent: transit.timeDependent, departAt: transit.departAt, mode: transit.mode },
+    { timeDependent: true, departAt: '2026-09-26T03:00:00.000Z', mode: 'transit' })
+  const [drive] = await provider(a, [b], { mode: 'drive', departAt })
+  assert.equal(requests[1].travelMode, 'DRIVING')
+  assert.equal('departureTime' in requests[1], false)
+  assert.equal(drive.timeDependent, false)
+
+  assert.notEqual(routePairKey(a, b, { mode: 'transit', departAt }), routePairKey(a, b, { mode: 'transit', departAt: '2026-09-26T03:05:00Z' }))
+  assert.equal(routePairKey(a, b, { mode: 'drive', departAt }), routePairKey(a, b, { mode: 'drive', departAt: '2026-09-26T09:00:00Z' }))
+  assert.notEqual(routePairKey(a, b, { mode: 'drive' }), routePairKey(a, b))
+  assert.equal(routePairKey(a, b, { mode: 'transit' }), null, 'public transport needs a departure')
+  assert.equal(routePairKey(a, b, { mode: 'teleport' }), null)
+})
+
+test('the store sends one request per origin, mode and departure, and looks results up the same way', async () => {
+  const calls = []
+  const store = createWalkingRouteStore(async (from, destinations, options) => {
+    calls.push({ destinations: destinations.length, ...options })
+    return destinations.map(() => ({ ...ready(), mode: options.mode }))
+  })
+  const departAt = '2026-09-26T03:00:00.000Z'
+  store.request([
+    { from: a, to: b, mode: 'transit', departAt }, { from: a, to: c, mode: 'transit', departAt },
+    { from: a, to: b }, { from: a, to: b, mode: 'drive' },
+  ])
+  await tick()
+  assert.deepEqual(calls.map(({ mode, destinations }) => [mode, destinations]).sort(), [['drive', 1], ['transit', 2], ['walk', 1]])
+  assert.equal(store.lookup(a, b, { mode: 'transit', departAt }).mode, 'transit')
+  assert.equal(store.lookup(a, b, { mode: 'transit', departAt: '2026-09-26T04:00:00Z' }).status, 'pending')
+  assert.equal(store.lookup(a, b).mode, 'walk')
 })
