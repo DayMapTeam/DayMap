@@ -286,3 +286,15 @@ test('the chosen way to travel to a Calendar event survives re-import and valida
   none.stops[1].travelMode = null
   validateSave(none.id, { baseVersion: none.version, plan: none })
 })
+
+test('where the day starts and ends is validated and kept by Calendar import', () => {
+  const home = { label: 'Home', placeId: null, lat: -34.95, lng: 138.6 }
+  const saved = { ...structuredClone(planWith(eventsToStops([lecture], day)).plan), startPlace: home, endPlace: home }
+  const { plan } = planWith(eventsToStops([lecture, standup], day), saved)
+  assert.deepEqual([plan.startPlace, plan.endPlace], [home, home])
+  validateSave(plan.id, { baseVersion: plan.version, plan })
+  for (const bad of [{ ...home, placeId: 'places/x' }, { ...home, lat: 200 }, { label: 'Home' }]) {
+    assert.throws(() => validateSave(plan.id, { baseVersion: plan.version, plan: { ...plan, endPlace: bad } }), { code: 'INVALID_PLAN' })
+  }
+  validateSave(plan.id, { baseVersion: plan.version, plan: { ...plan, startPlace: null } })
+})

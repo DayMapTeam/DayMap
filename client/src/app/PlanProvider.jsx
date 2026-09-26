@@ -34,6 +34,9 @@ export function PlanProvider({ initialPlan, children }) {
   const undoAdd = useCallback((stopId) => {
     dispatch({ type: 'undo-add', stopId })
   }, [])
+  const setDayPlace = useCallback((which, location) => {
+    dispatch({ type: 'set-day-place', which, location })
+  }, [])
   const setStopTravelMode = useCallback((stopId, mode) => {
     dispatch({ type: 'set-stop-travel-mode', stopId, mode })
   }, [])
@@ -61,11 +64,12 @@ export function PlanProvider({ initialPlan, children }) {
     discardDraft,
     addStop,
     undoAdd,
+    setDayPlace,
     setStopTravelMode,
     setStopKind,
     setStopLocation,
     loadPlan,
-  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, setStopTravelMode, setStopKind, setStopLocation, loadPlan])
+  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, setDayPlace, setStopTravelMode, setStopKind, setStopLocation, loadPlan])
 
   return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>
 }

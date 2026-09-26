@@ -1,3 +1,4 @@
+import { planDayBounds } from '../../../shared/planning/dayBounds.js'
 import { buildTimeline } from '../../../shared/planning/timeline.js'
 
 // Trip rules. Everything here is pure: positions come in as readings
@@ -73,9 +74,32 @@ function accuracyBonus(reading) {
 const arriveRadius = (reading) => RULES.arriveMeters + accuracyBonus(reading)
 const departRadius = (reading) => RULES.departMeters + accuracyBonus(reading)
 
-// Timed, not skipped, on the map, in time order. Includes completed stops, which you can still be at.
+export const DAY_END_ID = 'day-end'
+
+/**
+ * Where the day ends (home, a hotel) as the last stop a trip can go to: from
+ * the end of the last timed stop until midnight. Null without an end place.
+ */
+export function dayEndStop(plan) {
+  if (!isValidPoint(plan.endPlace)) return null
+  const timed = buildTimeline(plan).filter((stop) => stop.timing.kind !== 'all-day' && stop.timing.scheduledEndAt)
+  const { start, end } = planDayBounds(plan.date, plan.timezone)
+  const from = timed.length ? Date.parse(timed.at(-1).timing.scheduledEndAt) : start
+  const iso = (ms) => new Date(ms).toISOString()
+  return {
+    id: DAY_END_ID, title: plan.endPlace.label, source: 'manual', sourceEventId: null, sourceCalendarId: null,
+    location: plan.endPlace, travelMode: null, status: 'planned',
+    timing: { kind: 'flexible', durationMinutes: null, fixedStartAt: null, fixedEndAt: null, earliestStartAt: null,
+      latestEndAt: null, scheduledStartAt: iso(Math.min(from, end - 60000)), scheduledEndAt: iso(end) },
+  }
+}
+
+// Timed, not skipped, on the map, in time order, then where the day ends.
+// Includes completed stops, which you can still be at.
 function locatedStops(plan) {
-  return buildTimeline(plan).filter((stop) => isValidPoint(stop.location))
+  const stops = buildTimeline(plan).filter((stop) => isValidPoint(stop.location))
+  const end = dayEndStop(plan)
+  return end ? [...stops, end] : stops
 }
 
 /** Stops a trip can go to: planned, timed and on the map, in time order. */

@@ -81,3 +81,15 @@ export function withTravelMode(stop, mode) {
   if ((stop.travelMode ?? null) === next) return null
   return { ...stop, travelMode: next }
 }
+
+/**
+ * The plan with where the day starts and/or ends ('start' | 'end' | 'both'),
+ * or without it (location null). Returns the same plan when nothing changes.
+ */
+export function withDayPlace(plan, which, location) {
+  const place = location ? { label: location.label, placeId: location.placeId ?? null, lat: location.lat, lng: location.lng } : null
+  const fields = which === 'both' ? ['startPlace', 'endPlace'] : which === 'start' ? ['startPlace'] : which === 'end' ? ['endPlace'] : []
+  const same = (a, b) => (a ?? null) === null ? b === null : b !== null && a.lat === b.lat && a.lng === b.lng && a.label === b.label
+  if (fields.every((field) => same(plan[field], place))) return plan
+  return { ...plan, ...Object.fromEntries(fields.map((field) => [field, place])) }
+}

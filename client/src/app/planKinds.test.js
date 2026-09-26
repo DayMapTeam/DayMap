@@ -56,3 +56,18 @@ test('a chosen way of travelling applies to the plan and a draft, and null means
   assert.equal(auto.plan.stops[1].travelMode, null)
   assert.equal(planReducer(state, { type: 'set-stop-travel-mode', stopId: library.id, mode: 'boat' }), state, 'unknown modes mean automatic')
 })
+
+test('where the day starts and ends is set, saved and cleared like any accepted change', async () => {
+  const { toSavedPlan } = await import('./planPersistence.js')
+  const home = { label: 'Home', placeId: 'places/home', lat: -34.95, lng: 138.6 }
+  const state = createPlanState(demoPlan)
+  const both = planReducer(state, { type: 'set-day-place', which: 'both', location: home })
+  assert.deepEqual([both.plan.startPlace.label, both.plan.endPlace.label], ['Home', 'Home'])
+  assert.equal(both.plan.version, state.plan.version + 1)
+  assert.equal(planReducer(both, { type: 'set-day-place', which: 'both', location: home }), both)
+  assert.equal(toSavedPlan(both.plan).endPlace.placeId, null, 'place IDs are not saved')
+  const cleared = planReducer(both, { type: 'set-day-place', which: 'start', location: null })
+  assert.equal(cleared.plan.startPlace, null)
+  assert.equal(cleared.plan.endPlace.label, 'Home')
+  assert.equal(toSavedPlan(demoPlan).startPlace, null)
+})

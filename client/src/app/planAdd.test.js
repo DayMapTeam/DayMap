@@ -259,3 +259,13 @@ test('the reducer commits exactly the travel-aware option the preview showed', (
   const state = planReducer(createPlanState(demoPlan), { type: 'add-stop', newStop, afterStopId: lecture, baseVersion: demoPlan.version, now: NOW, ctx })
   assert.deepEqual(state.plan.stops, preview.plan.stops)
 })
+
+test('an event added with From–To times keeps them and stays flexible', () => {
+  const timed = { id: 'stop-new', title: 'Ice cream', location: null, kind: 'timed', startAt: '2026-09-26T04:30:00Z', endAt: '2026-09-26T05:00:00Z' }
+  const option = chooseOption(demoPlan, timed, { afterStopId: null, now: NOW })
+  const added = stopIn(option.plan, 'stop-new')
+  assert.equal(added.timing.kind, 'flexible')
+  assert.equal(added.timing.scheduledStartAt, '2026-09-26T04:30:00Z')
+  assert.equal(added.timing.fixedStartAt, null)
+  assert.equal(fitNewStop(demoPlan, { ...timed, endAt: null }, { now: NOW }).error, 'missing-time')
+})

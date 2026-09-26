@@ -3,6 +3,7 @@ import { usePlan } from '../app/planContext.js'
 import { listStopChanges } from '../app/planEdits.js'
 import { calendarLocationText, locationQuestionFor, placeStatus } from '../app/planLocations.js'
 import EventRow from './EventRow.jsx'
+import DayPlaceRow from './DayPlaceRow.jsx'
 import JourneyPopup from './JourneyPopup.jsx'
 import { journeySummary, pickService } from './journeySummary.js'
 import TravelConnector from './TravelConnector.jsx'
@@ -31,8 +32,8 @@ function matchesFilter(stop, needle) {
  * @param {(stopId: string) => void} props.onRequestDelete Ask before deleting this stop.
  */
 export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, planning, onGapPreview, emptyState = null }) {
-  const { analysis } = planning
-  const { plan, draft, selectedStopId, selectStop, editStopDraft, setStopLocation, setStopKind } = usePlan()
+  const { analysis, bookends } = planning
+  const { plan, draft, selectedStopId, selectStop, editStopDraft, setStopLocation, setStopKind, setDayPlace } = usePlan()
   const listRef = useRef(null)
   const reviewAfterSave = useRef(false)
   const lastPreview = useRef(null)
@@ -116,6 +117,10 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
         {filtering && (stops.length === 0 ? 'No stops match.' : `Showing ${stops.length} of ${shown.stops.length} stops`)}
       </p>
       {shown.stops.length === 0 && emptyState}
+      {!filtering && bookends.start && <>
+        <DayPlaceRow which="start" place={bookends.start.place} onRemove={() => setDayPlace('start', null)} />
+        {bookends.start.leg && <TravelConnector leg={bookends.start.leg} summary={journeySummary(bookends.start.leg, null, shown.timezone)} />}
+      </>}
       <ol ref={listRef} className="event-list" aria-label="Stops">
         {stops.map((stop, index) => {
           const gap = index > 0 && !filtering && planning.displayGaps.find((g) => g.fromStopId === stops[index - 1].id && g.toStopId === stop.id)
@@ -155,6 +160,11 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
         })}
       </ol>
       {gapProposal && !stops.some((s) => s.id === gapProposal.changes[0].stopId) && <GapPreview planning={planning} />}
+      {!filtering && bookends.end && <>
+        {bookends.end.leg && <TravelConnector leg={bookends.end.leg} summary={journeySummary(bookends.end.leg,
+          bookends.end.leg.mode === 'transit' ? pickService(planning.transitServicesFor(bookends.end.stop, bookends.end.to)) : null, shown.timezone)} />}
+        <DayPlaceRow which="end" place={bookends.end.place} onRemove={() => setDayPlace('end', null)} />
+      </>}
       {journeyStops && <JourneyPopup from={journeyStops.from} to={journeyStops.to} planning={planning} onClose={() => setJourney(null)} />}
     </>
   )

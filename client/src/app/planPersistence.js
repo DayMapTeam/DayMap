@@ -46,9 +46,11 @@ export function toSavedPlan(plan) {
       questions.push(locationQuestion(stop))
     }
   }
+  const place = (value) => (value ? { label: value.label, placeId: null, lat: value.lat, lng: value.lng } : null)
   return {
     id: plan.id, date: plan.date, timezone: plan.timezone, version: plan.version,
     dataMode: plan.dataMode, stops, legs: [], conflicts: [], questions,
+    startPlace: place(plan.startPlace), endPlace: place(plan.endPlace),
   }
 }
 

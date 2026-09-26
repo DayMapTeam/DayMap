@@ -1,16 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import '../components/buttons.css'
-import { describeDayCheck, describeReason, describeVerdict, splitPlaceLabel } from './addEventCopy.js'
-import { DurationChips, TimeRangeInputs, WhenModeToggle } from './AddEventFields.jsx'
-import ChangeList from './ChangeList.jsx'
+import { describeVerdict, splitPlaceLabel } from './addEventCopy.js'
+import { TimeRangeInputs } from './AddEventFields.jsx'
 import FitVerdict from './FitVerdict.jsx'
-import SlotOptions from './SlotOptions.jsx'
 import { useAddEventDraft } from './useAddEventDraft.js'
 import { placeStatusMessage, usePlaceSuggestions } from './usePlaceSuggestions.js'
 import { useReturnFocus } from './useReturnFocus.js'
 
-const STEPS = { 1: 'Where?', 2: 'When?', 3: 'Check your day' }
-const BACK_LABELS = { 1: 'Planner', 2: 'Where', 3: 'When' }
+const ROLES = [
+  { value: 'event', title: 'An event', note: 'Choose when it starts and ends.' },
+  { value: 'both', title: 'My day starts and ends here', note: 'Like home. No times needed.' },
+  { value: 'start', title: 'My day starts here', note: 'Where you are in the morning.' },
+  { value: 'end', title: 'My day ends here', note: 'Home, or a hotel for the night.' },
+]
 
 function ChevronIcon() {
   return (
@@ -99,47 +101,43 @@ function WhereStep({ query, onQueryChange, onPlace, onText }) {
 }
 
 /**
- * Guided "add event" flow that takes over the planner: Where?, When?, then
- * Check your day. Step 3 is the preview and Add to day is the explicit accept.
+ * Add to the day on one screen: find a place (or type a name), then say what
+ * it is — an event with From and To times, or where the day starts and/or
+ * ends (home, a hotel), which needs no times. Add is the explicit accept.
  *
  * @param {object} props
  * @param {Date} props.now
  * @param {object} props.planning The planner's analysis: journey estimates for the fit.
  * @param {string} props.returnFocusSelector
- * @param {(result: { stopId: string, message: string }) => void} props.onCommitted
+ * @param {(result: { stopId: string | null, message: string }) => void} props.onCommitted
  * @param {() => void} props.onCancel
  */
 export default function AddEventSheet({ now, planning, returnFocusSelector, onCommitted, onCancel }) {
   const titleId = useId()
   const sheetRef = useRef(null)
-  const [step, setStep] = useState(1)
+  const [searching, setSearching] = useState(true)
   const [query, setQuery] = useState('')
   const draft = useAddEventDraft({ now, planning })
   const { plan, option } = draft
-  const verdict = describeVerdict(draft.fit, option, plan, draft.kind)
+  const verdict = describeVerdict(draft.fit, option, plan, 'fixed')
 
   useReturnFocus(returnFocusSelector)
 
-  // Step 1 starts in the search field; later steps start at their title.
+  // Searching starts in the search field; the details start at their title.
   useEffect(() => {
     const sheet = sheetRef.current
-    const target = step === 1 ? sheet.querySelector('.sheet-autofocus') : sheet.querySelector('.sheet-title')
+    const target = searching ? sheet.querySelector('.sheet-autofocus') : sheet.querySelector('.sheet-title')
     target?.focus()
-  }, [step])
-
-  function back() {
-    if (step === 1) onCancel()
-    else setStep(step - 1)
-  }
+  }, [searching])
 
   function pickPlace(place) {
     draft.pickPlace(place)
-    setStep(2)
+    setSearching(false)
   }
 
   function chooseText(text) {
     draft.changeText(text)
-    setStep(2)
+    setSearching(false)
   }
 
   function add() {
@@ -163,26 +161,20 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
     >
       <div className="sheet-header">
         <div className="sheet-nav">
-          <button type="button" className="sheet-back" onClick={back}>
-            <span aria-hidden="true">‹ </span>{BACK_LABELS[step]}
-          </button>
+          {!searching ? (
+            <button type="button" className="sheet-back" onClick={() => setSearching(true)}>
+              <span aria-hidden="true">‹ </span>Search
+            </button>
+          ) : <span />}
           <button type="button" className="sheet-cancel" onClick={onCancel}>Cancel</button>
         </div>
-        <h2 id={titleId} className="sheet-title" tabIndex={-1}>{STEPS[step]}</h2>
-        <div className="sheet-progress">
-          <span className="sheet-progress-bars" aria-hidden="true">
-            {[1, 2, 3].map((n) => <span key={n} className="sheet-progress-bar" data-done={n <= step || undefined} />)}
-          </span>
-          Step {step} of 3
-        </div>
+        <h2 id={titleId} className="sheet-title" tabIndex={-1}>Add to your day</h2>
       </div>
 
       <div className="sheet-body">
-        {step === 1 && (
+        {searching ? (
           <WhereStep query={query} onQueryChange={setQuery} onPlace={pickPlace} onText={chooseText} />
-        )}
-
-        {step === 2 && (
+        ) : (
           <>
             <div className="sheet-place">
               <span className="sheet-row-thumb" data-plus={draft.location === null || undefined} aria-hidden="true">
@@ -201,82 +193,60 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
                   {draft.location === null ? 'No place. Travel stays unknown.' : draft.location.label}
                 </span>
               </span>
-              <button type="button" className="button-text" onClick={() => setStep(1)}>Change</button>
+              <button type="button" className="button-text" onClick={() => setSearching(true)}>Change</button>
             </div>
 
-            <div className="add-field">
-              <p className="add-section-label">When</p>
-              <WhenModeToggle value={draft.kind} onChange={draft.changeKind} />
-              <p className="add-hint">
-                {draft.kind === 'flexible'
-                  ? 'Flexible. DayMap finds a time and may suggest moving it later if your day changes.'
-                  : 'Fixed. DayMap will never move it.'}
-              </p>
-            </div>
-
-            {draft.kind === 'flexible' ? (
-              <>
-                <div className="add-field">
-                  <p className="add-section-label">How long?</p>
-                  <DurationChips value={draft.durationMinutes} onChange={draft.setDurationMinutes} />
-                </div>
-                {draft.fit.options.length > 0
-                  ? (
-                    <SlotOptions
-                      options={draft.fit.options}
-                      value={draft.chosenAfterStopId}
-                      onChange={draft.setChosenAfterStopId}
-                      plan={plan}
+            <fieldset className="add-field role-options">
+              <legend className="add-section-label">What is it?</legend>
+              {ROLES.map((role) => {
+                const disabled = role.value !== 'event' && draft.location === null
+                return (
+                  <label key={role.value} className="role-option" data-checked={draft.role === role.value || undefined} data-disabled={disabled || undefined}>
+                    <input
+                      className="visually-hidden"
+                      type="radio"
+                      name={`${titleId}-role`}
+                      checked={draft.role === role.value}
+                      disabled={disabled}
+                      onChange={() => draft.changeRole(role.value)}
                     />
-                  )
-                  : <FitVerdict verdict={verdict} />}
-              </>
-            ) : (
-              <>
+                    <span className="role-option-radio" aria-hidden="true" />
+                    <span className="role-option-text">
+                      <span className="role-option-title">{role.title}</span>
+                      <span className="role-option-note">{disabled ? 'Needs a place from search.' : role.note}</span>
+                    </span>
+                  </label>
+                )
+              })}
+            </fieldset>
+
+            {draft.role === 'event' ? (
+              <div className="add-field">
                 <TimeRangeInputs
                   start={draft.startTime}
                   end={draft.endTime}
                   onStartChange={draft.setStartTime}
                   onEndChange={draft.setEndTime}
+                  labels={['From', 'To']}
                 />
-                <FitVerdict verdict={verdict} />
-              </>
-            )}
-          </>
-        )}
-
-        {step === 3 && (
-          <>
-            {option?.ok ? (
-              <>
-                <FitVerdict
-                  title="Your day still works"
-                  verdict={{ tone: 'ok', text: describeDayCheck(option, plan, draft.stopId) }}
-                />
-                <ChangeList option={option} />
-              </>
+                <FitVerdict verdict={draft.checkingTravel ? { tone: 'neutral', text: 'Checking travel time…' } : verdict} />
+              </div>
             ) : (
-              <FitVerdict
-                title="This doesn’t fit"
-                verdict={{ tone: 'bad', text: option ? describeReason(option.reason, plan, draft.kind) : verdict.text }}
-              />
+              <p className="add-hint">
+                {draft.role === 'start' && 'The planner starts here and shows when to leave for your first stop.'}
+                {draft.role === 'end' && 'The planner ends here. After your last stop, Go takes you here.'}
+                {draft.role === 'both' && 'The planner starts and ends here. After your last stop, Go takes you back.'}
+              </p>
             )}
-            <p className="add-hint">Nothing is saved until you tap Add to day. You can edit it later from the planner.</p>
           </>
         )}
       </div>
 
-      {step > 1 && (
+      {!searching && (
         <div className="sheet-footer">
-          {step === 2 ? (
-            <button type="button" className="button-filled sheet-primary" disabled={!draft.canCommit} onClick={() => setStep(3)}>
-              Next: check your day
-            </button>
-          ) : (
-            <button type="button" className="button-filled sheet-primary" disabled={!draft.canCommit} onClick={add}>
-              Add to day
-            </button>
-          )}
+          <button type="button" className="button-filled sheet-primary" disabled={!draft.canCommit} onClick={add}>
+            Add to day
+          </button>
         </div>
       )}
     </div>

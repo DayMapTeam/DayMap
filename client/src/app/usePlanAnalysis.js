@@ -7,6 +7,7 @@ import { createWalkingRouteStore } from '../services/walkingRouteStore.js'
 import { createRoutesProvider } from '../services/walkingRoutes.js'
 import { createTransitOptionsProvider } from '../services/transitOptions.js'
 import { createTransitStore } from '../services/transitStore.js'
+import { dayBookends } from '../services/dayPlaces.js'
 import { loadMapsLibrary, mapsApiKey } from '../services/googleMaps.js'
 import { buildTimeline, stopInterval } from '../../../shared/planning/timeline.js'
 import { gapRoutePairs } from '../../../shared/planning/proposals.js'
@@ -41,6 +42,16 @@ export function usePlanAnalysis(plan, draft, now) {
     })
     routes.request([...pairs(shown, analysis.pending), ...pairs(plan, accepted.pending)])
   }, [provider, routes, shown, plan, analysis.pending, accepted.pending])
+  // Where the day starts and ends, and the journeys to the first and from the last stop.
+  const bookends = useMemo(() => dayBookends(shown, ctx), [shown, ctx])
+  useEffect(() => {
+    if (provider !== 'google') return
+    for (const bookend of [bookends.start, bookends.end]) {
+      if (!bookend?.request || bookend.leg?.status === 'ready') continue
+      const { from, to, mode, departAt } = bookend.request
+      routes.request(mode === 'transit' ? [{ from, to, mode, departAt }, { from, to, mode: 'walk' }] : [{ from, to, mode, departAt }])
+    }
+  }, [provider, routes, bookends])
   const introduced = analysis.conflicts.filter((c) => !accepted.conflicts.some((old) => old.id === c.id && old.factsKey === c.factsKey))
   const getContext = useCallback(() => createPlanningContext(shown,
     shown.dataMode === 'demo' ? now : new Date(), draft?.editedStopIds,
@@ -94,7 +105,9 @@ export function usePlanAnalysis(plan, draft, now) {
       const to = shown.stops.find((stop) => stop.id === leg.toStopId)
       if (from && to) requestTransit(from, to)
     }
-  }, [analysis.legs, shown, requestTransit])
+    const end = bookends.end
+    if (end?.leg?.status === 'ready' && end.leg.mode === 'transit') requestTransit(end.stop, end.to)
+  }, [analysis.legs, shown, requestTransit, bookends])
   const requestAllModes = useCallback((from, to) => {
     if (provider !== 'google') return
     const departAt = departureFor(from)
@@ -107,7 +120,7 @@ export function usePlanAnalysis(plan, draft, now) {
     return [stop.id, { clash: conflicts.length > 0, previewShifted: changedIds.has(stop.id),
       note: conflicts.length ? 'Schedule conflict' : unresolved ? 'Travel unresolved' : changedIds.has(stop.id) ? 'Draft change' : '' }]
   }))
-  return { shown, ctx, getContext, analysis, displayGaps, introduced, fingerprint: planFingerprint(shown), stopStates,
+  return { bookends, shown, ctx, getContext, analysis, displayGaps, introduced, fingerprint: planFingerprint(shown), stopStates,
     provider, loadingRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'pending'),
     failedRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'unavailable'),
     retryRoutes: routes.retryFailures, checkAlternatives, checkGapRoutes, requestJourneys,

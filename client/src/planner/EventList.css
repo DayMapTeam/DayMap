@@ -446,3 +446,61 @@
 .travel-connector[data-mode='walk'] .travel-connector-line { background: var(--mode-walk); }
 .travel-connector[data-mode='transit'] .travel-connector-line { background: var(--mode-bus); }
 .travel-connector[data-mode='drive'] .travel-connector-line { background: var(--mode-drive); }
+
+.day-place {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+}
+
+.day-place-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--on-accent);
+  background: var(--label);
+  border-radius: 50%;
+}
+
+.day-place-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.day-place-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--label-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.day-place-name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-place-remove {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--label-2);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+}
+
+.day-place-remove:hover {
+  background: var(--fill);
+}
