@@ -1,8 +1,8 @@
 # Google Calendar connection backend (DM-06)
 
-This branch implements the server-side connection foundation. It does not yet
-import events or change Google Calendar. Rafid's Calendar adapter and the
-frontend connection UI remain separate work.
+The server connects a user's Google Calendar and imports one day of events
+into their saved day plan (#30). It never changes Google Calendar. The
+frontend connection and import UI remain separate work.
 
 ## Team configuration
 
@@ -61,6 +61,9 @@ the associated user ID.
 - `POST /api/calendar/disconnect` deletes the stored credential and attempts
   Google revocation. It returns `{ "disconnected": true, "revoked": boolean }`.
   If revocation is unavailable, local access is still deleted.
+- `POST /api/calendar/import` takes `{ "date": "YYYY-MM-DD", "timezone": "<IANA>" }`
+  and returns `{ "plan": {...}, "summary": { "added", "updated", "removed" } }`
+  (201 when it created the day's plan, otherwise 200). See **Event import** below.
 
 Starting another connection replaces that user's unfinished attempt. A callback
 claims its state once, then waits for Google without holding a database lock.
@@ -100,15 +103,45 @@ exercise simultaneous database sessions or live Google OAuth. After configuring
 the team's environment, verify real consent, status and disconnect with a test
 account before wiring event import into the frontend.
 
-## Next integration
+## Event import
 
-Rafid's adapter should accept an access token supplied by the server, a
-primary-calendar ID, and timezone-aware UTC day boundaries. It should return
-normalized DayMap stops, expand recurring occurrences, follow pagination, and
-handle cancellations, all-day and unlocated events. The backend will refresh
-access tokens from the encrypted credential, deduplicate by calendar plus event
-ID, and save imported stops through versioned plan operations. Agree that
-adapter's exact input/output contract before adding `POST /api/calendar/import`.
+`server/src/integrations/googleCalendar.js` is the provider adapter. It receives
+a server-held access token, the primary calendar ID and the local day's UTC
+boundaries (`shared/planning/dayBounds.js`, daylight-saving safe). It requests
+`events.list` with `singleEvents=true`, so recurring events arrive as
+occurrences, and follows `nextPageToken`. The access token is sent only in the
+`Authorization` header to Google and never leaves `calendar/service.js`.
+
+Normalisation:
+
+- Timed events become `fixed` stops with their original start and end.
+  A timed event longer than 24 hours is shown as `all-day`.
+- Date-only events become `all-day` stops with no invented times.
+- Cancelled events and events the user declined are skipped.
+- Stop IDs are UUIDs derived from calendar ID + event ID, so a re-import
+  produces the same IDs.
+- Calendar location text is never guessed into a map pin. Every new stop has
+  `location: null` and a location question quoting the Calendar text, or
+  noting an online meeting.
+
+`calendar/importPlan.js` merges into the saved plan for that date and timezone,
+or creates one with `dataMode: 'live'`:
+
+- Deduplicates by `sourceCalendarId` + `sourceEventId`.
+- Updates the title and times of existing Calendar stops, keeping their ID,
+  status and any location the user already confirmed. A deferred location
+  question stays deferred.
+- Removes Calendar stops whose event no longer exists, unless completed.
+- Never touches manual stops.
+
+The merged plan passes the same validation as `PUT /api/plans/:id` and is saved
+with the loaded version, so a concurrent save returns 409 `VERSION_CONFLICT`
+and changes nothing. An unchanged import returns the saved plan without a new
+version. Google failures return 503 (retryable) or 409
+`CALENDAR_RECONNECT_REQUIRED`, leaving the saved plan untouched.
+
+Resolving Calendar location text into coordinates needs the server Places key
+and the provider-retention decision (ARCHITECTURE §12), so it is not done yet.
 
 The Google Maps browser key and any server Places/Routes key are separate from
 Calendar OAuth. Use keys owned by the team project, restricted to the APIs and

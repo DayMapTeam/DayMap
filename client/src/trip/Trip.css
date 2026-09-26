@@ -1,0 +1,123 @@
+/* Trip controls: bottom-left over the map, clear of the planner. */
+
+.trip-dock {
+  position: absolute;
+  bottom: var(--overlay-inset);
+  left: var(--overlay-inset);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(340px, calc(100% - var(--panel-width) - var(--overlay-inset) * 3));
+  pointer-events: none;
+}
+
+.trip-dock > * {
+  pointer-events: auto;
+}
+
+.trip-card {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-3);
+  border-radius: var(--radius-card);
+  animation: trip-in var(--duration-popup) var(--ease-spring);
+}
+
+@keyframes trip-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.trip-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.trip-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.trip-primary {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.trip-secondary {
+  font-size: 13px;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.trip-late {
+  color: var(--red-ink);
+}
+
+.trip-hint {
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.trip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.trip-actions .button-filled {
+  min-height: 40px;
+}
+
+.trip-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.trip-end {
+  margin-left: auto;
+}
+
+.trip-location {
+  padding-left: 0;
+}
+
+.trip-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
+  max-width: 100%;
+  padding: 6px 6px 6px 14px;
+  min-height: 44px;
+  font-size: 14px;
+  border-radius: var(--radius-pill);
+  animation: trip-in var(--duration-popup) var(--ease-spring);
+}
+
+.trip-toast-text {
+  min-width: 0;
+  padding-right: var(--space-2);
+}
+
+.trip-toast-action {
+  flex: none;
+  border-radius: var(--radius-pill);
+}
+
+/* Keep in sync with the sheet breakpoint in PlannerPanel.css: sit above the peeking sheet. */
+@media (max-width: 719px) {
+  .trip-dock {
+    right: var(--overlay-inset);
+    bottom: calc(var(--sheet-peek) + var(--space-3));
+    width: auto;
+  }
+}

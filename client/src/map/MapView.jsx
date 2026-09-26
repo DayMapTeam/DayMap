@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { numberStops } from '../app/stopNumbers.js'
 import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
 import { markerColors, markerTemplate, stopMarkerSvg } from './stopMarker.js'
+import { userMarkerSvg } from './userMarker.js'
 import './MapView.css'
 
 // A pointer press older than this is not the one that clicked the pin.
@@ -11,6 +12,15 @@ const PIN_CLICK_GRACE_MS = 300
 // Above this tilt the pins use a shorter stem.
 const STEEP_TILT = 45
 const CAMERA_EVENTS = ['gmp-centerchange', 'gmp-rangechange', 'gmp-headingchange', 'gmp-tiltchange']
+// Trip camera: close behind the person, looking where they are heading.
+const FOLLOW_RANGE = 450
+const FOLLOW_TILT = 55
+const FOLLOW_FLY_MS = 900
+// A drag shorter than this is a click, not a camera move.
+const DRAG_PX = 6
+const CAMERA_KEYS = /^(Arrow|Page|Home$|End$|[-+=_]$)/
+
+const flyMillis = (millis) => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : millis)
 
 function isValidLocation(location) {
   return Boolean(location) && Number.isFinite(location.lat) && Number.isFinite(location.lng)
@@ -23,16 +33,23 @@ function isFinished(stop, now) {
 }
 
 /**
- * The 3D map. Every pin is drawn by stopMarkerSvg; nothing else creates markers.
+ * The 3D map. Every stop pin is drawn by stopMarkerSvg, and "you are here" by
+ * userMarkerSvg; nothing else creates markers.
  *
  * - onSelectStop(stopId, { anchor }): a pin was clicked. `anchor` is the click
  *   point in map pixels, for the popup (the 3D map has no lat/lng-to-pixel API).
  * - onClearSelection(): the empty map was clicked.
  * - onCameraMove(): the camera moved, so a popup placed on screen is now stale.
  * - now: stops that ended before it are drawn faded.
+ * - userPosition: { lat, lng, simulated? } draws "you are here", or null.
+ * - tripActive: while true, the camera is saved; it flies back when the trip ends.
+ * - follow: { center, heading } moves the camera with the person during a trip,
+ *   or null. Only trips move the camera like this; nothing in the background does.
+ * - onUserCameraMove(): the person dragged, scrolled or used keys on the map.
  */
 export default function MapView({
   stops, selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, stopStates = {},
+  userPosition = null, tripActive = false, follow = null, onUserCameraMove,
 }) {
   const containerRef = useRef(null)
   const markersRef = useRef(new Map())
@@ -45,8 +62,8 @@ export default function MapView({
   const [error, setError] = useState('')
 
   useEffect(() => {
-    callbacksRef.current = { onSelectStop, onClearSelection, onCameraMove }
-  }, [onSelectStop, onClearSelection, onCameraMove])
+    callbacksRef.current = { onSelectStop, onClearSelection, onCameraMove, onUserCameraMove }
+  }, [onSelectStop, onClearSelection, onCameraMove, onUserCameraMove])
 
   // Remember where the pointer went down. Capture phase, so the map cannot stop it first.
   useEffect(() => {
@@ -57,6 +74,28 @@ export default function MapView({
     }
     container.addEventListener('pointerdown', rememberPointer, true)
     return () => container.removeEventListener('pointerdown', rememberPointer, true)
+  }, [])
+
+  // Tell the trip when the person moves the camera themselves, so following stops.
+  useEffect(() => {
+    const container = containerRef.current
+    let down = null
+    const moved = () => callbacksRef.current.onUserCameraMove?.()
+    const onDown = (event) => { down = { x: event.clientX, y: event.clientY } }
+    const onMove = (event) => {
+      if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > DRAG_PX) {
+        down = null
+        moved()
+      }
+    }
+    const onUp = () => { down = null }
+    const onKey = (event) => { if (CAMERA_KEYS.test(event.key)) moved() }
+    const listeners = [['pointerdown', onDown], ['pointermove', onMove], ['pointerup', onUp],
+      ['pointercancel', onUp], ['wheel', moved], ['keydown', onKey]]
+    for (const [type, listener] of listeners) container.addEventListener(type, listener, { capture: true, passive: true })
+    return () => {
+      for (const [type, listener] of listeners) container.removeEventListener(type, listener, { capture: true })
+    }
   }, [])
 
   useEffect(() => {
@@ -99,7 +138,7 @@ export default function MapView({
         for (const type of CAMERA_EVENTS) map.addEventListener(type, handleCameraChange)
         containerRef.current.append(map)
         setSteep(map.tilt > STEEP_TILT)
-        setRuntime({ map, Marker: maps3d.Marker3DInteractiveElement, colors: markerColors() })
+        setRuntime({ map, Marker: maps3d.Marker3DInteractiveElement, PlainMarker: maps3d.Marker3DElement, colors: markerColors() })
       } catch {
         if (!cancelled) {
           setError('Could not load Google Maps. Check the browser console.')
@@ -212,6 +251,61 @@ export default function MapView({
     runtime.map.append(marker)
     return () => marker.remove()
   }, [runtime, previewPlace, steep])
+
+  // "You are here". One marker, moved in place as readings arrive.
+  const userMarkerRef = useRef(null)
+  const simulated = Boolean(userPosition?.simulated)
+  useEffect(() => {
+    if (!runtime) return
+    const marker = new runtime.PlainMarker({
+      altitudeMode: 'CLAMP_TO_GROUND',
+      collisionBehavior: 'REQUIRED',
+      drawsWhenOccluded: true,
+      zIndex: 30,
+    })
+    marker.append(markerTemplate(userMarkerSvg(runtime.colors, { simulated })))
+    userMarkerRef.current = marker
+    return () => {
+      marker.remove()
+      userMarkerRef.current = null
+    }
+  }, [runtime, simulated])
+
+  useEffect(() => {
+    const marker = userMarkerRef.current
+    if (!runtime || !marker) return
+    if (!isValidLocation(userPosition)) {
+      marker.remove()
+      return
+    }
+    marker.position = { lat: userPosition.lat, lng: userPosition.lng }
+    if (!marker.isConnected) runtime.map.append(marker)
+  }, [runtime, userPosition, simulated])
+
+  // Save the camera when a trip starts and fly back to it when the trip ends.
+  useEffect(() => {
+    if (!runtime || !tripActive) return
+    const { map } = runtime
+    const saved = {
+      center: { lat: map.center.lat, lng: map.center.lng, altitude: map.center.altitude ?? 0 },
+      range: map.range, tilt: map.tilt, heading: map.heading,
+    }
+    return () => {
+      if (map.isConnected) map.flyCameraTo({ endCamera: saved, durationMillis: flyMillis(800) })
+    }
+  }, [runtime, tripActive])
+
+  // Follow the person during a trip, heading-up.
+  useEffect(() => {
+    if (!runtime || !follow || !isValidLocation(follow.center)) return
+    runtime.map.flyCameraTo({
+      endCamera: {
+        center: { lat: follow.center.lat, lng: follow.center.lng, altitude: 0 },
+        range: FOLLOW_RANGE, tilt: FOLLOW_TILT, heading: follow.heading ?? runtime.map.heading,
+      },
+      durationMillis: flyMillis(FOLLOW_FLY_MS),
+    })
+  }, [runtime, follow])
 
   // Camera changes belong to explicit place selection, not planner updates or tilt redraws.
   useEffect(() => {
