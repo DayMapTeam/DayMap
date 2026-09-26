@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePlan } from '../app/planContext.js'
 import { fitNewStop } from '../app/planAdd.js'
 import { toTimeInputValue } from '../components/formatTime.js'
@@ -20,8 +20,10 @@ function placeToLocation(place) {
  *
  * @param {object} options
  * @param {Date} options.now
+ * @param {ReturnType<import('../app/usePlanAnalysis.js').usePlanAnalysis>} options.planning
+ *   Its journey estimates are allowed for, and missing ones are requested.
  */
-export function useAddEventDraft({ now }) {
+export function useAddEventDraft({ now, planning }) {
   const { plan, addStop } = usePlan()
   const [id] = useState(() => crypto.randomUUID())
   const [title, setTitle] = useState('')
@@ -42,10 +44,17 @@ export function useAddEventDraft({ now }) {
     endAt: endTime ? zonedTimeToTimestamp(plan.date, endTime, plan.timezone) : null,
   }), [id, title, location, kind, durationMinutes, startTime, endTime, plan.date, plan.timezone])
 
+  const { ctx, requestJourneys } = planning
   const fit = useMemo(
-    () => fitNewStop(plan, newStop, { now }),
-    [plan, newStop, now],
+    () => fitNewStop(plan, newStop, { now, ctx }),
+    [plan, newStop, now, ctx],
   )
+
+  // Ask for the journeys the options are waiting for; known ones aren't refetched.
+  useEffect(() => {
+    const pending = fit.options.flatMap((candidate) => candidate.journeys).filter((leg) => leg.request).map((leg) => leg.request)
+    if (pending.length) requestJourneys(pending)
+  }, [fit, requestJourneys])
 
   const option = kind === 'fixed'
     ? fit.options[0] ?? null
@@ -75,7 +84,8 @@ export function useAddEventDraft({ now }) {
   /** Apply the draft. Returns what the toast should say, or null if it can't be added. */
   function commit() {
     if (!canCommit) return null
-    addStop({ newStop, afterStopId: option.afterStopId, baseVersion: plan.version, now })
+    // The same context as the preview, so the committed fit is the one shown.
+    addStop({ newStop, afterStopId: option.afterStopId, baseVersion: plan.version, now, ctx })
     return { stopId: id, message: describeAdded(option, plan, id, title) }
   }
 

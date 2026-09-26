@@ -104,16 +104,17 @@ function WhereStep({ query, onQueryChange, onPlace, onText }) {
  *
  * @param {object} props
  * @param {Date} props.now
+ * @param {object} props.planning The planner's analysis: journey estimates for the fit.
  * @param {string} props.returnFocusSelector
  * @param {(result: { stopId: string, message: string }) => void} props.onCommitted
  * @param {() => void} props.onCancel
  */
-export default function AddEventSheet({ now, returnFocusSelector, onCommitted, onCancel }) {
+export default function AddEventSheet({ now, planning, returnFocusSelector, onCommitted, onCancel }) {
   const titleId = useId()
   const sheetRef = useRef(null)
   const [step, setStep] = useState(1)
   const [query, setQuery] = useState('')
-  const draft = useAddEventDraft({ now })
+  const draft = useAddEventDraft({ now, planning })
   const { plan, option } = draft
   const verdict = describeVerdict(draft.fit, option, plan, draft.kind)
 

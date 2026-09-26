@@ -152,6 +152,7 @@ export default function Planner({ now, revealRequest, planning, emptyState }) {
           <AddEventSheet
             key={sheetKey}
             now={now}
+            planning={planning}
             returnFocusSelector=".planner-add"
             onCommitted={committed}
             onCancel={() => setSheetKey(null)}

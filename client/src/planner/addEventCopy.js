@@ -1,8 +1,7 @@
-// Words for the add flows. Always say what moves, what stays fixed, and why.
-// Travel is unknown until routes are calculated, so every fit says so.
+// Words for the add flows. Always say what moves, what stays fixed, and why,
+// and what travel was allowed for (or that it isn't known yet).
 import { formatClock, formatTimeRange } from '../components/formatTime.js'
 
-export const TRAVEL_NOTE = 'Travel time not included yet.'
 
 const VALIDATION = {
   'missing-title': 'Search for a place, or type a name to add it without one.',
@@ -40,6 +39,26 @@ function describeSpare(option, plan) {
   return `${option.spareMinutes} min spare before ${next}.`
 }
 
+/**
+ * The journeys a fit allowed for: "Allows 25 min to get there from Morning
+ * lecture and 15 min to get to Library study." Unknown travel is said plainly.
+ */
+export function describeTravel(option, plan) {
+  const legs = option.journeys ?? []
+  if (legs.some((leg) => leg.status === 'pending')) return 'Checking travel time…'
+  const parts = legs.filter((leg) => leg.status === 'ready' && leg.minutes > 0).map((leg) => {
+    const outbound = findStop(plan, leg.toStopId)
+    return outbound
+      ? `${leg.minutes} min to get to ${outbound.title}`
+      : `${leg.minutes} min to get there from ${findStop(plan, leg.fromStopId).title}`
+  })
+  const notes = []
+  if (parts.length) notes.push(`Allows ${listNames(parts)}.`)
+  if (legs.some((leg) => leg.status === 'no-place')) notes.push('Travel isn’t included where a stop has no place.')
+  if (legs.some((leg) => leg.status === 'unavailable')) notes.push('Some travel times are unavailable and aren’t included.')
+  return notes.join(' ')
+}
+
 /** Why an option doesn't fit, in one sentence. */
 export function describeReason(reason, plan, kind) {
   const stop = reason.stopId ? findStop(plan, reason.stopId) : null
@@ -59,6 +78,12 @@ export function describeReason(reason, plan, kind) {
     default:
       return 'This doesn’t fit your day.'
   }
+}
+
+/** For a fixed new stop the journey there makes late: "You'd arrive about 10 min late from Morning lecture." */
+function describeLateArrival(option, plan) {
+  if (!option.lateArrivalMinutes) return ''
+  return `You’d arrive about ${option.lateArrivalMinutes} min late from ${findStop(plan, option.afterStopId).title}.`
 }
 
 /** "After Morning lecture. 10 min spare before Library study." */
@@ -81,7 +106,8 @@ export function describeVerdict(fit, option, plan, kind) {
   const after = option.afterStopId === null ? '' : ` after ${findStop(plan, option.afterStopId).title}`
   return {
     tone: 'ok',
-    text: [`${range}${after}.`, describeMoves(option, plan), describeSpare(option, plan), TRAVEL_NOTE]
+    text: [`${range}${after}.`, describeLateArrival(option, plan), describeMoves(option, plan), describeSpare(option, plan),
+      describeTravel(option, plan)]
       .filter(Boolean)
       .join(' '),
   }
@@ -98,8 +124,9 @@ export function describeDayCheck(option, plan, stopId) {
   const fixed = nextFixedStop(option, stopId)
   return [
     fixed ? `${fixed.title} stays at ${formatClock(fixed.timing.scheduledStartAt, plan.timezone)}.` : '',
+    describeLateArrival(option, plan),
     describeMoves(option, plan) || describeSpare(option, plan),
-    TRAVEL_NOTE,
+    describeTravel(option, plan),
   ].filter(Boolean).join(' ')
 }
 

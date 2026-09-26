@@ -188,3 +188,74 @@ test('undo restores the day before the add, only while nothing else changed', ()
   const newer = { ...added, plan: { ...added.plan, version: added.plan.version + 1 } }
   assert.equal(planReducer(newer, { type: 'undo-add', stopId: 'stop-new' }), newer)
 })
+
+// A planning context whose journeys take `minutes[fromId:toId]` (default 10) on
+// foot, plus the 5-minute walking buffer. Missing entries can be marked pending.
+function travelContext(minutes = {}, { pending = [] } = {}) {
+  return {
+    modeFor: () => 'walk',
+    buffers: { walk: 5 },
+    travel: (from, to) => {
+      const key = `${from.id}:${to.id}`
+      if (pending.includes(key)) return { status: 'pending' }
+      return { status: 'ready', travelSeconds: (minutes[key] ?? 10) * 60 }
+    },
+  }
+}
+const coles = { label: 'Coles', placeId: null, lat: -34.93, lng: 138.6 }
+
+test('a new stop starts once you can get there, and later stops leave room for travel', () => {
+  const ctx = travelContext({ 'stop-university:stop-new': 20, 'stop-new:stop-library': 10 })
+  const { options: [option] } = fitNewStop(demoPlan, flexible(15, { location: coles }), { afterStopId: lecture, now: NOW, ctx })
+  assert.equal(option.ok, true)
+  // Lecture ends 10:00; 20 min walk + 5 min buffer → 10:25–10:40.
+  assert.equal(option.startAt, '2026-09-26T00:55:00Z')
+  assert.equal(option.endAt, '2026-09-26T01:10:00Z')
+  // Library (10:30) moves to 10:40 + 15 min (10 walk + 5 buffer) = 10:55.
+  assert.equal(stopIn(option.plan, library).timing.scheduledStartAt, '2026-09-26T01:25:00Z')
+  // Lunch and the break shift only as far as their own journeys need.
+  assert.equal(stopIn(option.plan, market).timing.scheduledStartAt, '2026-09-26T02:40:00Z')
+  assert.deepEqual(option.journeys.map(({ fromStopId, toStopId, minutes, status }) => [fromStopId, toStopId, minutes, status]), [
+    [lecture, 'stop-new', 25, 'ready'],
+    ['stop-new', library, 15, 'ready'],
+  ])
+})
+
+test('travel into a fixed stop that cannot be made is reported as late', () => {
+  const plan = withFixedLunch()
+  const ctx = travelContext({ 'stop-new:stop-market': 40 })
+  const { options: [option] } = fitNewStop(plan, flexible(20, { location: coles }), { afterStopId: library, now: NOW, ctx })
+  // Library ends 11:30; new stop 11:45–12:05 after 15 min; 45 min to lunch at 12:00.
+  assert.equal(option.ok, false)
+  assert.equal(option.reason.code, 'late')
+  assert.equal(option.reason.stopId, market)
+  assert.equal(option.reason.minutesLate, 50)
+})
+
+test('unknown travel counts as zero but is reported, and no place means no journey', () => {
+  const ctx = travelContext({}, { pending: ['stop-university:stop-new'] })
+  const { options: [option] } = fitNewStop(demoPlan, flexible(20, { location: coles }), { afterStopId: lecture, now: NOW, ctx })
+  assert.equal(option.startAt, '2026-09-26T00:30:00Z', 'straight after the lecture while the journey loads')
+  assert.equal(option.journeys[0].status, 'pending')
+  assert.equal(option.journeys[0].departAt, '2026-09-26T00:30:00.000Z')
+
+  const { options: [placeless] } = fitNewStop(demoPlan, flexible(20), { afterStopId: lecture, now: NOW, ctx: travelContext() })
+  assert.deepEqual(placeless.journeys.map((leg) => leg.status), ['no-place', 'no-place'])
+  assert.equal(placeless.startAt, '2026-09-26T00:30:00Z')
+})
+
+test('a fixed new stop keeps its time and says how late the journey there would make you', () => {
+  const ctx = travelContext({ 'stop-university:stop-new': 30 })
+  const { options: [option] } = fitNewStop(demoPlan, { ...fixed('2026-09-26T00:40:00Z', '2026-09-26T00:55:00Z'), location: coles }, { now: NOW, ctx })
+  assert.equal(option.ok, true)
+  assert.equal(option.startAt, '2026-09-26T00:40:00Z')
+  assert.equal(option.lateArrivalMinutes, 25, 'lecture ends 10:00, 35 min to get there, starts 10:10')
+})
+
+test('the reducer commits exactly the travel-aware option the preview showed', () => {
+  const ctx = travelContext({ 'stop-university:stop-new': 20, 'stop-new:stop-library': 10 })
+  const newStop = flexible(15, { location: coles })
+  const preview = chooseOption(demoPlan, newStop, { afterStopId: lecture, now: NOW, ctx })
+  const state = planReducer(createPlanState(demoPlan), { type: 'add-stop', newStop, afterStopId: lecture, baseVersion: demoPlan.version, now: NOW, ctx })
+  assert.deepEqual(state.plan.stops, preview.plan.stops)
+})

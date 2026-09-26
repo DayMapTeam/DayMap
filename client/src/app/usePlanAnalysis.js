@@ -55,6 +55,15 @@ export function usePlanAnalysis(plan, draft, now) {
   const checkGapRoutes = (gapId) => {
     if (provider === 'google') routes.request(withModes(gapRoutePairs(shown, gapId, getContext())))
   }
+  // Journeys the add flow is waiting for, at their real departures.
+  const requestJourneys = useCallback((pairs) => {
+    if (provider !== 'google') return
+    const lookup = (from, to, options) => routes.lookup(from, to, options)
+    routes.request(pairs.flatMap(({ from, to, departAt }) => {
+      const { mode } = chooseMode(from, to, preference, lookup)
+      return mode === 'transit' ? [{ from, to, mode, departAt }, { from, to, mode: 'walk' }] : [{ from, to, mode, departAt }]
+    }))
+  }, [provider, routes, preference])
   const changedIds = new Set(draft ? listStopChanges(plan, shown).map(({ after }) => after.id) : [])
   const stopStates = Object.fromEntries(shown.stops.map((stop) => {
     const conflicts = analysis.conflicts.filter((c) => c.stopIds.includes(stop.id))
@@ -65,5 +74,5 @@ export function usePlanAnalysis(plan, draft, now) {
   return { preference, setPreference, shown, ctx, getContext, analysis, displayGaps, introduced, fingerprint: planFingerprint(shown), stopStates,
     provider, loadingRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'pending'),
     failedRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'unavailable'),
-    retryRoutes: routes.retryFailures, checkAlternatives, checkGapRoutes }
+    retryRoutes: routes.retryFailures, checkAlternatives, checkGapRoutes, requestJourneys }
 }

@@ -15,9 +15,9 @@ export function createPlanState(initialPlan) {
  * applies it only if the plan hasn't changed since. A pending edit draft
  * blocks adding, so the two never overwrite each other.
  */
-function addStop(state, { newStop, afterStopId, baseVersion, now }) {
+function addStop(state, { newStop, afterStopId, baseVersion, now, ctx = null }) {
   if (state.draft !== null || baseVersion !== state.plan.version) return state
-  const option = chooseOption(state.plan, newStop, { afterStopId, now })
+  const option = chooseOption(state.plan, newStop, { afterStopId, now, ctx })
   if (option === null) return state
   const version = state.plan.version + 1
   return {
