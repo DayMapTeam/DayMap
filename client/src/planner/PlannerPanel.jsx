@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import { usePlan } from '../app/planContext.js'
 import { useMediaQuery } from '../components/useMediaQuery.js'
 import StatusPill from './StatusPill.jsx'
-import { usePlannerOpen } from './usePlannerOpen.js'
 import './PlannerPanel.css'
 
 // Keep in sync with the breakpoint in PlannerPanel.css.
@@ -13,12 +12,13 @@ const SHEET_QUERY = '(max-width: 719px)'
  * it is a bottom sheet with a peek and a full position.
  *
  * @param {object} props
+ * @param {boolean} props.open Open (desktop) or expanded (mobile sheet).
+ * @param {(open: boolean) => void} props.onOpenChange
  * @param {import('react').ReactNode} props.toolbar Controls under the title, such as the filter.
  * @param {import('react').ReactNode} props.children Scrollable body content.
  */
-export default function PlannerPanel({ toolbar, children }) {
+export default function PlannerPanel({ open, onOpenChange, toolbar, children }) {
   const { plan } = usePlan()
-  const [open, setOpen] = usePlannerOpen()
   const isSheet = useMediaQuery(SHEET_QUERY)
   const toggleRef = useRef(null)
   const reopenRef = useRef(null)
@@ -36,7 +36,7 @@ export default function PlannerPanel({ toolbar, children }) {
 
   function toggle() {
     focusAfterToggle.current = true
-    setOpen((isOpen) => !isOpen)
+    onOpenChange(!open)
   }
 
   return (
