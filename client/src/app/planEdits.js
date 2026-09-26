@@ -43,3 +43,29 @@ export function listStopChanges(before, after) {
       old.timing.scheduledEndAt !== next.timing.scheduledEndAt,
     )
 }
+
+/**
+ * The stop with a different kind, or null when it can't change: all-day and
+ * finished stops, and stops without planned times. Fixed → flexible keeps the
+ * planned times with no window limit; flexible → fixed pins them.
+ *
+ * @param {object} stop Stop in the §5 shape.
+ * @param {'fixed' | 'flexible'} kind
+ */
+export function withStopKind(stop, kind) {
+  const { timing } = stop
+  if (!['fixed', 'flexible'].includes(kind) || !['fixed', 'flexible'].includes(timing.kind) || timing.kind === kind) return null
+  if (stop.status !== 'planned' || timing.scheduledStartAt === null || timing.scheduledEndAt === null) return null
+  const pinned = kind === 'fixed'
+  return {
+    ...stop,
+    timing: {
+      ...timing,
+      kind,
+      fixedStartAt: pinned ? timing.scheduledStartAt : null,
+      fixedEndAt: pinned ? timing.scheduledEndAt : null,
+      earliestStartAt: null,
+      latestEndAt: null,
+    },
+  }
+}

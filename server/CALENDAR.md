@@ -157,7 +157,8 @@ or creates one with `dataMode: 'live'`:
 - Deduplicates by `sourceCalendarId` + `sourceEventId`.
 - Updates the title and times of existing Calendar stops, keeping their ID,
   status and any location the user already confirmed. A deferred location
-  question stays deferred.
+  question stays deferred. A Calendar event the person made flexible (#38)
+  keeps its DayMap times; only its title follows Calendar.
 - Removes Calendar stops whose event no longer exists, unless completed.
 - Never touches manual stops.
 

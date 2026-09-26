@@ -30,7 +30,7 @@ function matchesFilter(stop, needle) {
  */
 export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, planning, onGapPreview, emptyState = null }) {
   const { analysis } = planning
-  const { plan, draft, selectedStopId, selectStop, editStopDraft, setStopLocation } = usePlan()
+  const { plan, draft, selectedStopId, selectStop, editStopDraft, setStopLocation, setStopKind } = usePlan()
   const listRef = useRef(null)
   const reviewAfterSave = useRef(false)
   const lastPreview = useRef(null)
@@ -128,6 +128,8 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
               placeState={placeStatus(shown, stop)}
               calendarPlace={calendarLocationText(locationQuestionFor(shown, stop.id))}
               onSetPlace={setStopLocation}
+              onSetKind={draft === null ? setStopKind : null}
+              kindHint={draft === null ? null : 'Accept or keep your pending changes first.'}
             />}
           </li>
         })}

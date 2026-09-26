@@ -1,5 +1,5 @@
 import { chooseOption } from './planAdd.js'
-import { listStopChanges, validateStopEdit } from './planEdits.js'
+import { listStopChanges, validateStopEdit, withStopKind } from './planEdits.js'
 import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
 import { planFingerprint } from '../../../shared/planning/fingerprint.js'
@@ -158,6 +158,20 @@ function setLocation(state, { stopId, location }) {
 }
 
 /**
+ * Make a stop fixed or flexible. This is the explicit accept, so it changes
+ * the accepted plan. It waits while a draft is pending, because the draft may
+ * plan different times for the same stop.
+ */
+function setKind(state, { stopId, kind }) {
+  if (state.draft !== null) return state
+  const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
+  const next = stop && withStopKind(stop, kind)
+  if (!next) return state
+  const stops = state.plan.stops.map((candidate) => (candidate.id === stopId ? next : candidate))
+  return { ...state, plan: { ...state.plan, stops, version: state.plan.version + 1 } }
+}
+
+/**
  * Selection is UI state: it never modifies accepted plan data. Edits go into
  * a draft, and only 'accept-draft' replaces the accepted plan.
  */
@@ -202,6 +216,8 @@ export function planReducer(state, action) {
       return addStop(state, action)
     case 'undo-add':
       return undoAdd(state, action)
+    case 'set-stop-kind':
+      return setKind(state, action)
     case 'set-stop-location':
       return setLocation(state, action)
     case 'load-plan':
