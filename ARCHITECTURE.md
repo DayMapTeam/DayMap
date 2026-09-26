@@ -89,8 +89,8 @@ flowchart TD
 | From | To | Rule |
 | --- | --- | --- |
 | Browser | Supabase | **Auth only.** All app data reads and writes go through the Express `/api`. |
-| Browser | Google Maps JavaScript API | The map renderer loads directly in the browser, using a restricted browser key. |
-| Server | Google Calendar, Places, Routes | The server calls the providers and normalises their responses. Frontend code never depends on Google-specific event, place, or route shapes. |
+| Browser | Google Maps JavaScript API | The map renderer and Places autocomplete/preview load directly in the browser, using a website- and API-restricted browser key. |
+| Server | Google Calendar, Routes | The server calls these providers and normalises their responses. Places autocomplete/preview is the browser exception approved by Rafid for issue #16. Google-specific Places objects stay inside the client service adapter. |
 | Frontend services | Demo or live data | Both modes sit behind the same service interface ([§4](#demo-and-live-modes)). |
 
 ## 3. Repository layout
@@ -166,6 +166,12 @@ stateDiagram-v2
 - Preview returns routes, conflicts, and a proposal without touching the accepted plan.
 - **Accept** replaces the accepted plan only if the proposal's base version still matches; otherwise the server returns 409. **Keep current plan** leaves the accepted plan unchanged.
 - Recalculation (DM-08) reuses this flow. There is no separate route editor.
+
+### Browser place search (issue #16)
+
+Rafid approved browser Places autocomplete and selected-place details so search can work before the backend is merged. `client/src/services/places.js` owns session tokens and Google prediction objects, returning plain place data. Suggestions are biased toward Adelaide and restricted to Australia. The selected preview lives in App UI state, separate from the accepted plan; it never creates an activity. Requests are debounced and late results ignored. The planned server Places endpoints below are deferred for this flow; Calendar, Routes, and persistence retain their server boundaries.
+
+Enable Places API (New) and Maps JavaScript API for the restricted browser key. Results are transient, not persisted.
 
 ### `MapView` adapter
 

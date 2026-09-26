@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
+import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
 import './MapView.css'
-
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-
-if (apiKey) {
-  setOptions({ key: apiKey, v: 'weekly' })
-}
 
 // These are mutable Google Maps elements, not React state objects.
 function updateMarkerSelection({ marker, pin, title }, selected) {
@@ -18,11 +12,29 @@ function updateMarkerSelection({ marker, pin, title }, selected) {
   marker.title = selected ? `${title} (selected)` : title
 }
 
-export default function MapView({ stops, selectedStopId, onSelectStop }) {
+// A pointer press older than this is not the one that clicked the pin.
+const POINTER_CLICK_WINDOW_MS = 1000
+
+// onSelectStop(stopId, { anchor }) — anchor is the click point in map pixels,
+// for the place popup. Callers that only select can ignore the second argument.
+export default function MapView({ stops, selectedStopId, onSelectStop, previewPlace = null }) {
   const containerRef = useRef(null)
   const markersRef = useRef(new Map())
+  const lastPointerRef = useRef(null)
   const [runtime, setRuntime] = useState(null)
   const [error, setError] = useState('')
+
+  // The 3D map has no lat/lng-to-pixel API, so remember where the pointer went
+  // down. Capture phase, so the map cannot stop it first.
+  useEffect(() => {
+    const container = containerRef.current
+    function rememberPointer(event) {
+      const rect = container.getBoundingClientRect()
+      lastPointerRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top, at: event.timeStamp }
+    }
+    container.addEventListener('pointerdown', rememberPointer, true)
+    return () => container.removeEventListener('pointerdown', rememberPointer, true)
+  }, [])
 
   useEffect(() => {
     if (!apiKey) return
@@ -33,8 +45,8 @@ export default function MapView({ stops, selectedStopId, onSelectStop }) {
     async function loadMap() {
       try {
         const [maps3d, { PinElement }] = await Promise.all([
-          importLibrary('maps3d'),
-          importLibrary('marker'),
+          loadMapsLibrary('maps3d'),
+          loadMapsLibrary('marker'),
         ])
         if (cancelled) return
 
@@ -86,7 +98,17 @@ export default function MapView({ stops, selectedStopId, onSelectStop }) {
         glyphText: String(index + 1),
         glyphColor: '#ffffff',
       })
-      const handleClick = () => onSelectStop(stop.id)
+      const handleClick = (event) => {
+        const container = containerRef.current
+        const pointer = lastPointerRef.current
+        const recent = pointer !== null && event.timeStamp - pointer.at < POINTER_CLICK_WINDOW_MS
+        // Keyboard activation has no pointer position: anchor to the map centre.
+        const anchor = recent
+          ? { x: pointer.x, y: pointer.y }
+          : { x: container.clientWidth / 2, y: container.clientHeight / 2 }
+        lastPointerRef.current = null
+        onSelectStop(stop.id, { anchor })
+      }
       marker.append(pin)
       marker.addEventListener('gmp-click', handleClick)
       runtime.map.append(marker)
@@ -107,6 +129,32 @@ export default function MapView({ stops, selectedStopId, onSelectStop }) {
       updateMarkerSelection(entry, id === selectedStopId)
     }
   }, [runtime, stops, onSelectStop, selectedStopId])
+
+  useEffect(() => {
+    if (!runtime || !previewPlace) return
+
+    const { lat, lng, label } = previewPlace
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    const marker = new runtime.Marker({
+      position: { lat, lng },
+      altitudeMode: 'CLAMP_TO_GROUND',
+      collisionBehavior: 'REQUIRED',
+      drawsWhenOccluded: true,
+      label: `${label} (preview)`,
+      title: `${label} (preview)`,
+      zIndex: 20,
+    })
+    marker.append(new runtime.PinElement({
+      background: '#7e22ce', borderColor: '#581c87', glyphColor: '#ffffff', glyphText: 'P',
+    }))
+    runtime.map.append(marker)
+    // Camera changes belong to explicit place selection, not planner updates.
+    runtime.map.flyCameraTo({
+      endCamera: { center: { lat, lng, altitude: 0 }, range: 1200, tilt: 60 },
+      durationMillis: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800,
+    })
+    return () => marker.remove()
+  }, [runtime, previewPlace])
 
   const message = !apiKey ? 'Missing Google Maps API key.' : error
 

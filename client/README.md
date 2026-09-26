@@ -1,6 +1,6 @@
 # DayMap frontend
 
-React + JavaScript + Vite. The page shows the map-page layout (DM-02 in progress): a glass header, a placeholder map, and the planner panel listing the shared sample day. The Google map requires a browser Maps key; the planner and public demo API work without login or Google credentials. The sample plan loads from the Express backend.
+React + JavaScript + Vite. The page shows an Adelaide 3D map, a floating planner, and browser Places search. The fictional day loads from the Express demo API without login. Map rendering and place search require a restricted Google browser key.
 
 ## Run locally
 
@@ -9,6 +9,17 @@ From the repository root, use Node 22 (`nvm install && nvm use`), run `npm ci`, 
 Copy `.env.example` to `.env.local` and provide your restricted `VITE_GOOGLE_MAPS_API_KEY` for the map. Keep `VITE_API_BASE_URL` empty for local development. VS Code Live Server does not start Vite or Express.
 
 Run `npm test`, `npm run lint`, and `npm run build` from the root. To run only the client, use `npm run dev --workspace=client`; the backend must already be running. Tests use Node's built-in runner; lint includes the shared fixture.
+
+## Google setup and place search
+
+1. In the DayMap Google Cloud project, enable **Maps JavaScript API** and **Places API (New)**.
+2. Edit the browser key: keep **Websites** restrictions for `http://localhost:5173/*` and `http://127.0.0.1:5173/*`; allow both APIs under **API restrictions**. Billing must be enabled on the project.
+3. Set `VITE_GOOGLE_MAPS_API_KEY` in ignored `client/.env.local`, using `.env.example` as the template. Restart Vite after changing it. Never commit the real key.
+4. Search for `State Library` in the top-left field. Choose a suggestion by pointer or ArrowDown/Enter. A purple P pin previews the location and the camera moves there.
+5. Choose another place: the previous preview is replaced. Clear search or press Escape: the preview disappears. It never changes the day's activities or selected itinerary stop.
+6. Confirm itinerary pin/card selection still works. Try a query with no matches and check that the status is clear.
+
+Search waits 300ms after typing and requires two characters. Results favour Adelaide and are restricted to Australia. Loading, no-results and provider errors appear below the field. Session tokens group autocomplete with the selected place details; only coordinates and formatted address are requested. No Places data is persisted. Live verification requires the Cloud setup above; unit tests cover debouncing, stale responses, clearing during details loading and disposal.
 
 ## Sample day
 
@@ -60,26 +71,28 @@ export function EventButtons() {
 | `acceptDraft()` | Replace the accepted plan with the draft and bump `version`, only if the draft's `baseVersion` still matches; otherwise mark the draft `stale` |
 | `discardDraft()` | Keep the current plan and drop the draft |
 
-For the future map adapter:
+For the map adapter:
 
 ```jsx
 const { plan, selectedStopId, selectStop } = usePlan()
-// MapView will be implemented in the map issue.
 return <MapView stops={plan.stops} legs={plan.legs} selectedStopId={selectedStopId} onSelectStop={selectStop} />
 ```
 
-`usePlan()` throws a descriptive error outside the provider. Context/hook, reducer, and provider live in separate files to support React Fast Refresh. Edits follow ARCHITECTURE §4: they create a draft, and only `acceptDraft()` changes the accepted plan. Preview (conflicts and routes), persistence, and server-held proposals are later work.
+A pin click calls `onSelectStop(stopId, { anchor })`, where `anchor` is the click point in map pixels (`{ x, y }`). The 3D map has no lat/lng-to-pixel API, so this is how the place popup knows where to point. Callers that only select can ignore it. `App.jsx` opens the popup only from this call, never from the planner or search, and closes it when the map is dragged or zoomed, because it cannot follow the camera.
+
+`usePlan()` throws a descriptive error outside the provider. Context/hook, reducer, and provider live in separate files to support React Fast Refresh. Edits follow ARCHITECTURE §4: they create a draft, and only `acceptDraft()` changes the accepted demo plan. The server implements authenticated persistence, but the account UI and live-plan wiring remain follow-up work. Preview (conflicts and routes) and server-held proposals are still planned.
 
 ## Verify the planner
 
 1. Start both servers and open the page; loading is followed by the planner. The header shows the plan date and `9:50am · demo time`; demo mode uses a fixed clock on the plan date so finished stops look the same whenever the demo runs.
 2. The planner lists four stops in order, each with its time range, Fixed/Flexible, location and duration. Stops that ended before the demo time are greyed out (none in the current fixture; Morning lecture runs until 10:00am). Between rows, travel shows as *Travel unknown* until routes exist.
 3. Select a row by click, or with Tab and Enter/Space. It highlights; selecting another row moves the highlight. Selection lives in `PlanProvider`, so the map will follow it.
-4. Type `market` in *Filter your day*: one row remains, *Showing 1 of 4 stops* appears, and the travel lines hide. Clear it and all four return. Typing in *Search places* (top left) says place results aren't available yet.
+4. Type `market` in *Filter your day*: one row remains, *Showing 1 of 4 stops* appears, and the travel lines hide. Clear it and all four return. Use *Search places* (top left) for Google location suggestions; it is independent of the planner filter.
 5. Expand *Morning lecture*: details only, with "DayMap will never move a fixed event." Expand *Library study*: the edit form opens and the lecture row closes. An end before the start, or times outside 10:00am–12:00pm, show an error and nothing is saved.
 6. Change Library study to 10:45–11:45 and Save. The row shows the new time marked *Changed*, and a card lists the change. *Keep current plan* restores 10:30–11:30; *Accept changes* applies it.
 7. Collapse the planner with the › button; the *Planner* pill reopens it. Below 720px the planner is a bottom sheet; its handle switches between peek and full height. Open/collapsed is remembered per browser.
-8. Refresh: the fixture reloads with no selected stop and no draft. Selection and edits are not persisted yet.
+8. With a Maps key in `.env.local`, click a pin: a popup opens above it (below it near the top), never under the planner, with the stop's time, Fixed/Flexible and address. There is no photo yet ("No photo yet") until place details exist (DM-07). Selecting rows or searching never opens it. Esc, ×, selecting another stop, or dragging the map closes it. *View in planner* opens the panel if collapsed, clears the filter, expands that row, scrolls to it and briefly highlights it.
+9. Refresh: the fixture reloads with no selected stop and no draft. Selection and edits are not persisted yet.
 
 The planner lives in `src/planner/`, shared UI helpers in `src/components/`, and design tokens in `src/theme/tokens.css`.
 
