@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "lint": "eslint . ../shared",
+    "preview": "vite preview",
+    "test": "node --test src/app/planReducer.test.js"
   },
   "dependencies": {
     "react": "^19.2.8",
