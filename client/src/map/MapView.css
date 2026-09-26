@@ -1,12 +1,19 @@
 .map-view {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
   background: var(--map-placeholder);
 }
 
+.map-view-canvas {
+  width: 100%;
+  height: 100%;
+}
+
 .map-view-caption {
+  position: absolute;
+  top: 50%;
+  left: var(--overlay-inset);
+  max-width: calc(100% - 2 * var(--overlay-inset));
   padding: var(--space-2) var(--space-3);
   font-size: 12px;
   font-weight: 500;
