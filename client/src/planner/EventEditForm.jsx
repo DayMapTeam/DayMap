@@ -36,8 +36,9 @@ const ERROR_FIELDS = {
  * @param {string} props.timezone Plan IANA timezone.
  * @param {(edit: import('../app/planEdits.js').StopEdit) => void} props.onSave
  * @param {() => void} props.onCancel
+ * @param {() => void} props.onDelete Asks to delete the stop; nothing changes until the user confirms.
  */
-export default function EventEditForm({ stop, date, timezone, onSave, onCancel }) {
+export default function EventEditForm({ stop, date, timezone, onSave, onCancel, onDelete }) {
   const id = useId()
   const [title, setTitle] = useState(stop.title)
   const [start, setStart] = useState(toTimeInputValue(stop.timing.scheduledStartAt, timezone))
@@ -123,6 +124,9 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel }
         </p>
       )}
       <div className="event-form-actions">
+        <button type="button" className="button-destructive" data-delete-stop={stop.id} onClick={onDelete}>
+          Delete
+        </button>
         <button type="button" className="button-text" onClick={onCancel}>
           Cancel
         </button>

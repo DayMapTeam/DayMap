@@ -1,0 +1,674 @@
+/* Adding an event: header button, guided sheet, toast. */
+
+/* Header "+" button: 32px circle. */
+.planner-add {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--on-accent);
+  background: var(--blue);
+  border: 0;
+  border-radius: 50%;
+  transition: transform var(--duration-press) var(--ease-spring);
+}
+
+.planner-add:not(:disabled):active {
+  transform: scale(var(--press-scale));
+}
+
+.planner-add:disabled {
+  color: var(--label-2);
+  background: var(--fill);
+}
+
+/* A just-added row's label. */
+.event-row-new {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--on-accent);
+  background: var(--blue);
+  border-radius: var(--radius-pill);
+}
+
+.add-field {
+  display: grid;
+  gap: 6px;
+}
+
+.add-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.add-hint {
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+/* Search field */
+.add-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 38px;
+  padding: 0 10px;
+  background: var(--fill);
+  border-radius: var(--radius-control);
+}
+
+.add-search:focus-within {
+  background: var(--solid);
+  outline: var(--focus-ring);
+  outline-offset: 0;
+}
+
+.add-search-large {
+  height: 40px;
+  background: var(--solid);
+  box-shadow: var(--shadow-card);
+}
+
+.add-search-icon {
+  flex: none;
+  color: var(--label-2);
+}
+
+.add-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font-size: 14px;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.add-search-input::placeholder {
+  color: var(--label-2);
+}
+
+/* Segmented control (radio group) */
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  background: var(--fill);
+  border-radius: var(--radius-segmented);
+}
+
+/* Each option anchors its visually hidden radio, so focusing it never scrolls the panel. */
+.segmented-option,
+.chip,
+.slot-option {
+  position: relative;
+}
+
+.segmented-option {
+  display: grid;
+}
+
+.segmented-label {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-2);
+  border-radius: calc(var(--radius-segmented) - 2px);
+  cursor: pointer;
+  transition: background var(--duration-press) var(--ease-spring);
+}
+
+.segmented-option input:checked + .segmented-label {
+  color: var(--label);
+  background: var(--solid);
+  box-shadow: var(--shadow-thumb);
+}
+
+.segmented-option input:focus-visible + .segmented-label,
+.chip input:focus-visible + .chip-label,
+.slot-option input:focus-visible ~ .slot-option-radio {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* Duration chips */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-label {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--fill);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background var(--duration-press) var(--ease-spring);
+}
+
+.chip input:checked + .chip-label {
+  color: var(--on-accent);
+  background: var(--blue);
+}
+
+/* Start / End */
+.time-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.time-range-field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.time-range-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+.time-range-input {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  background: var(--fill);
+  border: 0;
+  border-radius: var(--radius-control);
+}
+
+/* Verdict: colour plus a written reason, never colour alone. */
+.fit-verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 10px var(--space-3);
+  font-size: 13px;
+  color: var(--label-2);
+  background: var(--fill);
+  border-radius: var(--radius-control);
+}
+
+.fit-verdict[data-tone='ok'] {
+  color: var(--green-ink);
+  background: var(--green-tint);
+}
+
+.fit-verdict[data-tone='bad'] {
+  color: var(--red-ink);
+  background: var(--red-tint);
+}
+
+.fit-verdict-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  background: var(--label-3);
+  border-radius: 50%;
+}
+
+.fit-verdict[data-tone='ok'] .fit-verdict-dot {
+  background: var(--green);
+}
+
+.fit-verdict[data-tone='bad'] .fit-verdict-dot {
+  background: var(--red);
+}
+
+.fit-verdict-text {
+  display: grid;
+  gap: 2px;
+}
+
+.fit-verdict-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* White inset group, like native settings. */
+.inset-group {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--solid);
+  border-radius: var(--radius-legend);
+  box-shadow: var(--shadow-card);
+}
+
+.inset-group > * + * {
+  border-top: 1px solid var(--separator);
+}
+
+/* Slot options */
+.slot-option {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  min-height: var(--hit-target);
+  padding: 10px var(--space-3);
+  cursor: pointer;
+}
+
+.slot-option-radio {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1.5px solid var(--label-3);
+  border-radius: 50%;
+}
+
+.slot-option input:checked ~ .slot-option-radio {
+  border: 6px solid var(--blue);
+}
+
+.slot-option-text {
+  display: grid;
+  gap: 2px;
+}
+
+.slot-option-time {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.slot-option-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.slot-option-reason {
+  font-size: 12px;
+  color: var(--red-ink);
+}
+
+.slot-option[data-ok] .slot-option-reason {
+  color: var(--label-2);
+}
+
+/* Change list */
+.change-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.change-row[data-type='new'] {
+  background: var(--blue-tint);
+}
+
+.change-row-badge {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--label);
+  border-radius: 50%;
+}
+
+.change-row[data-type='new'] .change-row-badge {
+  color: var(--blue);
+  background: var(--solid);
+  border: 2px dashed var(--blue);
+}
+
+.change-row-text,
+.change-row-when {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.change-row-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.change-row-sub {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--label-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change-row-when {
+  justify-items: end;
+}
+
+.change-row-time {
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.change-row-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.change-row[data-type='new'] .change-row-label {
+  color: var(--blue);
+}
+
+.change-row[data-type='shifted'] .change-row-label {
+  color: var(--orange-ink);
+}
+
+/* Guided sheet: takes over the planner, same size and glass. */
+.planner-takeover,
+.add-sheet {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sheet-header {
+  display: grid;
+  flex: none;
+  gap: 6px;
+  padding: 14px var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--separator);
+}
+
+.sheet-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sheet-back,
+.sheet-cancel {
+  min-height: var(--hit-target);
+  margin: -10px -6px;
+  padding: 0 6px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+}
+
+.sheet-back {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.sheet-cancel {
+  font-size: 14px;
+  color: var(--label-2);
+}
+
+.sheet-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.sheet-title:focus {
+  outline: none;
+}
+
+.sheet-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.sheet-progress-bars {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.sheet-progress-bar {
+  width: 22px;
+  height: 4px;
+  background: var(--fill-2);
+  border-radius: 2px;
+}
+
+.sheet-progress-bar[data-done] {
+  background: var(--blue);
+}
+
+.sheet-body {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  /* Rows keep their full height so the body scrolls; without this, grid shrinks overflow-hidden groups (the change list) and cuts off stops. */
+  grid-auto-rows: max-content;
+  gap: 14px;
+  min-height: 0;
+  padding: 14px var(--space-4) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-footer {
+  flex: none;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--separator);
+}
+
+.sheet-primary {
+  width: 100%;
+  min-height: var(--hit-target);
+  border-radius: var(--radius-legend);
+}
+
+.sheet-rows > li {
+  display: grid;
+}
+
+.sheet-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 12px;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  background: transparent;
+  border: 0;
+}
+
+.sheet-row:hover {
+  background: var(--fill);
+}
+
+.sheet-row-thumb {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--label-2);
+  background: var(--fill);
+  border-radius: var(--radius-control);
+}
+
+.sheet-row-thumb[data-plus] {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--on-accent);
+  background: var(--blue);
+}
+
+.sheet-row-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sheet-row-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sheet-row-sub {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--label-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-row-chevron {
+  color: var(--label-3);
+}
+
+.sheet-place {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  background: var(--solid);
+  border-radius: var(--radius-legend);
+  box-shadow: var(--shadow-card);
+}
+
+.sheet-place-name {
+  width: 100%;
+  min-width: 0;
+  padding: 2px var(--space-1);
+  margin: -2px calc(var(--space-1) * -1);
+  font-size: 15px;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-thumb);
+}
+
+.sheet-place-name:focus-visible {
+  background: var(--fill);
+  outline: var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* Confirmation inside the planner: a scrim over the panel and a solid card. */
+.confirm-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--scrim);
+  animation: confirm-in var(--duration-popup) var(--ease-spring);
+}
+
+.confirm-dialog {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 300px;
+  padding: var(--space-4);
+  background: var(--solid);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-glass);
+}
+
+.confirm-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.confirm-message {
+  font-size: 14px;
+  color: var(--label-2);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+@keyframes confirm-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Toast: glass pill over the map, above the mobile sheet's peek. */
+.add-toast {
+  position: absolute;
+  bottom: var(--space-6);
+  left: 50%;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(480px, calc(100% - var(--overlay-inset) * 2));
+  padding: 6px 6px 6px 14px;
+  font-size: 14px;
+  border-radius: var(--radius-pill);
+  transform: translateX(-50%);
+  animation: add-toast-in var(--duration-popup) var(--ease-spring);
+}
+
+@keyframes add-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+.add-toast-check {
+  flex: none;
+  color: var(--blue);
+}
+
+.add-toast-text {
+  min-width: 0;
+}
+
+.add-toast-undo {
+  flex: none;
+  border-radius: var(--radius-pill);
+}
+
+/* Keep in sync with the sheet breakpoint in PlannerPanel.css. */
+@media (max-width: 719px) {
+  .add-toast {
+    bottom: calc(var(--sheet-peek) + var(--space-3));
+  }
+}

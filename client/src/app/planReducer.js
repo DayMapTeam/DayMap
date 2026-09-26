@@ -1,8 +1,41 @@
+import { chooseOption } from './planAdd.js'
 import { listStopChanges, validateStopEdit } from './planEdits.js'
 
 /** Initialise an isolated plan snapshot for each provider. */
 export function createPlanState(initialPlan) {
-  return { plan: structuredClone(initialPlan), selectedStopId: null, draft: null }
+  return { plan: structuredClone(initialPlan), selectedStopId: null, draft: null, lastAdd: null }
+}
+
+/**
+ * Add a stop the user confirmed in an add flow. The flow is the preview and
+ * Add is the explicit accept, so this re-runs the same fit the flow showed and
+ * applies it only if the plan hasn't changed since. A pending edit draft
+ * blocks adding, so the two never overwrite each other.
+ */
+function addStop(state, { newStop, afterStopId, baseVersion, now }) {
+  if (state.draft !== null || baseVersion !== state.plan.version) return state
+  const option = chooseOption(state.plan, newStop, { afterStopId, now })
+  if (option === null) return state
+  const version = state.plan.version + 1
+  return {
+    ...state,
+    plan: { ...option.plan, version },
+    selectedStopId: newStop.id,
+    lastAdd: { stopId: newStop.id, previousPlan: state.plan, version },
+  }
+}
+
+// Undo restores the day as it was before the add, including any stops it
+// moved, but only while nothing else has changed the plan.
+function undoAdd(state, { stopId }) {
+  const { lastAdd } = state
+  if (lastAdd === null || lastAdd.stopId !== stopId || lastAdd.version !== state.plan.version) return state
+  return {
+    ...state,
+    plan: { ...lastAdd.previousPlan, version: state.plan.version + 1 },
+    selectedStopId: state.selectedStopId === stopId ? null : state.selectedStopId,
+    lastAdd: null,
+  }
 }
 
 /**
@@ -37,6 +70,40 @@ function editStopDraft(state, { stopId, edit }) {
   }
 }
 
+function withoutStop(plan, stopId) {
+  return {
+    ...plan,
+    stops: plan.stops.filter((stop) => stop.id !== stopId),
+    legs: plan.legs.filter((leg) => leg.fromStopId !== stopId && leg.toStopId !== stopId),
+  }
+}
+
+/**
+ * Delete a flexible stop the user confirmed, with its legs. The confirmation
+ * is the explicit accept, so this changes the accepted plan and bumps its
+ * version. A pending edit draft loses the stop too but keeps its other edits.
+ */
+function removeStop(state, { stopId }) {
+  const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
+  if (!stop || stop.timing.kind !== 'flexible') return state
+
+  const version = state.plan.version + 1
+  const plan = { ...withoutStop(state.plan, stopId), version }
+  let { draft } = state
+  if (draft !== null) {
+    const draftPlan = withoutStop(draft.plan, stopId)
+    draft = listStopChanges(plan, draftPlan).length === 0
+      ? null
+      : { ...draft, plan: draftPlan, baseVersion: draft.baseVersion === state.plan.version ? version : draft.baseVersion }
+  }
+  return {
+    ...state,
+    plan,
+    draft,
+    selectedStopId: state.selectedStopId === stopId ? null : state.selectedStopId,
+  }
+}
+
 /**
  * Selection is UI state: it never modifies accepted plan data. Edits go into
  * a draft, and only 'accept-draft' replaces the accepted plan.
@@ -54,6 +121,8 @@ export function planReducer(state, action) {
         : { ...state, selectedStopId: null }
     case 'edit-stop-draft':
       return editStopDraft(state, action)
+    case 'remove-stop':
+      return removeStop(state, action)
     case 'accept-draft': {
       const { draft } = state
       if (draft === null) return state
@@ -65,6 +134,10 @@ export function planReducer(state, action) {
     }
     case 'discard-draft':
       return state.draft === null ? state : { ...state, draft: null }
+    case 'add-stop':
+      return addStop(state, action)
+    case 'undo-add':
+      return undoAdd(state, action)
     default:
       return state
   }

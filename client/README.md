@@ -80,8 +80,11 @@ export function EventButtons() {
 | `clearSelection()` | Reset selection without changing plan data |
 | `draft` | `{ baseVersion, plan, stale }` holding saved but unaccepted edits, or `null` |
 | `editStopDraft(id, edit)` | Put an edit to a flexible stop (`{ title, scheduledStartAt, scheduledEndAt }`) into the draft; invalid edits and fixed stops are ignored (rules in `src/app/planEdits.js`) |
+| `removeStop(id)` | Delete a flexible stop (and its legs) the user confirmed; bumps `version`. A pending draft keeps its other edits. Fixed and unknown stops are ignored |
 | `acceptDraft()` | Replace the accepted plan with the draft and bump `version`, only if the draft's `baseVersion` still matches; otherwise mark the draft `stale` |
 | `discardDraft()` | Keep the current plan and drop the draft |
+| `addStop({ newStop, afterStopId, baseVersion, now })` | Add a stop confirmed in an add flow. Re-runs `fitNewStop` (`src/app/planAdd.js`) and applies it only if it still fits, `baseVersion` matches and no edit draft is pending; bumps `version` and selects the new stop |
+| `undoAdd(stopId)` | Restore the day from before that add (including stops it moved), only if nothing else changed the plan since |
 
 For the map adapter:
 
@@ -116,6 +119,9 @@ Besides the documented props, `MapView` takes:
 6. Change Library study to 10:45–11:45 and Save. The row shows the new time marked *Changed*, and a card lists the change. *Keep current plan* restores 10:30–11:30; *Accept changes* applies it.
 7. Collapse the planner with the › button; the *Planner* pill reopens it. Below 720px the planner is a bottom sheet; its handle switches between peek and full height. Open/collapsed is remembered per browser.
 8. With a Maps key in `.env.local`, click a pin: a popup opens above it (below it near the top), never under the planner, with the stop's time, Fixed/Flexible and address. There is no photo yet ("No photo yet") until place details exist (DM-07). Selecting rows or searching never opens it. The popup shows the pin's number and points at the pin head. Esc, ×, clicking the same pin again, or clicking the empty map closes it and clears the selection; moving the camera or selecting another stop in the planner only closes it. *View in planner* keeps it open, opens the panel if collapsed, clears the filter, expands that row, scrolls to it and briefly highlights it.
-9. Refresh: the fixture reloads with no selected stop and no draft. Selection and edits are not persisted yet.
+9. Expand *Library study* and press the red *Delete* on the left of Cancel and Save. A dialog over the planner asks "Are you sure you want to delete this event?". *Cancel* (or Esc) changes nothing and returns focus to Delete; *Confirm* removes the stop. Only flexible stops show Delete.
+10. The round *+* button in the planner header (or the N key) opens the add sheet: *Where?* (a place, or *Use “…”* without one), *When?* (duration and the best times, or a set time), then *Check your day* listing what is new, moved or unchanged. Nothing changes until *Add to day*. The new row is marked *New* and selected, and a toast offers *Undo* for 5 seconds. Try *At a set time* 11:00–11:20am: it overlaps Library study and *Next* stays disabled. Without a Maps key, place search says it is unavailable and events can still be added without a place (shown as *Location needed*).
+11. Adding is disabled while an edit is waiting to be accepted. Fits use clock times only: travel is unknown until routes exist, and every message says so. The fit logic is local (`src/app/planAdd.js`) until the planning endpoint exists.
+12. Refresh: the fixture reloads with no selected stop and no draft. Selection and edits are not persisted yet.
 
 The planner lives in `src/planner/`, shared UI helpers in `src/components/`, and design tokens in `src/theme/tokens.css`.
