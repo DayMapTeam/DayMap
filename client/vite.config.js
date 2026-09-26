@@ -6,6 +6,9 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: 5173,
+    strictPort: true,
+    proxy: { '/api': 'http://localhost:3001' },
     fs: {
       // Shared fixtures live beside client; do not expose future server files.
       allow: [fileURLToPath(new URL('.', import.meta.url)), fileURLToPath(new URL('../shared', import.meta.url))],

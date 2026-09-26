@@ -1,10 +1,10 @@
 # DayMap frontend
 
-React + JavaScript + Vite. Issue #5 adds a temporary selection demo, not the final planner or a geographic map. It runs without login, API keys, or a backend.
+React + JavaScript + Vite. Issue #5 adds a temporary selection demo, not the final planner or a geographic map. It loads the sample day from the Express backend without login or API keys.
 
 ## Run locally
 
-From the repository root:
+Start the backend in another terminal with `npm --prefix server run dev` (install its dependencies first with `npm --prefix server ci`). From the repository root:
 
 ```sh
 cd client
@@ -12,7 +12,7 @@ npm ci
 npm run dev
 ```
 
-Open the Local URL printed by Vite. Run checks from `client/` too:
+Open `http://localhost:5173`. Vite proxies `/api` to `http://localhost:3001` and requires port 5173 to be available. VS Code Live Server does not run this React/Vite app or the Express backend. Run checks from `client/` too:
 
 ```sh
 npm run lint
@@ -26,7 +26,7 @@ There are no root npm scripts yet. Tests use Node's built-in test runner and int
 
 `shared/fixtures/demoPlan.js` exports `demoPlan`, following ARCHITECTURE.md's stop contract. It contains four fictional activities at approximate public Adelaide locations, stable IDs, UTC times, and the `Australia/Adelaide` display timezone. The first event is fixed; the rest have flexible windows. `legs`, `questions`, and `conflicts` are empty. Gaps between activities are sample spacing, not calculated travel times.
 
-From `client/src/main.jsx`, import it with:
+The backend imports the fixture and serves it from `GET /api/demo-plan`. `client/src/services/plans.js` loads it over HTTP. For fixture-based tests, import it with:
 
 ```js
 import { demoPlan } from '../../shared/fixtures/demoPlan.js'
@@ -34,7 +34,7 @@ import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 
 ## Shared state for Hannah's planner and Rafid's map
 
-`src/main.jsx` wraps the app once in `PlanProvider`. The `initialPlan` prop seeds a cloned snapshot on mount; later prop changes do not replace the plan. Future data loading/replacement needs a deliberate reducer action. Do not mutate `plan` or create a second provider around each surface.
+`src/main.jsx` wraps the app once in `PlanProvider`. The `initialPlan` prop seeds a cloned snapshot on mount; later prop changes do not replace the plan. The `loadPlan(plan)` action replaces the accepted plan with a cloned response and clears selection. `DemoLoader` calls it after loading the API response. Do not mutate `plan` or create a second provider around each surface.
 
 Both surfaces consume `usePlan()`:
 
@@ -76,14 +76,20 @@ const { plan, selectedStopId, selectStop } = usePlan()
 return <MapView stops={plan.stops} legs={plan.legs} selectedStopId={selectedStopId} onSelectStop={selectStop} />
 ```
 
-`usePlan()` throws a descriptive error outside the provider. Context/hook, reducer, and provider live in separate files to support React Fast Refresh. Editing, persistence, loading data from `/api/demo-plan`, and draft/proposal actions are later work.
+`usePlan()` throws a descriptive error outside the provider. Context/hook, reducer, and provider live in separate files to support React Fast Refresh. Editing, persistence, and draft/proposal actions are later work.
 
 ## Verify the temporary demo
 
-1. Open the page: four events appear; Shared selection says No event selected.
+1. Start both servers and open the page: a loading message is followed by four events; Shared selection says No event selected.
 2. Select Morning lecture, then Library study. The pressed button and separate detail panel agree on the selected event and its ID.
 3. Click Clear selection in the detail panel. No event remains pressed; the empty state returns.
 4. Use Tab and Enter/Space to select events by keyboard.
 5. Refresh: the fixture reloads with no selected event. Selection is intentionally not persisted.
 
 The two consumers are `src/demo/EventSelector.jsx` and `src/demo/SelectionPreview.jsx`. Replace these temporary components with the real planner/map later, keeping the provider and hook.
+
+## API loading and failure recovery
+
+`DemoLoader` cancels requests on unmount, ignores obsolete responses, and times out after 10 seconds. Failure shows a retry button; no local fixture silently replaces a failed API call. Stop the backend and reload to verify the error state, then restart it and choose Try again.
+
+For a deployed backend or a different API origin, copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL` to the server origin (without `/api`). Configure the server `CLIENT_ORIGIN` to the frontend origin and restart Vite after environment changes. An empty API base uses relative `/api` requests; the dev proxy applies only to the development server. Production hosting needs an API base URL or a reverse proxy.

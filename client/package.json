@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint . ../shared",
     "preview": "vite preview",
-    "test": "node --test src/app/planReducer.test.js"
+    "test": "node --test src/app/planReducer.test.js src/services/plans.test.js"
   },
   "dependencies": {
     "react": "^19.2.8",

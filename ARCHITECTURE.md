@@ -181,7 +181,7 @@ The map sits behind a single adapter:
 
 ### Demo and live modes
 
-- Demo mode must keep working without login or Calendar credentials. Issue #5 imports `shared/fixtures/demoPlan.js` directly so the frontend runs before the backend exists. Once DM-04 is implemented, the demo service will read the same fixture through `GET /api/demo-plan`, which makes no external API calls.
+- Demo mode must keep working without login or Calendar credentials. The demo service loads the shared fixture through `GET /api/demo-plan`, which makes no external API calls. The frontend shows loading and retry states and dispatches `load-plan` to replace the accepted snapshot and clear selection.
 - Simulated data, including sample route geometry and disruptions, is clearly labelled in the UI (`dataMode: 'demo'`).
 
 ## 5. Shared data contract
