@@ -70,3 +70,24 @@
 .place-search-note[hidden] {
   display: none;
 }
+
+.place-search-results {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1);
+  border-radius: var(--radius-card);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.place-search-results[hidden] { display: none; }
+
+.place-search-results li {
+  padding: var(--space-3);
+  min-height: var(--hit-target);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.place-search-results li:hover,
+.place-search-results li[aria-selected='true'] { background: var(--blue-tint); }
