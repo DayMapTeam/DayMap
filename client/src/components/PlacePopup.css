@@ -1,18 +1,22 @@
-/* Positioned by PlacePopup.jsx; --tail-x and data-placement are set there. */
+/* Positioned by PlacePopup.jsx; --pointer-x and data-placement are set there. */
 .place-popup {
   position: absolute;
   z-index: 6;
-  width: 272px;
+  width: 250px;
   border-radius: var(--radius-panel);
-  animation: place-popup-in var(--duration-popup) var(--ease-spring);
+  animation:
+    place-popup-fly var(--duration-popup-fly) var(--ease-spring),
+    place-popup-fade var(--duration-popup) var(--ease-spring);
 }
 
 .place-popup[data-placement='above'] {
-  transform-origin: var(--tail-x) 100%;
+  --fly-from: 40px;
+  transform-origin: var(--pointer-x) calc(100% + 8px);
 }
 
 .place-popup[data-placement='below'] {
-  transform-origin: var(--tail-x) 0;
+  --fly-from: -40px;
+  transform-origin: var(--pointer-x) -8px;
 }
 
 /* The dialog itself only holds focus for screen readers; its controls show the ring. */
@@ -20,10 +24,16 @@
   outline: none;
 }
 
-@keyframes place-popup-in {
+/* Flies up out of the pin. */
+@keyframes place-popup-fly {
+  from {
+    transform: translateY(var(--fly-from)) scale(0.3);
+  }
+}
+
+@keyframes place-popup-fade {
   from {
     opacity: 0;
-    transform: scale(0.96);
   }
 }
 
@@ -31,7 +41,7 @@
   position: relative;
   display: grid;
   place-items: center;
-  height: 110px;
+  height: 104px;
   margin: var(--space-2) var(--space-2) 0;
   overflow: hidden;
   background: repeating-linear-gradient(135deg, var(--fill) 0 10px, transparent 10px 20px);
@@ -73,7 +83,41 @@
   padding: 10px 14px 14px;
 }
 
+.place-popup-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+/* Repeats the pin's number, in the pin's colour. */
+.place-popup-badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 0.5px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-accent);
+  background: var(--blue);
+  border-radius: 50%;
+}
+
+.place-popup-badge[data-kind='fixed'] {
+  background: var(--label);
+}
+
+.place-popup-badge[data-kind='all-day'] {
+  background: var(--label-2);
+}
+
 .place-popup-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 18px;
   font-weight: 600;
   line-height: 1.2;
@@ -110,12 +154,12 @@
 }
 
 /*
- * 12px rotated square in the same glass. clip-path keeps only the half
- * outside the popup, so the blur is not doubled over the popup edge.
+ * 12px rotated square in the same glass, pointing at the pin. clip-path keeps
+ * only the half outside the popup, so the blur is not doubled over its edge.
  */
-.place-popup-tail {
+.place-popup-pointer {
   position: absolute;
-  left: calc(var(--tail-x) - 6px);
+  left: calc(var(--pointer-x) - 6px);
   width: 12px;
   height: 12px;
   background: var(--glass);
@@ -125,20 +169,20 @@
   transform: rotate(45deg);
 }
 
-.place-popup[data-placement='above'] .place-popup-tail {
+.place-popup[data-placement='above'] .place-popup-pointer {
   bottom: -6px;
   border-width: 0 1px 1px 0;
   clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 
-.place-popup[data-placement='below'] .place-popup-tail {
+.place-popup[data-placement='below'] .place-popup-pointer {
   top: -6px;
   border-width: 1px 0 0 1px;
   clip-path: polygon(0 0, 100% 0, 0 100%);
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .place-popup-tail,
+  .place-popup-pointer,
   .place-popup-close {
     background: var(--glass-opaque);
     -webkit-backdrop-filter: none;

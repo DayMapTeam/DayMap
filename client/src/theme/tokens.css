@@ -66,6 +66,11 @@
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-marker: 0 4px 12px rgba(0, 0, 0, 0.35);
 
+  /* Map pins (read by map/stopMarker.js, which draws them as SVG images) */
+  --marker-halo: rgba(10, 132, 255, 0.35);
+  --marker-dot-halo: rgba(10, 132, 255, 0.25);
+  --marker-shadow-color: rgba(0, 0, 0, 0.35);
+
   /* Focus */
   --focus-ring: 3px solid rgba(10, 132, 255, 0.5);
   --focus-offset: 2px;
@@ -74,7 +79,8 @@
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --duration-panel: 250ms;
   --duration-press: 180ms;
-  --duration-popup: 200ms;
+  --duration-popup: 250ms; /* popup fade */
+  --duration-popup-fly: 400ms;
   --duration-camera: 700ms;
   --press-scale: 0.97;
 
@@ -100,6 +106,7 @@
     --duration-panel: 0ms;
     --duration-press: 0ms;
     --duration-popup: 0ms;
+    --duration-popup-fly: 0ms;
     --duration-camera: 0ms;
     --press-scale: 1;
   }
