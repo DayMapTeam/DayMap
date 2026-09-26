@@ -30,3 +30,5 @@ CORS, a 100 KB JSON body limit, and the shared JSON error shape. Importing
 
 Authenticated plan endpoints, Supabase migrations, setup, and isolation tests
 are documented in [PERSISTENCE.md](PERSISTENCE.md).
+The server-side Google Calendar connection flow is documented in
+[CALENDAR.md](CALENDAR.md).
