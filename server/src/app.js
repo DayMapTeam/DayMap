@@ -3,9 +3,11 @@ import cors from 'cors'
 import healthRouter from './routes/health.js'
 import demoPlanRouter from './routes/demoPlan.js'
 import { notFound, errorHandler } from './middleware/errors.js'
+import { createSupabase } from './repositories/supabase.js'
+import { plansRouter } from './routes/plans.js'
 
-// Configure middleware and mount route modules here; importing the app opens no port.
-export function createApp({ clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173' } = {}) {
+// Importing the app opens no port; tests can inject an isolated data service.
+export function createApp({ clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173', supabase = createSupabase() } = {}) {
   const origin = new URL(clientOrigin)
   if (!['http:', 'https:'].includes(origin.protocol) || origin.origin !== clientOrigin) {
     throw new Error('CLIENT_ORIGIN must be one exact HTTP(S) origin without a path or trailing slash')
@@ -15,11 +17,10 @@ export function createApp({ clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://
   app.use(express.json())
   app.use('/api/health', healthRouter)
   app.use('/api/demo-plan', demoPlanRouter)
+  app.use('/api/plans', plansRouter(supabase))
   app.use(notFound)
   app.use(errorHandler)
   return app
 }
 
-const app = createApp()
-
-export default app
+export default createApp()

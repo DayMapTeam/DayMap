@@ -4,7 +4,7 @@ An interactive map that turns your calendar into a personalised daily route and 
 
 DayMap puts one day on a 3D map of Adelaide, next to a linked event planner. Google Calendar events, activities you add, and the travel time between them form a single plan. When something runs over, DayMap proposes one clear adjustment and changes nothing until you accept it.
 
-> **Status (September 2026):** initial implementation. The frontend loads the shared demo through Express, with linked map/planner selection and local draft edits. Public health/demo endpoints and the Vite proxy are implemented. Live integrations remain planned.
+> **Status (September 2026):** initial implementation. The frontend loads the shared demo through Express, with linked map/planner selection and local draft edits. Public health/demo endpoints and the Vite proxy are implemented. Authenticated plan persistence and versioned migrations are implemented; hosted Supabase configuration and live integrations remain to be completed.
 
 ## Documentation
 
@@ -32,6 +32,8 @@ Optional local configuration:
 - Restart the dev servers after environment changes. Never commit local environment files.
 
 Root checks: `npm test`, `npm run lint`, and `npm run build`. npm workspaces install both packages using the root `package-lock.json`. See [client/README.md](client/README.md) and [server/README.md](server/README.md) for implementation details.
+
+Supabase setup, authenticated endpoint examples, and database isolation checks: [DM-04 persistence](server/PERSISTENCE.md). Demo mode remains usable without Supabase credentials.
 
 ## Team Members
 

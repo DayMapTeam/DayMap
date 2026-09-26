@@ -1,6 +1,6 @@
 # DayMap architecture
 
-**Status:** initial implementation, September 2026. The React frontend now has a shared sample day and selection demo (issue #5). Backend, live integrations, map rendering, and the remaining architecture are proposed. Current run commands and the selection interface are in [client/README.md](client/README.md). Who builds what, and when, is in [CONTRIBUTING.md](CONTRIBUTING.md).
+**Status:** initial implementation, September 2026. The React frontend now has a shared sample day and selection demo (issue #5). The Express public API, authenticated persistence routes, and initial RLS migrations are implemented. Hosted Supabase setup and live provider integrations remain pending. Current run commands and the selection interface are in [client/README.md](client/README.md). Who builds what, and when, is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 This is the technical source of truth. Changing the data contract (§5), the API (§6), or the security rules (§7, §8, §10) needs team agreement. When an [open decision](#12-open-decisions) is resolved, record it in the relevant section and remove it from §12.
 
@@ -279,7 +279,7 @@ const dayPlan = {
 
 ### Endpoints
 
-`GET /api/health` and `GET /api/demo-plan` are implemented. The remaining endpoints are proposed, starting with DM-04.
+`GET /api/health`, `GET /api/demo-plan`, `GET /api/plans`, and `PUT /api/plans/:id` are implemented. The remaining endpoints are proposed. See [DM-04 endpoint examples and setup](server/PERSISTENCE.md).
 
 | Endpoint | Purpose | Issue |
 | --- | --- | --- |
@@ -316,6 +316,12 @@ A single JSONB plan keeps the first model small. Split stops and legs into their
 - The Supabase secret (service-role) key bypasses RLS. Use it only for narrowly scoped privileged operations, and verify ownership explicitly every time.
 - Keep Calendar credentials in a server-only table or schema, outside public Data API access.
 - Saving a plan and accepting a proposal each run an atomic check against `baseVersion`. A mismatch returns 409.
+
+### DM-04 implementation
+
+`profiles` and `day_plans` are defined by versioned migrations with owner-scoped RLS. Authenticated saves use the caller's verified token, an atomic version-filtered update, and a database version trigger. Creation uses `baseVersion: 0`; updates return 409 for stale versions and 404 for inaccessible plans. Plan identity (ID, owner, date and timezone) is immutable. Provider geometry and place details are not persisted until the retention decision is resolved. Profiles are explicitly created by their owner; no profile API or signup trigger exists yet.
+
+The exact request/response wrappers and annotation validation in [server/PERSISTENCE.md](server/PERSISTENCE.md) are proposed for team review in the DM-04 PR. This does not resolve the shared annotation contract decision in §12.
 
 ### Migrations
 
