@@ -19,6 +19,7 @@
  * negative margin so the row text stays aligned with the rest of the panel.
  */
 .event-item {
+  position: relative;
   margin: 0 -10px;
   border-radius: var(--radius-control);
   transition: background var(--duration-press) var(--ease-spring);
@@ -26,6 +27,23 @@
 
 .event-item[data-selected] {
   background: var(--blue-tint);
+}
+
+/* Brief highlight when "View in planner" reveals the row. */
+.event-item-flash {
+  position: absolute;
+  inset: 0;
+  background: var(--blue-tint);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  animation: event-item-flash 1.2s var(--ease-spring);
+}
+
+@keyframes event-item-flash {
+  20% {
+    opacity: 1;
+  }
 }
 
 .event-row {

@@ -1,7 +1,6 @@
 import { formatDuration, formatTimeRange } from '../components/formatTime.js'
 import EventEditForm from './EventEditForm.jsx'
-
-const KIND_LABELS = { fixed: 'Fixed', flexible: 'Flexible', 'all-day': 'All day' }
+import { KIND_LABELS } from './stopLabels.js'
 
 const KIND_NOTES = {
   fixed: 'DayMap will never move a fixed event.',
@@ -22,10 +21,11 @@ const KIND_NOTES = {
  * @param {boolean} props.open
  * @param {boolean} props.past Whether the stop has already ended.
  * @param {boolean} props.changed Whether the draft changes this stop.
+ * @param {number | null} props.flashKey Changes each time "View in planner" reveals this row.
  * @param {(stopId: string) => void} props.onToggle
  * @param {(stopId: string, edit: object) => void} props.onSave
  */
-export default function EventRow({ stop, date, timezone, selected, open, past, changed, onToggle, onSave }) {
+export default function EventRow({ stop, date, timezone, selected, open, past, changed, flashKey, onToggle, onSave }) {
   const { timing } = stop
   const detailsId = `stop-details-${stop.id}`
   const hasTimes = timing.scheduledStartAt !== null && timing.scheduledEndAt !== null
@@ -38,7 +38,14 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
   ].filter(Boolean)
 
   return (
-    <div className="event-item" data-selected={selected || undefined} data-open={open || undefined}>
+    <div
+      className="event-item"
+      data-stop-id={stop.id}
+      data-selected={selected || undefined}
+      data-open={open || undefined}
+    >
+      {/* A new key restarts the highlight animation on every reveal. */}
+      {flashKey !== null && <span key={flashKey} className="event-item-flash" aria-hidden="true" />}
       <button
         type="button"
         className="event-row"

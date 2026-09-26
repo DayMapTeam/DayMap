@@ -1,0 +1,147 @@
+/* Positioned by PlacePopup.jsx; --tail-x and data-placement are set there. */
+.place-popup {
+  position: absolute;
+  z-index: 6;
+  width: 272px;
+  border-radius: var(--radius-panel);
+  animation: place-popup-in var(--duration-popup) var(--ease-spring);
+}
+
+.place-popup[data-placement='above'] {
+  transform-origin: var(--tail-x) 100%;
+}
+
+.place-popup[data-placement='below'] {
+  transform-origin: var(--tail-x) 0;
+}
+
+/* The dialog itself only holds focus for screen readers; its controls show the ring. */
+.place-popup:focus {
+  outline: none;
+}
+
+@keyframes place-popup-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.place-popup-photo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 110px;
+  margin: var(--space-2) var(--space-2) 0;
+  overflow: hidden;
+  background: repeating-linear-gradient(135deg, var(--fill) 0 10px, transparent 10px 20px);
+  border-radius: var(--radius-photo);
+}
+
+.place-popup-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.place-popup-photo-empty {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+.place-popup-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--label);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 0;
+  border-radius: 50%;
+}
+
+.place-popup-body {
+  display: grid;
+  gap: 3px;
+  padding: 10px 14px 14px;
+}
+
+.place-popup-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.place-popup-meta,
+.place-popup-sub {
+  color: var(--label-2);
+}
+
+.place-popup-meta {
+  font-size: 12px;
+}
+
+.place-popup-meta strong {
+  font-weight: 600;
+  color: var(--star);
+}
+
+.place-popup-time {
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.place-popup-sub {
+  font-size: 13px;
+}
+
+.place-popup-action {
+  min-height: 40px;
+  margin-top: var(--space-2);
+}
+
+/*
+ * 12px rotated square in the same glass. clip-path keeps only the half
+ * outside the popup, so the blur is not doubled over the popup edge.
+ */
+.place-popup-tail {
+  position: absolute;
+  left: calc(var(--tail-x) - 6px);
+  width: 12px;
+  height: 12px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  transform: rotate(45deg);
+}
+
+.place-popup[data-placement='above'] .place-popup-tail {
+  bottom: -6px;
+  border-width: 0 1px 1px 0;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+.place-popup[data-placement='below'] .place-popup-tail {
+  top: -6px;
+  border-width: 1px 0 0 1px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .place-popup-tail,
+  .place-popup-close {
+    background: var(--glass-opaque);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

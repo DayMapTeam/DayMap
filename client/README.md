@@ -72,13 +72,14 @@ export function EventButtons() {
 | `acceptDraft()` | Replace the accepted plan with the draft and bump `version`, only if the draft's `baseVersion` still matches; otherwise mark the draft `stale` |
 | `discardDraft()` | Keep the current plan and drop the draft |
 
-For the future map adapter:
+For the map adapter:
 
 ```jsx
 const { plan, selectedStopId, selectStop } = usePlan()
-// MapView will be implemented in the map issue.
 return <MapView stops={plan.stops} legs={plan.legs} selectedStopId={selectedStopId} onSelectStop={selectStop} />
 ```
+
+A pin click calls `onSelectStop(stopId, { anchor })`, where `anchor` is the click point in map pixels (`{ x, y }`). The 3D map has no lat/lng-to-pixel API, so this is how the place popup knows where to point. Callers that only select can ignore it. `App.jsx` opens the popup only from this call, never from the planner or search, and closes it when the map is dragged or zoomed, because it cannot follow the camera.
 
 `usePlan()` throws a descriptive error outside the provider. Context/hook, reducer, and provider live in separate files to support React Fast Refresh. Edits follow ARCHITECTURE §4: they create a draft, and only `acceptDraft()` changes the accepted plan. Preview (conflicts and routes), persistence, loading data from `/api/demo-plan`, and server-held proposals are later work.
 
@@ -91,6 +92,7 @@ return <MapView stops={plan.stops} legs={plan.legs} selectedStopId={selectedStop
 5. Expand *Morning lecture*: details only, with "DayMap will never move a fixed event." Expand *Library study*: the edit form opens and the lecture row closes. An end before the start, or times outside 10:00am–12:00pm, show an error and nothing is saved.
 6. Change Library study to 10:45–11:45 and Save. The row shows the new time marked *Changed*, and a card lists the change. *Keep current plan* restores 10:30–11:30; *Accept changes* applies it.
 7. Collapse the planner with the › button; the *Planner* pill reopens it. Below 720px the planner is a bottom sheet; its handle switches between peek and full height. Open/collapsed is remembered per browser.
-8. Refresh: the fixture reloads with no selected stop and no draft. Selection and edits are not persisted yet.
+8. With a Maps key in `.env.local`, click a pin: a popup opens above it (below it near the top), never under the planner, with the stop's time, Fixed/Flexible and address. There is no photo yet ("No photo yet") until place details exist (DM-07). Selecting rows or searching never opens it. Esc, ×, selecting another stop, or dragging the map closes it. *View in planner* opens the panel if collapsed, clears the filter, expands that row, scrolls to it and briefly highlights it.
+9. Refresh: the fixture reloads with no selected stop and no draft. Selection and edits are not persisted yet.
 
 The planner lives in `src/planner/`, shared UI helpers in `src/components/`, and design tokens in `src/theme/tokens.css`.

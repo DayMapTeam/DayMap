@@ -18,11 +18,29 @@ function updateMarkerSelection({ marker, pin, title }, selected) {
   marker.title = selected ? `${title} (selected)` : title
 }
 
+// A pointer press older than this is not the one that clicked the pin.
+const POINTER_CLICK_WINDOW_MS = 1000
+
+// onSelectStop(stopId, { anchor }) — anchor is the click point in map pixels,
+// for the place popup. Callers that only select can ignore the second argument.
 export default function MapView({ stops, selectedStopId, onSelectStop }) {
   const containerRef = useRef(null)
   const markersRef = useRef(new Map())
+  const lastPointerRef = useRef(null)
   const [runtime, setRuntime] = useState(null)
   const [error, setError] = useState('')
+
+  // The 3D map has no lat/lng-to-pixel API, so remember where the pointer went
+  // down. Capture phase, so the map cannot stop it first.
+  useEffect(() => {
+    const container = containerRef.current
+    function rememberPointer(event) {
+      const rect = container.getBoundingClientRect()
+      lastPointerRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top, at: event.timeStamp }
+    }
+    container.addEventListener('pointerdown', rememberPointer, true)
+    return () => container.removeEventListener('pointerdown', rememberPointer, true)
+  }, [])
 
   useEffect(() => {
     if (!apiKey) return
@@ -86,7 +104,17 @@ export default function MapView({ stops, selectedStopId, onSelectStop }) {
         glyphText: String(index + 1),
         glyphColor: '#ffffff',
       })
-      const handleClick = () => onSelectStop(stop.id)
+      const handleClick = (event) => {
+        const container = containerRef.current
+        const pointer = lastPointerRef.current
+        const recent = pointer !== null && event.timeStamp - pointer.at < POINTER_CLICK_WINDOW_MS
+        // Keyboard activation has no pointer position: anchor to the map centre.
+        const anchor = recent
+          ? { x: pointer.x, y: pointer.y }
+          : { x: container.clientWidth / 2, y: container.clientHeight / 2 }
+        lastPointerRef.current = null
+        onSelectStop(stop.id, { anchor })
+      }
       marker.append(pin)
       marker.addEventListener('gmp-click', handleClick)
       runtime.map.append(marker)
