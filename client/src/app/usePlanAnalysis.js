@@ -5,7 +5,6 @@ import { listStopChanges } from './planEdits.js'
 import { chooseMode, chooseTravelProvider, createPlanningContext } from '../services/planningContext.js'
 import { createWalkingRouteStore } from '../services/walkingRouteStore.js'
 import { createRoutesProvider } from '../services/walkingRoutes.js'
-import { useTravelPreference } from './useTravelPreference.js'
 import { loadMapsLibrary, mapsApiKey } from '../services/googleMaps.js'
 import { buildTimeline, stopInterval } from '../../../shared/planning/timeline.js'
 import { gapRoutePairs } from '../../../shared/planning/proposals.js'
@@ -15,7 +14,8 @@ const googleRoutes = createRoutesProvider(loadMapsLibrary)
 export function usePlanAnalysis(plan, draft, now) {
   const shown = draft?.plan ?? plan
   const provider = chooseTravelProvider(shown, import.meta.env.VITE_TRAVEL_PROVIDER, Boolean(mapsApiKey))
-  const [preference, setPreference] = useTravelPreference()
+  // Automatic mode choice; a journey's own choice lives on its destination stop.
+  const preference = 'auto'
   const [routes] = useState(() => createWalkingRouteStore(googleRoutes))
   const results = useSyncExternalStore(routes.subscribe, routes.getSnapshot)
   const ctx = useMemo(() => createPlanningContext(shown, now, draft?.editedStopIds,
@@ -41,9 +41,9 @@ export function usePlanAnalysis(plan, draft, now) {
     shown.dataMode === 'demo' ? now : new Date(), draft?.editedStopIds,
     provider === 'google' ? (from, to, options) => routes.lookup(from, to, options) : undefined, preference),
   [shown, now, draft?.editedStopIds, provider, routes, preference])
-  // Alternative times: walking or driving as the setting chooses. Public
-  // transport at a new time is only known once that departure is fetched.
-  const withModes = (pairs) => pairs.map((pair) => ({ ...pair, mode: preference === 'drive' ? chooseMode(pair.from, pair.to, 'drive').mode : 'walk' }))
+  // Alternative times: walking, or driving where that journey is by car.
+  // Public transport at a new time is only known once that departure is fetched.
+  const withModes = (pairs) => pairs.map((pair) => ({ ...pair, mode: pair.to.travelMode === 'drive' ? 'drive' : 'walk' }))
   const checkAlternatives = () => {
     if (provider !== 'google') return
     const current = getContext().now
@@ -64,6 +64,23 @@ export function usePlanAnalysis(plan, draft, now) {
       return mode === 'transit' ? [{ from, to, mode, departAt }, { from, to, mode: 'walk' }] : [{ from, to, mode, departAt }]
     }))
   }, [provider, routes, preference])
+  // Every way of making one journey, for the journey popup. Departure is when
+  // `from` ends, or now if that has passed.
+  const departureFor = useCallback((from) => {
+    const end = stopInterval(from)?.end
+    if (!Number.isFinite(end)) return null
+    const current = now instanceof Date ? now.getTime() : now
+    return new Date(Math.max(end, Math.ceil(current / 60000) * 60000)).toISOString()
+  }, [now])
+  const journeyEstimates = useCallback((from, to) => {
+    const departAt = departureFor(from)
+    return Object.fromEntries(['walk', 'transit', 'drive'].map((mode) => [mode, ctx.travel(from, to, { mode, departAt })]))
+  }, [ctx, departureFor])
+  const requestAllModes = useCallback((from, to) => {
+    if (provider !== 'google') return
+    const departAt = departureFor(from)
+    routes.request(['walk', 'transit', 'drive'].map((mode) => ({ from, to, mode, departAt })))
+  }, [provider, routes, departureFor])
   const changedIds = new Set(draft ? listStopChanges(plan, shown).map(({ after }) => after.id) : [])
   const stopStates = Object.fromEntries(shown.stops.map((stop) => {
     const conflicts = analysis.conflicts.filter((c) => c.stopIds.includes(stop.id))
@@ -71,8 +88,9 @@ export function usePlanAnalysis(plan, draft, now) {
     return [stop.id, { clash: conflicts.length > 0, previewShifted: changedIds.has(stop.id),
       note: conflicts.length ? 'Schedule conflict' : unresolved ? 'Travel unresolved' : changedIds.has(stop.id) ? 'Draft change' : '' }]
   }))
-  return { preference, setPreference, shown, ctx, getContext, analysis, displayGaps, introduced, fingerprint: planFingerprint(shown), stopStates,
+  return { shown, ctx, getContext, analysis, displayGaps, introduced, fingerprint: planFingerprint(shown), stopStates,
     provider, loadingRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'pending'),
     failedRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'unavailable'),
-    retryRoutes: routes.retryFailures, checkAlternatives, checkGapRoutes, requestJourneys }
+    retryRoutes: routes.retryFailures, checkAlternatives, checkGapRoutes, requestJourneys,
+    departureFor, journeyEstimates, requestAllModes }
 }

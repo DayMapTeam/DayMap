@@ -295,7 +295,7 @@
 .travel-connector {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2);
   min-height: 28px;
   padding-left: 4px;
   font-size: 12px;
@@ -386,6 +386,30 @@
 
 .segmented[aria-disabled='true'] {
   opacity: 0.6;
+}
+
+.travel-connector-button,
+.travel-connector-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+}
+
+.travel-connector-button:hover {
+  color: var(--label);
+  background: var(--fill);
+}
+
+.travel-connector-chevron {
+  color: var(--label-3);
 }
 
 .travel-connector[data-mode='walk'] .travel-connector-line { background: var(--mode-walk); }

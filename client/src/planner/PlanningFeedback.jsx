@@ -2,15 +2,7 @@ import { useMemo, useState } from 'react'
 import { suggestFix } from '../../../shared/planning/proposals.js'
 import { usePlan } from '../app/planContext.js'
 import { formatTimeRange } from '../components/formatTime.js'
-import { WhenModeToggle } from './AddEventFields.jsx'
 import './PlanningFeedback.css'
-
-const PREFERENCE_OPTIONS = [['auto', 'Walk + transit'], ['drive', 'Car'], ['walk', 'Walk only']]
-const PREFERENCE_TEXT = {
-  auto: 'Short trips are walked; longer ones use public transport when it’s quicker.',
-  drive: 'Short trips are walked; longer ones are driven (no live traffic).',
-  walk: 'Every journey is walked.',
-}
 
 const unresolvedText = {
   'ambiguous-order': 'Overlapping events need a clear order before travel can be checked.',
@@ -70,13 +62,6 @@ export default function PlanningFeedback({ planning }) {
   const { shown, analysis, introduced } = planning
   const urgent = introduced.find((c) => c.severity === 'error')?.id
   return <section className="planning-feedback" aria-label="Day checks">
-    <div className="planning-travel">
-      <span className="planning-travel-label">Getting around</span>
-      <WhenModeToggle value={planning.preference} onChange={planning.setPreference} options={PREFERENCE_OPTIONS} label="Getting around" />
-    </div>
-    <p className="planning-source">{PREFERENCE_TEXT[planning.preference]} {planning.provider === 'demo'
-      ? 'Simulated estimates, no live routes.'
-      : 'Estimates by Google Maps.'} Buffers: walk 5 min, transit 5 min, car 10 min.</p>
     {planning.loadingRoutes && <p role="status">Loading travel times…</p>}
     {planning.failedRoutes && <button type="button" className="button-text" disabled={planning.loadingRoutes} onClick={planning.retryRoutes}>Retry routes</button>}
     <p role="status">{analysis.conflicts.length ? `${analysis.conflicts.length} schedule issue${analysis.conflicts.length === 1 ? '' : 's'}` : 'No schedule conflicts detected'}

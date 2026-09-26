@@ -10,15 +10,3 @@
 .planning-free ul { padding-left: var(--space-4); display: grid; gap: var(--space-2); }
 .event-row-conflict { font-size: 12px; font-weight: 600; color: var(--orange-ink); }
 
-.planning-travel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: var(--space-2);
-}
-
-.planning-travel-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--label-2);
-}

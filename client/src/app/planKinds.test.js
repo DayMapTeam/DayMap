@@ -45,3 +45,14 @@ test('the reducer changes the accepted plan, but not while a draft is pending', 
   assert.ok(drafted.draft)
   assert.equal(planReducer(drafted, { type: 'set-stop-kind', stopId: lecture.id, kind: 'flexible' }), drafted)
 })
+
+test('a chosen way of travelling applies to the plan and a draft, and null means automatic', () => {
+  const state = createPlanState(demoPlan)
+  const next = planReducer(state, { type: 'set-stop-travel-mode', stopId: library.id, mode: 'drive' })
+  assert.equal(next.plan.stops[1].travelMode, 'drive')
+  assert.equal(next.plan.version, state.plan.version + 1)
+  assert.equal(planReducer(next, { type: 'set-stop-travel-mode', stopId: library.id, mode: 'drive' }), next)
+  const auto = planReducer(next, { type: 'set-stop-travel-mode', stopId: library.id, mode: null })
+  assert.equal(auto.plan.stops[1].travelMode, null)
+  assert.equal(planReducer(state, { type: 'set-stop-travel-mode', stopId: library.id, mode: 'boat' }), state, 'unknown modes mean automatic')
+})

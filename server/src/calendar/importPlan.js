@@ -6,8 +6,8 @@ const isCalendarStop = stop => stop.source === 'google-calendar'
  *
  * - Deduplicates by calendar ID + event ID.
  * - Updates the title and times of existing Calendar stops, keeping their ID,
- *   status and any location the user already confirmed. A stop the user made
- *   flexible keeps its DayMap times.
+ *   status, chosen travel mode and any location the user already confirmed.
+ *   A stop the user made flexible keeps its DayMap times.
  * - Removes Calendar stops whose event is gone, unless already completed.
  * - Never touches manual stops.
  *
@@ -36,7 +36,8 @@ export function mergeCalendarImport(existing, imported, { planId, date, timezone
       continue
     }
     incoming.delete(sourceKey(stop))
-    const merged = { ...next, id: stop.id, location: stop.location, status: stop.status }
+    const merged = { ...next, id: stop.id, location: stop.location, status: stop.status,
+      ...(stop.travelMode ? { travelMode: stop.travelMode } : {}) }
     // A Calendar event the person made flexible is DayMap's to schedule; only its title follows Calendar.
     if (stop.timing.kind === 'flexible' && next.timing.kind === 'fixed') merged.timing = stop.timing
     if (merged.title !== stop.title || JSON.stringify(merged.timing) !== JSON.stringify(stop.timing)) summary.updated++

@@ -59,7 +59,9 @@ export function useAddEventDraft({ now, planning }) {
   const option = kind === 'fixed'
     ? fit.options[0] ?? null
     : fit.options.find((candidate) => candidate.afterStopId === chosenAfterStopId) ?? fit.options[0] ?? null
-  const canCommit = option?.ok === true
+  // Wait for journey estimates, so the time shown includes the travel.
+  const checkingTravel = option?.journeys?.some((leg) => leg.status === 'pending') ?? false
+  const canCommit = option?.ok === true && !checkingTravel
 
   // Switching to a set time starts from the slot DayMap would have picked.
   function changeKind(next) {
@@ -110,6 +112,7 @@ export function useAddEventDraft({ now, planning }) {
     fit,
     option,
     canCommit,
+    checkingTravel,
     commit,
   }
 }

@@ -35,7 +35,10 @@ export function validateSave(id, body) {
   check(plan.legs.length === 0, 'Journey persistence is not enabled yet; omit provider route data.')
   const ids = new Set()
   for (const stop of plan.stops) {
-    keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status'])
+    keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode'])
+    // How the person chose to travel to this stop; absent or null means automatic.
+    check(stop.travelMode === undefined || stop.travelMode === null || ['walk', 'transit', 'drive'].includes(stop.travelMode),
+      'Invalid travelMode.')
     check(text(stop.id) && (plan.dataMode === 'demo' || uuid.test(stop.id)) && !ids.has(stop.id), 'Stop IDs must be unique; live IDs must be UUIDs.')
     ids.add(stop.id)
     check(text(stop.title) && ['manual', 'google-calendar'].includes(stop.source)
