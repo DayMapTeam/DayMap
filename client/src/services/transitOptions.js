@@ -8,6 +8,26 @@ const iso = (value) => {
 const safeColor = (value) => (typeof value === 'string' && COLOR.test(value) ? value : null)
 const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null)
 
+/** One ride of a Google transit step, as plain data. */
+export function normalizeRide(details, seconds = 0) {
+  const line = details.transitLine ?? {}
+  return {
+    kind: 'ride',
+    vehicle: text(line.vehicle?.name) ?? 'Transit',
+    name: text(line.shortName) ?? text(line.name) ?? 'Service',
+    lineName: text(line.name),
+    color: safeColor(line.color),
+    textColor: safeColor(line.textColor),
+    headsign: text(details.headsign),
+    fromStop: text(details.departureStop?.name),
+    toStop: text(details.arrivalStop?.name),
+    departAt: iso(details.departureTime),
+    arriveAt: iso(details.arrivalTime),
+    stopCount: Number.isFinite(Number(details.stopCount)) ? Number(details.stopCount) : null,
+    minutes: Math.round(seconds / 60),
+  }
+}
+
 /**
  * Plain public-transport options from Google routes: each ride (line, vehicle,
  * colours, stops, times) and the walking before, between and after it.
@@ -22,22 +42,7 @@ export function normalizeTransitRoutes(routes) {
       const seconds = Number(step?.staticDurationMillis ?? 0) / 1000
       const details = step?.travelMode === 'TRANSIT' ? step.transitDetails : null
       if (details) {
-        const line = details.transitLine ?? {}
-        parts.push({
-          kind: 'ride',
-          vehicle: text(line.vehicle?.name) ?? 'Transit',
-          name: text(line.shortName) ?? text(line.name) ?? 'Service',
-          lineName: text(line.name),
-          color: safeColor(line.color),
-          textColor: safeColor(line.textColor),
-          headsign: text(details.headsign),
-          fromStop: text(details.departureStop?.name),
-          toStop: text(details.arrivalStop?.name),
-          departAt: iso(details.departureTime),
-          arriveAt: iso(details.arrivalTime),
-          stopCount: Number.isFinite(Number(details.stopCount)) ? Number(details.stopCount) : null,
-          minutes: Math.round(seconds / 60),
-        })
+        parts.push(normalizeRide(details, seconds))
       } else if (parts.at(-1)?.kind === 'walk') {
         parts.at(-1).seconds += seconds
       } else {

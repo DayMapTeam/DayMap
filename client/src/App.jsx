@@ -18,6 +18,7 @@ import StopPopup from './planner/StopPopup.jsx'
 import TripDock from './trip/TripDock.jsx'
 import { bearingDegrees, tripStops } from './trip/tripRules.js'
 import { useLocation } from './trip/useLocation.js'
+import { useNavigation } from './trip/useNavigation.js'
 import { useTrip } from './trip/useTrip.js'
 import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 import './App.css'
@@ -44,15 +45,26 @@ function App() {
   const reading = location.position
   const trip = useTrip({ plan, now, reading })
   const tripTargetId = trip.target?.id ?? null
+  // Live guidance: a route from where you are (or the stop before) to the destination.
+  const plannedLeg = planning.analysis.legs.find((leg) => leg.toStopId === tripTargetId)
+  const previousStop = plannedLeg ? plan.stops.find((stop) => stop.id === plannedLeg.fromStopId) : null
+  const navigation = useNavigation({
+    target: trip.target,
+    plannedMode: plannedLeg?.mode ?? null,
+    reading,
+    fallbackOrigin: trip.atStop?.location ?? previousStop?.location ?? null,
+  })
   // The camera follows each new trip until the person moves the map themselves.
   const [followState, setFollowState] = useState({ tripId: null, paused: false })
   if (followState.tripId !== tripTargetId) setFollowState({ tripId: tripTargetId, paused: false })
   const following = tripTargetId !== null && !followState.paused
   const follow = useMemo(() => {
     if (!following) return null
-    if (!reading) return { center: trip.target.location }
-    return { center: reading, heading: bearingDegrees(reading, trip.target.location) }
-  }, [following, reading, trip.target])
+    const start = navigation.route?.path[0]
+    if (!reading) return start ? { center: start, heading: bearingDegrees(start, navigation.route.path[1] ?? trip.target.location) } : { center: trip.target.location }
+    // Look along the route ahead, not straight at the destination.
+    return { center: reading, heading: bearingDegrees(reading, navigation.progress?.ahead ?? trip.target.location) }
+  }, [following, reading, trip.target, navigation.route, navigation.progress])
   const pauseFollow = useCallback(() => {
     setFollowState((current) => (current.paused || current.tripId === null ? current : { ...current, paused: true }))
   }, [])
@@ -103,6 +115,7 @@ function App() {
         tripActive={tripTargetId !== null}
         follow={follow}
         onUserCameraMove={pauseFollow}
+        route={tripTargetId ? navigation.route : null}
       />
       <AppHeader
         date={plan.date}
@@ -134,6 +147,9 @@ function App() {
       </div>
       <TripDock
         trip={trip}
+        navigation={navigation}
+        now={now}
+        timezone={plan.timezone}
         onGo={startTrip}
         following={following}
         hasPosition={reading !== null}
