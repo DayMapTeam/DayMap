@@ -143,7 +143,7 @@ Based on the initial sketch:
 - **Panel.** Roughly 360px wide on desktop, with a collapse control. A bottom sheet on mobile.
 - **Map space.** Leave room for map attribution and controls. Don't open large popovers for every stop at once.
 - **Accessibility.** Every card shows readable times. Every map interaction has a keyboard-accessible alternative.
-- **Camera.** Selecting a stop may focus the camera on it. Background schedule updates must never move the camera. Camera tours are later work.
+- **Camera.** Selecting a stop may focus the camera on it. Background schedule updates must never move the camera. During a trip the person chose to start, the camera follows them until they move the map themselves, then flies back to where it was when the trip ends ([Trip mode](#trip-mode-issue-29)). Camera tours are later work.
 
 ### Plan state
 
@@ -191,6 +191,18 @@ With a browser key, Google estimates are used for the fictional day too.
 Live plans and failed Google requests never silently switch to simulation.
 Application and acceptance both recheck current estimates. Transit, driving,
 route polylines and authenticated server validation are separate increments.
+
+### Trip mode (issue #29)
+
+`client/src/trip/` guides the person from stop to stop. The rules in `tripRules.js` are pure and unit-tested; `useTrip` feeds each position reading through them once.
+
+- **Next stop** is the next planned, located, timed stop in the *accepted* plan after the stop the person is at (or the first that has not ended). **Go** starts a trip to it; **Directions** in a pin's popup starts one to any navigable stop.
+- **Leaving** the stop you are at (beyond ~150 m for three consecutive readings) starts directions to the next stop, with **Cancel**. A cancelled or declined start waits until the person returns and leaves again. Leaving more than 15 minutes before the stop ends asks "Heading to …?" instead. Nothing starts after the last stop.
+- **Arriving** (within ~50 m for two consecutive readings, or **I'm here**) ends the trip, shows a short message, and records that stop as where the person is. GPS accuracy widens both circles by up to 50 m; readings worse than 200 m are ignored.
+- **Privacy.** Location starts only after a tap (**Go** on a live day, or **Use my location**). Positions stay in memory and are never saved to the plan, the server, storage or logs. Only the opt-in is remembered, and it resumes on load only when the browser already granted permission.
+- **Plan data.** Trip state is UI state. It never edits the plan, the draft or the version; marking a stop completed stays an explicit action. The planner is not changed by a trip.
+- **Guidance.** A website cannot use Google's turn-by-turn navigation, and cannot read location while the tab is closed or the phone is locked. The trip card shows straight-line distance, compass direction and a rough walking ETA against the stop's start, and hands off to Google Maps (a plain link, no API request) for turn-by-turn directions. Route geometry on the map arrives with #26.
+- **Demo.** On demo plans, **Simulate walk** moves a dashed "you are here" marker in a straight line at 15× walking speed through the same rules. The demo day never asks for real location.
 
 ### `MapView` adapter
 

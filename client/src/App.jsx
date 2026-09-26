@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { usePlan } from './app/planContext.js'
 import { usePlanAnalysis } from './app/usePlanAnalysis.js'
 import AppHeader from './components/AppHeader.jsx'
@@ -7,6 +7,11 @@ import { usePlanClock } from './components/usePlanClock.js'
 import MapView from './map/MapView.jsx'
 import Planner from './planner/Planner.jsx'
 import StopPopup from './planner/StopPopup.jsx'
+import TripDock from './trip/TripDock.jsx'
+import { bearingDegrees, tripStops } from './trip/tripRules.js'
+import { useLocation } from './trip/useLocation.js'
+import { useSimulatedWalk } from './trip/useSimulatedWalk.js'
+import { useTrip } from './trip/useTrip.js'
 import './App.css'
 
 function App() {
@@ -17,6 +22,36 @@ function App() {
   // The popup opens only from a pin click on the map: { stopId, anchor } or null.
   const [popup, setPopup] = useState(null)
   const [revealRequest, setRevealRequest] = useState(null)
+
+  // Trips use the accepted plan and the device's position, or a labelled
+  // simulated walk on the demo day.
+  const location = useLocation()
+  const simulation = useSimulatedWalk()
+  const sim = plan.dataMode === 'demo' ? simulation : null
+  const reading = sim?.position ?? location.position
+  const trip = useTrip({ plan, now, reading })
+  const tripTargetId = trip.target?.id ?? null
+  // The camera follows each new trip until the person moves the map themselves.
+  const [followState, setFollowState] = useState({ tripId: null, paused: false })
+  if (followState.tripId !== tripTargetId) setFollowState({ tripId: tripTargetId, paused: false })
+  const following = tripTargetId !== null && !followState.paused
+  const follow = useMemo(() => {
+    if (!following) return null
+    if (!reading) return { center: trip.target.location }
+    return { center: reading, heading: bearingDegrees(reading, trip.target.location) }
+  }, [following, reading, trip.target])
+  const pauseFollow = useCallback(() => {
+    setFollowState((current) => (current.paused || current.tripId === null ? current : { ...current, paused: true }))
+  }, [])
+  const recenter = useCallback(() => setFollowState((current) => ({ ...current, paused: false })), [])
+
+  // Go is the tap that may ask for location on a live day. The demo day never asks.
+  const { go } = trip
+  const startTrip = useCallback((stopId) => {
+    go(stopId)
+    if (plan.dataMode === 'live' && location.status === 'off') location.enable()
+  }, [go, plan.dataMode, location])
+  const navigableIds = useMemo(() => new Set(tripStops(plan).map((stop) => stop.id)), [plan])
 
   // Esc, ×, clicking the open pin again, or clicking the empty map: close and deselect.
   const dismiss = useCallback(() => {
@@ -56,6 +91,10 @@ function App() {
         onCameraMove={closePopup}
         now={now}
         previewPlace={previewPlace}
+        userPosition={reading}
+        tripActive={tripTargetId !== null}
+        follow={follow}
+        onUserCameraMove={pauseFollow}
       />
       <AppHeader
         date={plan.date}
@@ -67,6 +106,18 @@ function App() {
       <div className="app-controls-top-left">
         <PlaceSearch onPlaceSelect={setPreviewPlace} />
       </div>
+      <TripDock
+        trip={trip}
+        plan={plan}
+        now={now}
+        reading={reading}
+        legs={draft ? [] : planning.analysis.legs}
+        location={location}
+        onGo={startTrip}
+        following={following}
+        onRecenter={recenter}
+        sim={sim}
+      />
       <Planner now={now} revealRequest={revealRequest} planning={planning} />
       {popup !== null && (
         <StopPopup
@@ -75,6 +126,7 @@ function App() {
           anchor={popup.anchor}
           onClose={dismiss}
           onViewInPlanner={viewInPlanner}
+          onDirections={navigableIds.has(popup.stopId) ? (stopId) => { dismiss(); startTrip(stopId) } : null}
         />
       )}
     </div>

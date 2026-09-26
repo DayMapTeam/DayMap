@@ -27,9 +27,10 @@ function usePlaceDetails(placeId) {
 
 /**
  * Popup for a stop whose pin was clicked. Shows the draft when there is one,
- * like the planner does.
+ * like the planner does. `onDirections(stopId)` starts a trip there, or is null
+ * when the stop can't be navigated to (no location, not planned, all-day).
  */
-export default function StopPopup({ stopId, anchor, onClose, onViewInPlanner }) {
+export default function StopPopup({ stopId, anchor, onClose, onViewInPlanner, onDirections = null }) {
   const { plan, draft } = usePlan()
   const shown = draft?.plan ?? plan
   const stop = shown.stops.find((candidate) => candidate.id === stopId)
@@ -61,6 +62,11 @@ export default function StopPopup({ stopId, anchor, onClose, onViewInPlanner }) 
       <button type="button" className="button-filled place-popup-action" onClick={() => onViewInPlanner(stop.id)}>
         View in planner
       </button>
+      {onDirections && (
+        <button type="button" className="button-text place-popup-action" onClick={() => onDirections(stop.id)}>
+          Directions
+        </button>
+      )}
     </PlacePopup>
   )
 }
