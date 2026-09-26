@@ -27,6 +27,8 @@ Selection can focus a destination, but background schedule updates must not unex
 
 ## 3. Stack and boundaries
 
+**Team ownership:** Hannah leads the planner and interface; Rafid leads the map and external API adapters (Calendar, Places, Routes, and later weather); Sudipta leads Express, Supabase, authentication, secure token storage, persistence, and the planning engine. Rafid and Sudipta jointly define integration contracts: Rafid handles provider requests and response normalisation, while Sudipta handles authenticated app endpoints and database writes.
+
 | Layer | Initial choice | Responsibility |
 | --- | --- | --- |
 | Client | React, JavaScript/JSX, Vite, CSS or Tailwind chosen in DM-01 | UI, map lifecycle, local editing, selection |
@@ -65,15 +67,15 @@ client/src/
   components/           # Shared UI primitives (Hannah coordinates)
   services/             # Express API and Supabase Auth clients
 server/src/
-  routes/               # Express handlers and validation
-  middleware/           # Authentication and error handling
-  integrations/         # Calendar, Places, Routes, later weather
-  planning/             # Scheduling and conflict/proposal calculation
-  repositories/         # Database access
+  routes/               # Express handlers and validation (Sudipta)
+  middleware/           # Authentication and error handling (Sudipta)
+  integrations/         # Calendar, Places, Routes, later weather (Rafid)
+  planning/             # Scheduling and conflict/proposal calculation (Sudipta)
+  repositories/         # Database access and secure token storage (Sudipta)
 shared/
   fixtures/             # Fictional Adelaide demo plan
   contracts/            # JSDoc shapes and agreed validation rules
-supabase/migrations/    # Versioned SQL schema and access policies
+supabase/migrations/    # Versioned SQL schema and access policies (Sudipta)
 ```
 
 Use npm workspaces for `client` and `server`, one lockfile, and one agreed Node LTS version. Exact dependency versions are pinned when scaffolding. Keep fixture mode and live mode behind the same frontend service interface.
