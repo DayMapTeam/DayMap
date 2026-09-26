@@ -3,7 +3,7 @@
 The public demo remains available without Supabase. Persistence uses Supabase
 Auth's `/auth/v1/user` endpoint to verify each Bearer token and forwards that same
 token to PostgREST. No service-role key or new runtime dependency is needed.
-The frontend still uses demo mode; account UI is separate follow-up work.
+The frontend signs in with Supabase Auth and saves the accepted plan through these endpoints (#32); see `client/README.md`.
 
 ## Shared development project
 

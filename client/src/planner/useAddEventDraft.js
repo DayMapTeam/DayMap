@@ -23,7 +23,7 @@ function placeToLocation(place) {
  */
 export function useAddEventDraft({ now }) {
   const { plan, addStop } = usePlan()
-  const [id] = useState(() => `stop-${crypto.randomUUID()}`)
+  const [id] = useState(() => crypto.randomUUID())
   const [title, setTitle] = useState('')
   const [location, setLocation] = useState(null)
   const [kind, setKind] = useState('flexible')

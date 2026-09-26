@@ -1,7 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
 import { usePlan } from './app/planContext.js'
 import { usePlanAnalysis } from './app/usePlanAnalysis.js'
+import { readDemoPlan, sessionStore, writeDemoPlan } from './app/planPersistence.js'
+import { useAccount } from './app/useAccount.js'
+import { usePlanSync } from './app/usePlanSync.js'
+import AccountMenu from './components/AccountMenu.jsx'
 import AppHeader from './components/AppHeader.jsx'
+import { SyncBanner, SyncChip } from './components/PlanSyncStatus.jsx'
 import PlaceSearch from './components/PlaceSearch.jsx'
 import { usePlanClock } from './components/usePlanClock.js'
 import MapView from './map/MapView.jsx'
@@ -12,10 +17,17 @@ import { bearingDegrees, tripStops } from './trip/tripRules.js'
 import { useLocation } from './trip/useLocation.js'
 import { useSimulatedWalk } from './trip/useSimulatedWalk.js'
 import { useTrip } from './trip/useTrip.js'
+import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 import './App.css'
 
 function App() {
-  const { plan, draft, selectedStopId, selectStop, clearSelection } = usePlan()
+  const { plan, draft, selectedStopId, selectStop, clearSelection, loadPlan } = usePlan()
+  const account = useAccount()
+  const sync = usePlanSync(account.user?.id ?? null)
+  const resetDemo = useCallback(() => {
+    writeDemoPlan(sessionStore(), null)
+    if (plan.dataMode === 'demo') loadPlan(readDemoPlan(sessionStore(), demoPlan))
+  }, [plan.dataMode, loadPlan])
   const [previewPlace, setPreviewPlace] = useState(null)
   const { now, isDemoTime } = usePlanClock(plan)
   const planning = usePlanAnalysis(plan, draft, now)
@@ -102,7 +114,11 @@ function App() {
         dataMode={plan.dataMode}
         now={now}
         isDemoTime={isDemoTime}
-      />
+      >
+        <SyncChip sync={sync} />
+        <AccountMenu account={account} onResetDemo={resetDemo} />
+      </AppHeader>
+      <SyncBanner sync={sync} />
       <div className="app-controls-top-left">
         <PlaceSearch onPlaceSelect={setPreviewPlace} />
       </div>

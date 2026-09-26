@@ -163,6 +163,10 @@ stateDiagram-v2
 - **Accept** replaces the accepted plan only if the proposal's base version still matches; otherwise the server returns 409. **Keep current plan** leaves the accepted plan unchanged.
 - Recalculation (DM-08) reuses this flow. There is no separate route editor.
 
+### Saved days (issue #32)
+
+Signed in, `usePlanSync` loads today's plan in the browser's timezone from `GET /api/plans` (or starts an empty live day) and saves each new *accepted* plan with `PUT /api/plans/:id`. Saves run one at a time against the version the server last returned; the local `plan.version` is only a local edit counter. A 409 stops saving until the person picks **Load latest** or **Keep mine**. Place IDs and legs are stripped before saving (§12), and unlocated stops get a location question. Signed out, the demo day is kept in sessionStorage only.
+
 ### Browser place search (issue #16)
 
 Rafid approved browser Places autocomplete and selected-place details so search can work before the backend is merged. `client/src/services/places.js` owns session tokens and Google prediction objects, returning plain place data. Suggestions are biased toward Adelaide and restricted to Australia. The selected preview lives in App UI state, separate from the accepted plan; it never creates an activity. Requests are debounced and late results ignored. The planned server Places endpoints below are deferred for this flow; Calendar and persistence retain their server boundaries.
