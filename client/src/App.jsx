@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePlan } from './app/planContext.js'
 import { usePlanAnalysis } from './app/usePlanAnalysis.js'
 import { readDemoPlan, sessionStore, writeDemoPlan } from './app/planPersistence.js'
@@ -16,9 +16,12 @@ import EmptyDay from './planner/EmptyDay.jsx'
 import Planner from './planner/Planner.jsx'
 import StopPopup from './planner/StopPopup.jsx'
 import TripDock from './trip/TripDock.jsx'
-import { bearingDegrees, tripStops } from './trip/tripRules.js'
+import { bearingDegrees, offsetPoint, tripStops } from './trip/tripRules.js'
 import { useLocation } from './trip/useLocation.js'
+import { splitRoute } from './trip/navigation.js'
 import { useNavigation } from './trip/useNavigation.js'
+import { useVoiceGuidance } from './trip/useVoiceGuidance.js'
+import { useWakeLock } from './trip/useWakeLock.js'
 import { useTrip } from './trip/useTrip.js'
 import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 import './App.css'
@@ -54,21 +57,44 @@ function App() {
     reading,
     fallbackOrigin: trip.atStop?.location ?? previousStop?.location ?? null,
   })
-  // The camera follows each new trip until the person moves the map themselves.
-  const [followState, setFollowState] = useState({ tripId: null, paused: false })
-  if (followState.tripId !== tripTargetId) setFollowState({ tripId: tripTargetId, paused: false })
-  const following = tripTargetId !== null && !followState.paused
+  // Navigation mode: like Google Maps on a phone, the map takes the whole screen.
+  const navigating = tripTargetId !== null
+  const voice = useVoiceGuidance({
+    route: navigation.route,
+    progress: navigation.progress,
+    destination: trip.target?.title ?? null,
+    notice: trip.state.notice && { ...trip.state.notice, title: trip.noticeStop?.title ?? null },
+  })
+  useWakeLock(navigating)
+  // On the route, you are drawn on it (like Google Maps snapping to the road).
+  const shownPosition = useMemo(() => (navigating && navigation.progress && navigation.progress.offRouteMeters <= 25
+    ? { ...reading, ...navigation.progress.snapped } : reading), [navigating, navigation.progress, reading])
+  const routeSplit = useMemo(() => (navigation.route ? splitRoute(navigation.route, navigation.progress) : null),
+    [navigation.route, navigation.progress])
+
+  // The camera follows each new trip until the person moves the map, and
+  // picks up again by itself after a few seconds, like Google Maps.
+  const [followState, setFollowState] = useState({ tripId: null, paused: false, pausedAt: 0 })
+  if (followState.tripId !== tripTargetId) setFollowState({ tripId: tripTargetId, paused: false, pausedAt: 0 })
+  const following = navigating && !followState.paused
   const follow = useMemo(() => {
     if (!following) return null
     const start = navigation.route?.path[0]
-    if (!reading) return start ? { center: start, heading: bearingDegrees(start, navigation.route.path[1] ?? trip.target.location) } : { center: trip.target.location }
-    // Look along the route ahead, not straight at the destination.
-    return { center: reading, heading: bearingDegrees(reading, navigation.progress?.ahead ?? trip.target.location) }
-  }, [following, reading, trip.target, navigation.route, navigation.progress])
+    if (!shownPosition) return start ? { center: start, heading: bearingDegrees(start, navigation.route.path[1] ?? trip.target.location) } : { center: trip.target.location }
+    // Look along the route ahead, and centre a little ahead so you sit low on the screen, like Google Maps.
+    const heading = bearingDegrees(shownPosition, navigation.progress?.ahead ?? trip.target.location)
+    return { center: offsetPoint(shownPosition, heading, 90), heading }
+  }, [following, shownPosition, trip.target, navigation.route, navigation.progress])
   const pauseFollow = useCallback(() => {
-    setFollowState((current) => (current.paused || current.tripId === null ? current : { ...current, paused: true }))
+    setFollowState((current) => (current.tripId === null ? current : { ...current, paused: true, pausedAt: Date.now() }))
   }, [])
   const recenter = useCallback(() => setFollowState((current) => ({ ...current, paused: false })), [])
+  const { paused: followPaused, pausedAt } = followState
+  useEffect(() => {
+    if (!followPaused) return undefined
+    const timer = setTimeout(recenter, 10000)
+    return () => clearTimeout(timer)
+  }, [followPaused, pausedAt, recenter])
 
   const { go: startTrip } = trip
   const navigableIds = useMemo(() => new Set(tripStops(plan).map((stop) => stop.id)), [plan])
@@ -101,7 +127,7 @@ function App() {
   if (popup !== null && popup.stopId !== selectedStopId) setPopup(null)
 
   return (
-    <div className="app">
+    <div className="app" data-navigating={navigating || undefined}>
       <MapView
         stops={planning.shown.stops}
         stopStates={planning.stopStates}
@@ -111,11 +137,12 @@ function App() {
         onCameraMove={closePopup}
         now={now}
         previewPlace={previewPlace}
-        userPosition={reading}
-        tripActive={tripTargetId !== null}
+        userPosition={shownPosition}
+        tripActive={navigating}
         follow={follow}
         onUserCameraMove={pauseFollow}
-        route={tripTargetId ? navigation.route : null}
+        route={navigating ? navigation.route : null}
+        routeSplit={navigating ? routeSplit : null}
       />
       <AppHeader
         date={plan.date}
@@ -148,6 +175,8 @@ function App() {
       <TripDock
         trip={trip}
         navigation={navigation}
+        voice={voice}
+        reading={reading}
         now={now}
         timezone={plan.timezone}
         onGo={startTrip}
