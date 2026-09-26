@@ -3,13 +3,16 @@ import { usePlan } from './app/planContext.js'
 import { usePlanAnalysis } from './app/usePlanAnalysis.js'
 import { readDemoPlan, sessionStore, writeDemoPlan } from './app/planPersistence.js'
 import { useAccount } from './app/useAccount.js'
+import { useCalendar } from './app/useCalendar.js'
 import { usePlanSync } from './app/usePlanSync.js'
 import AccountMenu from './components/AccountMenu.jsx'
 import AppHeader from './components/AppHeader.jsx'
-import { SyncBanner, SyncChip } from './components/PlanSyncStatus.jsx'
+import CalendarSection from './components/CalendarSection.jsx'
+import { Notice, SyncBanner, SyncChip } from './components/PlanSyncStatus.jsx'
 import PlaceSearch from './components/PlaceSearch.jsx'
 import { usePlanClock } from './components/usePlanClock.js'
 import MapView from './map/MapView.jsx'
+import EmptyDay from './planner/EmptyDay.jsx'
 import Planner from './planner/Planner.jsx'
 import StopPopup from './planner/StopPopup.jsx'
 import TripDock from './trip/TripDock.jsx'
@@ -23,7 +26,9 @@ import './App.css'
 function App() {
   const { plan, draft, selectedStopId, selectStop, clearSelection, loadPlan } = usePlan()
   const account = useAccount()
-  const sync = usePlanSync(account.user?.id ?? null)
+  const userId = account.user?.id ?? null
+  const sync = usePlanSync(userId)
+  const calendar = useCalendar({ userId, sync, plan, draft })
   const resetDemo = useCallback(() => {
     writeDemoPlan(sessionStore(), null)
     if (plan.dataMode === 'demo') loadPlan(readDemoPlan(sessionStore(), demoPlan))
@@ -116,9 +121,23 @@ function App() {
         isDemoTime={isDemoTime}
       >
         <SyncChip sync={sync} />
-        <AccountMenu account={account} onResetDemo={resetDemo} />
+        <AccountMenu account={account} onResetDemo={resetDemo}>
+          <CalendarSection calendar={calendar} />
+        </AccountMenu>
       </AppHeader>
-      <SyncBanner sync={sync} />
+      <div className="app-notices">
+        <SyncBanner sync={sync} />
+        {calendar.notice && (
+          <Notice
+            tone={calendar.notice.tone}
+            text={calendar.notice.text}
+            actions={calendar.notice.reconnect && (
+              <button type="button" className="button-filled" onClick={calendar.connect}>Reconnect</button>
+            )}
+            onDismiss={calendar.notice.tone === 'progress' ? undefined : calendar.dismissNotice}
+          />
+        )}
+      </div>
       <div className="app-controls-top-left">
         <PlaceSearch onPlaceSelect={setPreviewPlace} />
       </div>
@@ -134,7 +153,12 @@ function App() {
         onRecenter={recenter}
         sim={sim}
       />
-      <Planner now={now} revealRequest={revealRequest} planning={planning} />
+      <Planner
+        now={now}
+        revealRequest={revealRequest}
+        planning={planning}
+        emptyState={<EmptyDay calendar={userId ? calendar : null} />}
+      />
       {popup !== null && (
         <StopPopup
           key={popup.stopId}

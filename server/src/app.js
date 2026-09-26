@@ -16,6 +16,7 @@ export function createApp({ clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://
     throw new Error('CLIENT_ORIGIN must be one exact HTTP(S) origin without a path or trailing slash')
   }
   const app = express()
+  app.locals.calendar = calendar
   app.use(cors({ origin: [clientOrigin] }))
   app.use(express.json())
   app.use('/api/health', healthRouter)

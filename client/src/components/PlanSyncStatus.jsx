@@ -50,10 +50,31 @@ export function SyncBanner({ sync }) {
   } else {
     return null
   }
+  return <Notice tone="error" text={text.trim()} actions={actions} />
+}
+
+/**
+ * A message under the header, centred over the map. Errors are announced
+ * assertively; everything else politely.
+ *
+ * @param {object} props
+ * @param {'success' | 'info' | 'progress' | 'error'} props.tone
+ * @param {string} props.text
+ * @param {import('react').ReactNode} [props.actions]
+ * @param {() => void} [props.onDismiss]
+ */
+export function Notice({ tone, text, actions, onDismiss }) {
   return (
-    <div className="sync-banner glass" role="alert">
-      <p className="sync-banner-text">{text.trim()}</p>
-      <div className="sync-banner-actions">{actions}</div>
+    <div className={`notice notice-${tone} glass`} role={tone === 'error' ? 'alert' : 'status'}>
+      <p className="notice-text">{text}</p>
+      {(actions || onDismiss) && (
+        <div className="notice-actions">
+          {actions}
+          {onDismiss && (
+            <button type="button" className="notice-dismiss" aria-label="Dismiss" onClick={onDismiss}>×</button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -27,8 +27,9 @@ function isTyping(target) {
  * @param {object} props
  * @param {Date} props.now The planner's current time.
  * @param {{ stopId: string, key: number } | null} props.revealRequest Set by "View in planner" in the map popup.
+ * @param {import('react').ReactNode} [props.emptyState] Shown when the day has no stops.
  */
-export default function Planner({ now, revealRequest, planning }) {
+export default function Planner({ now, revealRequest, planning, emptyState }) {
   const { plan, draft, undoAdd, removeStop } = usePlan()
   const [filter, setFilter] = useState('')
   const [open, setOpen] = usePlannerOpen()
@@ -169,6 +170,7 @@ export default function Planner({ now, revealRequest, planning }) {
           revealRequest={reveal}
           newStopId={added?.showNew ? added.stopId : null}
           onRequestDelete={setPendingDeleteId}
+          emptyState={emptyState}
         />
       </PlannerPanel>
       {added && <AddToast key={added.key} message={added.message} onUndo={undo} />}

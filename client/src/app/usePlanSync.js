@@ -13,7 +13,7 @@ const noSubscription = () => () => {}
  * demo day in this browser session while they are not. Drafts are never
  * saved; only the accepted plan is.
  *
- * Returns `{ state, error, retry, loadLatest, keepMine }` where state is
+ * Returns `{ state, error, day, retry, loadLatest, keepMine, adopt }` where state is
  * 'demo' | 'loading' | 'load-error' | 'saved' | 'saving' | 'error' | 'conflict'.
  *
  * @param {string | null} userId The signed-in DayMap user, or null.
@@ -108,5 +108,20 @@ export function usePlanSync(userId) {
   const loadLatest = useCallback(() => resolve(false), [resolve])
   const keepMine = useCallback(() => resolve(true), [resolve])
 
-  return { ...status, retry, loadLatest, keepMine }
+  /**
+   * Replace the local day with a plan the server has already saved (for
+   * example a Calendar import), but only if the day is still exactly
+   * `basePlan` and fully saved. Otherwise nothing changes and it returns false,
+   * so a local edit is never lost; the next save then reports the conflict.
+   */
+  const adopt = useCallback((serverPlan, basePlan) => {
+    if (!saver || planRef.current !== basePlan || saver.getStatus().state !== 'saved') return false
+    loadPlan(serverPlan)
+    setLoaded((current) => (current?.saver === saver ? { ...current, planId: serverPlan.id } : current))
+    saver.reset({ plan: serverPlan, version: serverPlan.version, dirty: false })
+    return true
+  }, [saver, loadPlan])
+
+  const day = saver ? { date: loaded.date, timezone: loaded.timezone } : null
+  return { ...status, day, retry, loadLatest, keepMine, adopt }
 }

@@ -51,11 +51,18 @@ export function calendarRouter({ supabase, calendar, clientOrigin }) {
     const saved = await plans.save(plan.id, plan.version, plan)
     res.status(existing ? 200 : 201).json({ plan: saved, summary })
   })
+  // Google sends the browser here. Every outcome returns to the app, which
+  // explains it; the person never sees an error page on the API origin.
   router.get('/callback', async (req, res) => {
     res.set('Cache-Control', 'no-store')
-    const outcome = await configured().callback(req.query)
     const target = new URL(clientOrigin)
-    target.searchParams.set('calendar', outcome)
+    try {
+      target.searchParams.set('calendar', await configured().callback(req.query))
+    } catch (error) {
+      if (!(error instanceof ApiError)) console.error('Calendar callback failed:', error?.code ?? '', error?.message)
+      target.searchParams.set('calendar', 'error')
+      target.searchParams.set('reason', error instanceof ApiError ? error.code : 'CALENDAR_CONNECTION_FAILED')
+    }
     res.redirect(303, target.toString())
   })
   return router

@@ -20,5 +20,7 @@ export function errorHandler(error, req, res, next) {
   }
   const [status, code, message] = knownErrors[error.type] ??
     [500, 'INTERNAL_ERROR', 'An unexpected error occurred']
+  // Only the error itself: request bodies and headers can hold plans and tokens.
+  if (status === 500) console.error(`${req.method} ${req.path} failed:`, error?.code ?? '', error?.message)
   res.status(status).json({ error: { code, message, retryable: false } })
 }

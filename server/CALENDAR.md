@@ -1,8 +1,8 @@
 # Google Calendar connection backend (DM-06)
 
 The server connects a user's Google Calendar and imports one day of events
-into their saved day plan (#30). It never changes Google Calendar. The
-frontend connection and import UI remain separate work.
+into their saved day plan (#30). It never changes Google Calendar. In the app,
+signed-in users connect, import and disconnect from the account menu (#34).
 
 ## Team configuration
 
@@ -55,8 +55,10 @@ the associated user ID.
 - `GET /api/calendar/callback` is the exact Google redirect. A one-time,
   ten-minute state binds it to the user who started the flow. It exchanges
   the code on the server, encrypts the refresh token, and redirects to the
-  configured frontend origin with `?calendar=connected` or
-  `?calendar=denied`. It never returns a Google token to the browser.
+  configured frontend origin with `?calendar=connected`, `?calendar=denied`
+  or `?calendar=error&reason=<CODE>` (for example `INVALID_OAUTH_STATE`,
+  `CALENDAR_RECONNECT_REQUIRED`, `CALENDAR_NOT_CONFIGURED`). It never shows an
+  error page on the API origin and never returns a Google token to the browser.
 - `GET /api/calendar/status` returns `{ "connected": true | false }`.
 - `POST /api/calendar/disconnect` deletes the stored credential and attempts
   Google revocation. It returns `{ "disconnected": true, "revoked": boolean }`.
@@ -80,6 +82,31 @@ cancellation does not guarantee cancellation of a Google request already in flig
 
 No Calendar request runs in demo mode. The server refuses a partial Calendar
 configuration. Missing configuration returns 503 for Calendar endpoints.
+
+## In the app
+
+- The account menu shows the Calendar status and **Connect Google Calendar**,
+  **Import today's events** or **Disconnect**. An empty day offers the same.
+- Back from Google, DayMap shows the outcome, removes `?calendar=…` from the
+  address bar and, after a successful connection, imports today straight away.
+- With Calendar connected, each loaded day is imported once automatically, so
+  opening DayMap shows the day's events. A message appears only if something changed.
+- Import waits until local changes are saved and no draft is pending. If the day
+  changes locally while an import runs, the import result is not applied over it.
+- On start-up the server logs whether sign-in and Calendar are configured (naming
+  missing variables, never values) and whether the Calendar migrations are applied.
+  Unexpected server errors are logged with their code and message only.
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| Menu says "Not set up on this server" | Set all five Calendar variables in `server/.env` and restart. |
+| Server logs "Google Calendar database: not ready" | Apply migrations 003 and 004 to the database in `DATABASE_URL`. |
+| Google shows `redirect_uri_mismatch` | Register exactly `http://localhost:3001/api/calendar/callback` on the OAuth client, matching `GOOGLE_OAUTH_REDIRECT_URI`. |
+| Google shows "access blocked" / app not verified | Add your Google account as a test user on the consent screen. |
+| Back in DayMap with "didn't grant offline Calendar access" | Connect again and tick the Calendar permission. |
+| Import says access expired | Testing-mode grants expire after seven days; use **Reconnect**. |
 
 ## Verification
 
