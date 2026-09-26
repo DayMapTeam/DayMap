@@ -10,7 +10,8 @@ The frontend still uses demo mode; account UI is separate follow-up work.
 1. Create one Supabase development project in the team's organisation and agreed
    region. Store its database password privately.
 2. Apply `supabase/migrations/202609260001_profiles.sql`, then
-   `202609260002_day_plans.sql` (and `202609260003_calendar_credentials.sql`
+   `202609260002_day_plans.sql` (and `202609260003_calendar_credentials.sql`,
+   then `202609270004_calendar_connection_races.sql`
    when testing the Calendar backend) using the Supabase migration workflow. With the
    Supabase CLI installed and authenticated: `supabase link --project-ref <ref>`
    then `supabase db push`. Review the target before pushing.

@@ -36,8 +36,12 @@ Generate the encryption key with `openssl rand -base64 32`. Keep one stable
 key for an environment; changing it makes existing stored refresh tokens
 unreadable. Never commit the values. The direct database credential can read
 the `private` schema and must stay on the server. Apply
-`supabase/migrations/202609260003_calendar_credentials.sql` after the first
-two migrations.
+`supabase/migrations/202609260003_calendar_credentials.sql`, then
+`supabase/migrations/202609270004_calendar_connection_races.sql` after the first
+two migrations, before starting the updated backend. Use the existing environment's
+encryption key when sharing a database; do not generate a different key per developer.
+The database login must own the Calendar tables/functions or have explicitly granted
+access. Browser roles cannot call these functions.
 
 ## Backend endpoints
 
@@ -58,8 +62,43 @@ the associated user ID.
   Google revocation. It returns `{ "disconnected": true, "revoked": boolean }`.
   If revocation is unavailable, local access is still deleted.
 
+Starting another connection replaces that user's unfinished attempt. A callback
+claims its state once, then waits for Google without holding a database lock.
+Completion and disconnect use the same per-user PostgreSQL transaction lock:
+completion saves only if the claimed attempt still exists and has not expired.
+If disconnect or a newer connect removed it, completion returns 409
+`CALENDAR_CONNECTION_CANCELLED`. This also works across separate server processes.
+An old refresh failure deletes only the credential it actually used; a successful
+refresh checks that credential is still current before returning an access token.
+Expired attempts are cleaned up when a new connection starts.
+
+Google revocation remains best-effort, outside the database transaction. Local
+cancellation does not guarantee cancellation of a Google request already in flight.
+
 No Calendar request runs in demo mode. The server refuses a partial Calendar
 configuration. Missing configuration returns 503 for Calendar endpoints.
+
+## Verification
+
+Run `npm --prefix server test` and `npm --prefix server run check`. Regression
+tests pause mocked Google exchanges and exercise disconnect, a replacement
+connection, replay, expiry, and late refresh responses. They use a fake database.
+
+For actual SQL checks, start the disposable PostgreSQL container described in
+`PERSISTENCE.md` and apply migrations 001 and 002, then run from the repository root:
+
+```sh
+docker exec -i daymap-dm04-test psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202609260003_calendar_credentials.sql
+docker exec -i daymap-dm04-test psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202609270004_calendar_connection_races.sql
+docker exec -i daymap-dm04-test psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/calendar-isolation.sql
+docker exec -i daymap-dm04-test psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/calendar-connections.sql
+docker stop daymap-dm04-test
+```
+
+The SQL checks verify actual functions, transitions and permissions. They do not
+exercise simultaneous database sessions or live Google OAuth. After configuring
+the team's environment, verify real consent, status and disconnect with a test
+account before wiring event import into the frontend.
 
 ## Next integration
 
