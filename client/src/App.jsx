@@ -1,10 +1,11 @@
 import { usePlan } from './app/planContext.js'
 import { EventSelector } from './demo/EventSelector.jsx'
 import { SelectionPreview } from './demo/SelectionPreview.jsx'
+import { MapView } from './map/MapView.jsx'
 import './App.css'
 
 function App() {
-  const { plan } = usePlan()
+  const { plan, selectedStopId, selectStop } = usePlan()
 
   return (
     <main className="demo-page">
@@ -16,6 +17,11 @@ function App() {
         </div>
         <div className="day-label"><time dateTime={plan.date}>{plan.date}</time><span>{plan.timezone}</span></div>
       </header>
+      <MapView
+        stops={plan.stops}
+        selectedStopId={selectedStopId}
+        onSelectStop={selectStop}
+      />
       <div className="demo-grid">
         <EventSelector />
         <SelectionPreview />
