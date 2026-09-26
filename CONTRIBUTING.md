@@ -343,7 +343,7 @@ cp server/.env.example server/.env
 npm run dev
 ```
 
-**These commands do not work yet.** DM-01 adds root `dev`, `build`, and `lint` scripts. A `test` script comes with the first meaningful planning or access-control tests. Planned ports: client `5173`, server `3001`, with Vite proxying `/api` to the server.
+Root npm workspaces now provide `dev`, `build`, `lint`, and `test` scripts using one root lockfile. `.nvmrc` selects Node 22 (minimum 22.12.0). Run `npm ci` and `npm run dev` from the root. Client port: `5173`; server port: `3001`; Vite proxies `/api` to the server. Environment copies are optional for the public demo API; add the browser Maps key to display the map.
 
 ### Branches and pull requests
 

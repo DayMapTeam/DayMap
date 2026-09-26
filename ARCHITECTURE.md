@@ -124,7 +124,7 @@ supabase/migrations/    # Versioned SQL schema and access policies (Sudipta)
 
 Area owners are listed in [CONTRIBUTING.md §1](CONTRIBUTING.md#1-team-and-ownership).
 
-**Backend foundation:** `server/src/app.js` and `server/src/index.js` now provide application construction and server startup. They sit above `routes/`, which is reserved for endpoint handlers. `routes/health.js` and `routes/demoPlan.js` implement the two public endpoints, with exact-origin CORS and shared JSON error handling. Other backend directories and endpoints remain planned and should be added with their features. See [server/README.md](server/README.md) for current commands. Client and server currently have separate packages/lockfiles; root workspaces remain a scaffold follow-up.
+**Backend foundation:** `server/src/app.js` and `server/src/index.js` now provide application construction and server startup. They sit above `routes/`, which is reserved for endpoint handlers. `routes/health.js` and `routes/demoPlan.js` implement the two public endpoints, with exact-origin CORS and shared JSON error handling. Other backend directories and endpoints remain planned and should be added with their features. See [server/README.md](server/README.md) for current commands. Client and server are npm workspaces with one root lockfile and root dev/build/test/lint scripts. `.nvmrc` selects Node 22; the root package requires at least 22.12.0.
 
 ## 4. Frontend
 
@@ -463,5 +463,4 @@ Resolve each one by the point shown, record the outcome in the relevant section,
 - [Google 3D Maps overview](https://developers.google.com/maps/documentation/javascript/3d/overview) and [coverage](https://developers.google.com/maps/documentation/javascript/3d/coverage).
 - [Google transit route capabilities](https://developers.google.com/maps/documentation/routes/transit-route).
 - [Calendar events listing](https://developers.google.com/workspace/calendar/api/v3/reference/events/list) and [permission scopes](https://developers.google.com/workspace/calendar/api/auth).
-- [Google web-server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server) and [Maps key security](https://developers.google.com/maps/api-security-best-practices).
-- [Supabase database](https://supabase.com/docs/guides/database/overview), [Auth](https://supabase.com/docs/guides/auth), and [provider-token responsibilities](https://supabase.com/docs/guides/auth/social-login).
+- [Google web-server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server) and [Maps key security](https://developers.

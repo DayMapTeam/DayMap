@@ -8,10 +8,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    proxy: { '/api': 'http://localhost:3001' },
+    proxy: { '/api': { target: 'http://127.0.0.1:3001', changeOrigin: true } },
     fs: {
       // Shared fixtures live beside client; do not expose future server files.
-      allow: [fileURLToPath(new URL('.', import.meta.url)), fileURLToPath(new URL('../shared', import.meta.url))],
-    },
-  },
-})
+      allow:

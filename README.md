@@ -16,8 +16,4 @@ DayMap puts one day on a 3D map of Adelaide, next to a linked event planner. Goo
 
 ## Getting started
 
-Run the frontend using [client/README.md](client/README.md), and the backend using [server/README.md](server/README.md). Each currently has its own npm commands; root workspace commands remain planned in [CONTRIBUTING.md §5](CONTRIBUTING.md#5-development-workflow).
-
-## Team Members
-
-- Sudipta Bhattacharya
+Use Node 22 (`nvm install && nvm use`); the minimum supported version is 22.12. From the rep

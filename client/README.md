@@ -4,23 +4,11 @@ React + JavaScript + Vite. The page shows the map-page layout (DM-02 in progress
 
 ## Run locally
 
-Start the backend in another terminal with `npm --prefix server run dev` (first install with `npm --prefix server ci`). From the repository root:
+From the repository root, use Node 22 (`nvm install && nvm use`), run `npm ci`, then `npm run dev`. This starts both the frontend and backend. Open `http://localhost:5173`; Vite forwards `/api` to `http://127.0.0.1:3001`. Both ports must be available.
 
-```sh
-cd client
-npm ci
-npm run dev
-```
+Copy `.env.example` to `.env.local` and provide your restricted `VITE_GOOGLE_MAPS_API_KEY` for the map. Keep `VITE_API_BASE_URL` empty for local development. VS Code Live Server does not start Vite or Express.
 
-Open `http://localhost:5173`. Vite proxies `/api` to `http://localhost:3001`. Run checks from `client/` too:
-
-```sh
-npm run lint
-npm test
-npm run build
-```
-
-There are no root npm scripts yet. Tests use Node's built-in test runner and introduce no additional dependencies. Lint includes the shared fixture outside `client/`; Vite allows that directory during development.
+Run `npm test`, `npm run lint`, and `npm run build` from the root. To run only the client, use `npm run dev --workspace=client`; the backend must already be running. Tests use Node's built-in runner; lint includes the shared fixture.
 
 ## Sample day
 
