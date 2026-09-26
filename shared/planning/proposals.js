@@ -29,7 +29,7 @@ function magnitude(conflict, analysis, plan) {
 }
 
 function safeCandidate(before, after, original, candidate, target) {
-  if (after.conflicts.some((conflict) => pair(conflict) === pair(target))) return false
+  if (target && after.conflicts.some((conflict) => pair(conflict) === pair(target))) return false
   const prior = new Map(before.conflicts.map((conflict) => [conflict.id, conflict]))
   for (const conflict of after.conflicts) {
     const old = prior.get(conflict.id)
@@ -152,6 +152,89 @@ export function suggestFix(plan, conflictId, ctx) {
   }
 }
 
+// Cheap eligibility before looking up routes. Gap boundaries never move.
+function gapCandidates(plan, gap, ctx) {
+  const now = ctx.now instanceof Date ? ctx.now.getTime() : ctx.now
+  const day = planDayBounds(plan.date, plan.timezone)
+  const timeline = buildTimeline(plan)
+  const from = timeline.find((s) => s.id === gap.fromStopId)
+  const to = timeline.find((s) => s.id === gap.toStopId)
+  const locks = new Set(ctx.lockedStopIds ?? [])
+  return timeline.flatMap((stop, index) => {
+    if (stop.id === from.id || stop.id === to.id || lockReason(stop, now, locks)) return []
+    const current = stopInterval(stop)
+    const duration = current.end - current.start
+    if (duration !== stop.timing.durationMinutes * MINUTE) return []
+    const lo = Math.max(now, day.start, stopInterval(from).end,
+      stop.timing.earliestStartAt == null ? day.start : Date.parse(stop.timing.earliestStartAt))
+    const hi = Math.min(day.end, stopInterval(to).start,
+      stop.timing.latestEndAt == null ? day.end : Date.parse(stop.timing.latestEndAt)) - duration
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi) return []
+    return [{ stop, current, duration, lo, hi, from, to,
+      oldPrevious: timeline[index - 1], oldNext: timeline[index + 1] }]
+  })
+}
+
+/** Only the journeys needed to evaluate this gap. Called on explicit tap. */
+export function gapRoutePairs(plan, freeTimeId, ctx) {
+  const gap = analyzePlan(plan, ctx).freeTime.find((g) => g.id === freeTimeId)
+  if (!gap) return []
+  return gapCandidates(plan, gap, ctx).flatMap(({ stop, from, to, oldPrevious, oldNext }) => [
+    { from, to: stop }, { from: stop, to },
+    ...(oldPrevious && oldNext ? [{ from: oldPrevious, to: oldNext }] : []),
+  ]).filter(({ from, to }) => !(from.location?.placeId && from.location.placeId === to.location?.placeId))
+}
+
+/** Return up to three safe moves; the UI shows only the first until asked. */
+export function suggestFitsForGap(plan, freeTimeId, ctx) {
+  const before = analyzePlan(plan, ctx)
+  const gap = before.freeTime.find((g) => g.id === freeTimeId)
+  if (!gap) return { proposals: [], reason: 'gap-not-current' }
+  const proposals = []
+  let unknown = false
+  for (const item of gapCandidates(plan, gap, ctx)) {
+    const { stop, current, duration, from, to } = item
+    const incoming = journeyNeed(from, stop, stopInterval(from).end, ctx)
+    const outgoing = journeyNeed(stop, to, current.end, ctx)
+    if (incoming === null || outgoing === null) { unknown = true; continue }
+    const lo = Math.max(item.lo, stopInterval(from).end + incoming)
+    const hi = Math.min(item.hi, stopInterval(to).start - outgoing - duration)
+    // Start near the beginning so the remaining breathing room is visible.
+    const start = nearestStart(lo, hi, lo)
+    if (start === null || start === current.start) continue
+    const candidate = structuredClone(plan)
+    const changed = candidate.stops.find((s) => s.id === stop.id)
+    changed.timing.scheduledStartAt = iso(start)
+    changed.timing.scheduledEndAt = iso(start + duration)
+    const after = analyzePlan(candidate, ctx)
+    if (after.unresolved.some((entry) => entry.stopIds.includes(stop.id))) { unknown = true; continue }
+    if (!safeCandidate(before, after, plan, candidate)) {
+      unknown ||= after.unresolved.some((entry) => !before.unresolved.some((old) => old.id === entry.id))
+      continue
+    }
+    const newLegs = after.legs.filter((leg) => (leg.fromStopId === from.id && leg.toStopId === stop.id)
+      || (leg.fromStopId === stop.id && leg.toStopId === to.id))
+    const remainingMinutes = newLegs.reduce((sum, leg) => sum + leg.spareSeconds, 0) / 60
+    const totalTravel = (analysis) => analysis.legs.reduce((sum, leg) => sum + (leg.travelSeconds ?? 0), 0)
+    proposals.push({
+      id: JSON.stringify(['gap', plan.id, plan.version, freeTimeId, stop.id, start]),
+      planId: plan.id, baseVersion: plan.version, baseFingerprint: planFingerprint(plan),
+      strategy: 'fill-gap', freeTimeId, remainingMinutes,
+      changes: [{ stopId: stop.id, before: structuredClone(stop), after: changed }],
+      legs: after.legs, remainingConflicts: after.conflicts,
+      resolves: before.conflicts.filter((old) => !after.conflicts.some((c) => c.id === old.id)).map((c) => c.id),
+      freeMinutesAfter: after.summary.freeMinutes,
+      extraTravelSeconds: totalTravel(after) - totalTravel(before),
+    })
+  }
+  proposals.sort((a, b) => Number(b.remainingMinutes >= 10) - Number(a.remainingMinutes >= 10)
+    || a.extraTravelSeconds - b.extraTravelSeconds
+    || Math.abs(Date.parse(a.changes[0].after.timing.scheduledStartAt) - Date.parse(a.changes[0].before.timing.scheduledStartAt))
+      - Math.abs(Date.parse(b.changes[0].after.timing.scheduledStartAt) - Date.parse(b.changes[0].before.timing.scheduledStartAt))
+    || a.id.localeCompare(b.id))
+  return { proposals: proposals.slice(0, 3), reason: proposals.length ? null : unknown ? 'travel-unknown' : 'no-fit' }
+}
+
 /**
  * Revalidate and apply a single-stop proposal to a new snapshot. The caller
  * must supply CURRENT analysis context; a fingerprint alone is insufficient.
@@ -187,7 +270,13 @@ export function applyProposal(plan, proposal, ctx) {
 
   const before = analyzePlan(plan, ctx)
   const target = before.conflicts.find((conflict) => conflict.id === proposal.conflictId)
-  if (!target || target.needsDecision || !target.stopIds.includes(moving.id)) return null
+  if (proposal.strategy === 'fill-gap') {
+    const gap = before.freeTime.find((g) => g.id === proposal.freeTimeId)
+    if (!gap || [gap.fromStopId, gap.toStopId].includes(moving.id)) return null
+    const from = plan.stops.find((s) => s.id === gap.fromStopId)
+    const to = plan.stops.find((s) => s.id === gap.toStopId)
+    if (updated.start < stopInterval(from).end || updated.end > stopInterval(to).start) return null
+  } else if (!target || target.needsDecision || !target.stopIds.includes(moving.id)) return null
   const candidate = structuredClone(plan)
   candidate.stops = candidate.stops.map((stop) => stop.id === moving.id ? expected : stop)
   const after = analyzePlan(candidate, ctx)

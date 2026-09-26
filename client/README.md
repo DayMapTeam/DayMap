@@ -185,8 +185,10 @@ use fetched walking durations instead, so suggested times may differ.
    to 13:00–13:30. Apply again, then **Keep current plan** to discard both edits.
 5. Repeat and choose **Accept changes** to keep both. Reopen the event rows to
    confirm the times; acceptance rechecks the current clock and estimates.
-6. Expand **Free time** to see usable intervals at the next destination after
-   travel and buffer. Choosing an activity to fill a gap is a later feature.
+6. Free-time gaps of at least 15 minutes appear between events after travel and
+   buffer. Tap the **+** to check one existing flexible activity that fits. The
+   default demo's short morning gap may have no suitable activity; **Keep free**
+   closes the card without changing the plan.
 7. Dismiss a suggestion: its conflict stays visible, muted. **Suggest a fix**
    brings it back. Existing conflicts need this click; a newly introduced error
    gets one automatic suggestion. A bounded search may report no one-event fix.
@@ -195,6 +197,35 @@ Automated coverage: `node --test src/services/planningContext.test.js` from
 `client/` runs this fixture's edit/apply/revert/accept sequence without a Maps key.
 The existing add-event fit remains time-only; the day checks show any resulting
 travel issues after adding. Refresh still resets to the fixture.
+
+### Compact gap preview
+
+Gaps live in the timeline, not in a separate free-time panel. Tapping a gap checks
+only eligible activities and their required journeys. One recommendation shows
+its name and proposed time. **Preview →** makes a dashed card in the timeline,
+highlights its map marker, and shows remaining space around it. **Details** holds
+the before/after times, affected journeys and exact remaining minutes.
+
+**Cancel** removes the suggestion while keeping earlier manual edits. **Confirm**
+accepts the draft after revalidation; if it includes earlier manual edits, the
+button says **Confirm N changes** and Details lists them. A changed clock, plan,
+window or travel estimate can block confirmation; cancel and preview again.
+Only one preview is active. Filtering hides gap controls because filtered events
+may not be neighbours. The preview's controls stay accessible even if its event
+is filtered out. Existing scheduled activities are supported; this is not a
+nearby-places recommender or an unscheduled task list.
+
+To try a successful move with the Google provider in the demo:
+
+1. Add a fictional **Coffee break** at State Library of South Australia, choose
+   **15 min**, and select the 11:30–11:45 slot. Add-event fitting is still time-only;
+   the day checks will flag the resulting travel shortfalls.
+2. Edit **Library study** to **11:00–11:30**, then Save. Leave that edit in the draft.
+3. Tap the larger free-time gap before Library study. Once routes resolve, the
+   coffee activity can be previewed in that gap (exact times depend on Google).
+4. Preview, then Cancel: coffee returns to 11:30–11:45 and the library edit stays.
+5. Preview again and **Confirm 2 changes**. Both events update in the planner and
+   map; the preview is gone. Verify Details on desktop and a narrow screen.
 
 ### Existing planner interactions
 

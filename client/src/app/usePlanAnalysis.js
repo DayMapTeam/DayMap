@@ -7,6 +7,7 @@ import { createWalkingRouteStore } from '../services/walkingRouteStore.js'
 import { createWalkingRoutesProvider } from '../services/walkingRoutes.js'
 import { loadMapsLibrary, mapsApiKey } from '../services/googleMaps.js'
 import { buildTimeline, stopInterval } from '../../../shared/planning/timeline.js'
+import { gapRoutePairs } from '../../../shared/planning/proposals.js'
 
 const googleWalking = createWalkingRoutesProvider(loadMapsLibrary)
 
@@ -20,6 +21,10 @@ export function usePlanAnalysis(plan, draft, now) {
   [shown, now, draft?.editedStopIds, provider, routes, results])
   const analysis = useMemo(() => analyzePlan(shown, ctx), [shown, ctx])
   const accepted = useMemo(() => analyzePlan(plan, ctx), [plan, ctx])
+  const displayGaps = useMemo(() => draft?.suggestion?.strategy === 'fill-gap'
+    ? analyzePlan(shown, { ...ctx, freeTimeMin: 0 }).freeTime.filter((gap) => gap.minutes >= ctx.freeTimeMin
+      || [gap.fromStopId, gap.toStopId].includes(draft.suggestion.changes[0].stopId)) : analysis.freeTime,
+  [draft, shown, ctx, analysis.freeTime])
   useEffect(() => {
     if (provider !== 'google') return
     const pairs = (source, pending) => pending.map(({ fromStopId, toStopId }) => ({
@@ -39,6 +44,9 @@ export function usePlanAnalysis(plan, draft, now) {
     routes.request(stops.flatMap((from) => stops.filter((to) => to.id !== from.id
       && !(from.location?.placeId && from.location.placeId === to.location?.placeId)).map((to) => ({ from, to }))))
   }
+  const checkGapRoutes = (gapId) => {
+    if (provider === 'google') routes.request(gapRoutePairs(shown, gapId, getContext()))
+  }
   const changedIds = new Set(draft ? listStopChanges(plan, shown).map(({ after }) => after.id) : [])
   const stopStates = Object.fromEntries(shown.stops.map((stop) => {
     const conflicts = analysis.conflicts.filter((c) => c.stopIds.includes(stop.id))
@@ -46,8 +54,8 @@ export function usePlanAnalysis(plan, draft, now) {
     return [stop.id, { clash: conflicts.length > 0, previewShifted: changedIds.has(stop.id),
       note: conflicts.length ? 'Schedule conflict' : unresolved ? 'Travel unresolved' : changedIds.has(stop.id) ? 'Draft change' : '' }]
   }))
-  return { shown, ctx, getContext, analysis, introduced, fingerprint: planFingerprint(shown), stopStates,
+  return { shown, ctx, getContext, analysis, displayGaps, introduced, fingerprint: planFingerprint(shown), stopStates,
     provider, loadingRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'pending'),
     failedRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'unavailable'),
-    retryRoutes: routes.retryFailures, checkAlternatives }
+    retryRoutes: routes.retryFailures, checkAlternatives, checkGapRoutes }
 }

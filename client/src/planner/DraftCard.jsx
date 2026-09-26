@@ -2,6 +2,7 @@ import { usePlan } from '../app/planContext.js'
 import { listStopChanges } from '../app/planEdits.js'
 import { formatTimeRange } from '../components/formatTime.js'
 import '../components/buttons.css'
+import SuggestionDetails from './SuggestionDetails.jsx'
 
 function describeChange({ before, after }, timezone) {
   const parts = []
@@ -18,7 +19,7 @@ function describeChange({ before, after }, timezone) {
  */
 export default function DraftCard({ planning }) {
   const { plan, draft, acceptDraft, discardDraft, revertSuggestion } = usePlan()
-  if (draft === null) return null
+  if (draft === null || draft.suggestion?.strategy === 'fill-gap') return null
 
   const changes = listStopChanges(plan, draft.plan)
 
@@ -40,6 +41,7 @@ export default function DraftCard({ planning }) {
         <p className="draft-card-body">Nothing in your plan changes until you accept.</p>
       )}
       {draft.suggestion && <p className="draft-card-body">Suggestion included. Revert keeps your own edits. Editing again removes the suggestion.</p>}
+      {draft.suggestion && <SuggestionDetails proposal={draft.suggestion} base={draft.beforeSuggestion?.plan ?? plan} ctx={planning.ctx} />}
       {draft.suggestionInvalid && <p className="draft-card-alert" role="alert">This suggestion is no longer verified. Revert it and request a new fix.</p>}
       <div className="draft-card-actions">
         {draft.suggestion && <button type="button" className="button-text" onClick={revertSuggestion}>Revert suggestion</button>}

@@ -76,11 +76,5 @@ export default function PlanningFeedback({ planning }) {
         {entry.stopIds.map((id) => shown.stops.find((s) => s.id === id)?.title ?? id).join(' → ')}: {unresolvedText[entry.code] ?? 'A verified travel estimate is unavailable.'}
       </li>)}</ul>
     </details>}
-    {analysis.freeTime.length > 0 && <details className="planning-free">
-      <summary>Free time · {Math.floor(analysis.summary.freeMinutes)} min across {analysis.freeTime.length} gap{analysis.freeTime.length === 1 ? '' : 's'}</summary>
-      <ul>{analysis.freeTime.map((gap) => <li key={gap.id}>
-        {formatTimeRange(gap.startAt, gap.endAt, shown.timezone)} · {Math.floor(gap.minutes)} min at {shown.stops.find((s) => s.id === gap.locationStopId)?.location?.label ?? 'the next stop'}, after travel and buffer
-      </li>)}</ul>
-    </details>}
   </section>
 }

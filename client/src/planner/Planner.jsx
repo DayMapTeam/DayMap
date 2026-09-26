@@ -160,7 +160,8 @@ export default function Planner({ now, revealRequest, planning }) {
         <DraftCard planning={planning} />
         <PlanningFeedback planning={planning} />
         <EventList
-          analysis={planning.analysis}
+          planning={planning}
+          onGapPreview={() => setFilter('')}
           now={now}
           filter={filter}
           openStopId={openStopId}

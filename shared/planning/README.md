@@ -164,3 +164,34 @@ fetches missing journeys outside render and recomputes analysis as they arrive.
 The engine itself remains synchronous and provider-independent. Demo simulation
 is an explicit option; Google failures stay unresolved. Persistence remains
 separate work.
+
+## Actionable free-time gaps
+
+`suggestFitsForGap(plan, freeTimeId, ctx)` returns `{ proposals, reason }` for a
+current gap from `analyzePlan`. It considers existing scheduled flexible activities
+outside that gap; fixed, completed, skipped, started and draft-locked stops never
+move. Gap boundary events also stay put. Unscheduled activities are not included
+in this first flow.
+
+The engine verifies travel into and out of the activity, mode buffers, the full
+duration, the activity window and local-day bounds. It also checks the journey
+left behind when the activity moves. No new conflict or unresolved journey is
+allowed, and existing conflicts may not worsen. Missing travel never becomes a
+zero-minute journey.
+
+Proposals use `strategy: 'fill-gap'`, `freeTimeId`, and `remainingMinutes`, alongside
+the existing plan fingerprint and before/after snapshots. `remainingMinutes` is
+the spare time across the two new legs inside the original gap, after travel and
+buffers. Rank moves with at least 10 minutes remaining first, then least additional
+total walking, smallest time shift and stable ID. This is a preference; a verified
+exact fit is still valid. Return at most three; the compact UI shows the first.
+
+`gapRoutePairs(plan, freeTimeId, ctx)` supplies just the candidate incoming,
+outgoing and old-neighbour journeys. The client requests them when a gap is
+tapped; rendering and suggestion calculation remain pure. Cached journeys are
+reused, including on repeated taps. Empty/ineligible gaps request nothing.
+
+`applyProposal` revalidates gap moves at preview and again at acceptance using
+current time and estimates. It does not trust supplied journey or spare-time data.
+Cancel restores the draft from before preview; confirmation includes any manual
+edits already in that draft, with the count and details shown explicitly.

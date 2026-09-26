@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePlan } from '../app/planContext.js'
 import { listStopChanges } from '../app/planEdits.js'
 import EventRow from './EventRow.jsx'
 import TravelConnector from './TravelConnector.jsx'
+import FreeTimeGap, { GapPreview } from './FreeTimeGap.jsx'
 import './EventList.css'
 import { sortStopsForDisplay } from '../../../shared/planning/timeline.js'
 
@@ -26,16 +27,34 @@ function matchesFilter(stop, needle) {
  * @param {string | null} props.newStopId A just-added stop, labelled New.
  * @param {(stopId: string) => void} props.onRequestDelete Ask before deleting this stop.
  */
-export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, analysis }) {
+export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, planning, onGapPreview }) {
+  const { analysis } = planning
   const { plan, draft, selectedStopId, selectStop, editStopDraft } = usePlan()
   const listRef = useRef(null)
   const reviewAfterSave = useRef(false)
+  const lastPreview = useRef(null)
+  const [activeGap, setActiveGap] = useState(null)
+  const gapProposal = draft?.suggestion?.strategy === 'fill-gap' ? draft.suggestion : null
   const shown = draft?.plan ?? plan
   const needle = filter.trim().toLocaleLowerCase()
   const filtering = needle !== ''
   const ordered = sortStopsForDisplay(shown.stops)
   const stops = filtering ? ordered.filter((stop) => matchesFilter(stop, needle)) : ordered
   const changedIds = new Set(draft ? listStopChanges(plan, draft.plan).map(({ after }) => after.id) : [])
+
+  useEffect(() => {
+    const previous = lastPreview.current
+    if (previous?.id === gapProposal?.id) return
+    lastPreview.current = gapProposal
+    const body = listRef.current?.closest('.planner-body')
+    const target = gapProposal ? body?.querySelector('.gap-preview') : previous && (
+      body?.querySelector(`[data-gap-id="${CSS.escape(previous.freeTimeId)}"] button`)
+      ?? body?.querySelector(`[data-stop-id="${CSS.escape(previous.changes[0].stopId)}"] .event-row`))
+    if (body && target) {
+      body.scrollTo({ top: body.scrollTop + target.getBoundingClientRect().top - body.getBoundingClientRect().top - 12, behavior: 'instant' })
+      target.focus({ preventScroll: true })
+    }
+  }, [gapProposal])
 
   useEffect(() => {
     if (!reviewAfterSave.current) return
@@ -80,11 +99,17 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
         {filtering && (stops.length === 0 ? 'No stops match.' : `Showing ${stops.length} of ${shown.stops.length} stops`)}
       </p>
       <ol ref={listRef} className="event-list" aria-label="Stops">
-        {stops.map((stop, index) => (
-          <li key={stop.id}>
+        {stops.map((stop, index) => {
+          const gap = index > 0 && !filtering && planning.displayGaps.find((g) => g.fromStopId === stops[index - 1].id && g.toStopId === stop.id)
+          return <li key={stop.id}>
             {/* While filtering, neighbours in the list may not be neighbours in the day. */}
-            {index > 0 && !filtering && <TravelConnector leg={analysis.legs.find((leg) => leg.fromStopId === stops[index - 1].id && leg.toStopId === stop.id)} />}
-            <EventRow
+            {gap ? <FreeTimeGap gap={gap} planning={planning}
+              open={activeGap?.id === gap.id && activeGap.fingerprint === planning.fingerprint}
+              onOpen={() => setActiveGap({ id: gap.id, fingerprint: planning.fingerprint })}
+              onClose={() => setActiveGap(null)}
+              onPreview={() => { setActiveGap(null); onOpenStopChange(null); onGapPreview() }} />
+              : index > 0 && !filtering && <TravelConnector leg={analysis.legs.find((leg) => leg.fromStopId === stops[index - 1].id && leg.toStopId === stop.id)} />}
+            {gapProposal?.changes[0].stopId === stop.id ? <GapPreview planning={planning} /> : <EventRow
               stop={stop}
               conflict={analysis.conflicts.some((c) => c.stopIds.includes(stop.id))}
               date={shown.date}
@@ -98,10 +123,11 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
               onToggle={toggle}
               onSave={save}
               onDelete={onRequestDelete}
-            />
+            />}
           </li>
-        ))}
+        })}
       </ol>
+      {gapProposal && !stops.some((s) => s.id === gapProposal.changes[0].stopId) && <GapPreview planning={planning} />}
     </>
   )
 }
