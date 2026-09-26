@@ -1,5 +1,6 @@
 import { chooseOption } from './planAdd.js'
 import { listStopChanges, validateStopEdit } from './planEdits.js'
+import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
 import { planFingerprint } from '../../../shared/planning/fingerprint.js'
 
@@ -140,6 +141,23 @@ function removeStop(state, { stopId }) {
 }
 
 /**
+ * Set or clear a stop's place. Choosing a place is the explicit accept, so it
+ * changes the accepted plan (and a pending draft, which keeps its own edits).
+ */
+function setLocation(state, { stopId, location }) {
+  if (state.draft?.suggestion) return setLocation(revertSuggestion(state), { stopId, location })
+  const next = setStopLocation(state.plan, stopId, location)
+  if (next === state.plan) return state
+  const version = state.plan.version + 1
+  const draft = state.draft === null ? null : {
+    ...state.draft,
+    plan: setStopLocation(state.draft.plan, stopId, location),
+    baseVersion: state.draft.baseVersion === state.plan.version ? version : state.draft.baseVersion,
+  }
+  return { ...state, plan: { ...next, version }, draft }
+}
+
+/**
  * Selection is UI state: it never modifies accepted plan data. Edits go into
  * a draft, and only 'accept-draft' replaces the accepted plan.
  */
@@ -184,6 +202,8 @@ export function planReducer(state, action) {
       return addStop(state, action)
     case 'undo-add':
       return undoAdd(state, action)
+    case 'set-stop-location':
+      return setLocation(state, action)
     case 'load-plan':
       // A different day (or a signed-in user's saved day) replaces everything,
       // including a pending draft, which was built on the old plan.
