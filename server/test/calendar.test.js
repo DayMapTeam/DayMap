@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import { createApp } from '../src/app.js'
 import { createCalendarService } from '../src/calendar/service.js'
 import { createTokenCipher } from '../src/calendar/tokenCipher.js'
+import { ApiError } from '../src/middleware/apiError.js'
 
 const scope = 'https://www.googleapis.com/auth/calendar.events.readonly'
 const key = randomBytes(32).toString('base64')
@@ -357,4 +358,41 @@ test('listDayEvents refreshes on the server and sends the access token only to G
   assert.match(calendarCall.url, /^https:\/\/www\.googleapis\.com\/calendar\/v3\/calendars\/primary\/events\?/)
   assert.equal(calendarCall.options.headers.Authorization, 'Bearer short-lived')
   assert.ok(!calendarCall.url.includes('short-lived'))
+})
+
+test('every callback outcome returns to the app, never a JSON page', async t => {
+  const outcomes = [
+    ['denied', () => 'denied'],
+    ['expired', () => { throw new ApiError(400, 'INVALID_OAUTH_STATE', 'expired') }],
+    ['no offline access', () => { throw new ApiError(400, 'CALENDAR_RECONNECT_REQUIRED', 'no refresh token') }],
+    ['unexpected', () => { throw Object.assign(new Error('relation does not exist'), { code: '42P01' }) }],
+  ]
+  let next
+  const calendar = { async callback() { return next() } }
+  const server = createApp({ supabase: null, calendar, clientOrigin: 'http://localhost:5173' }).listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  t.after(() => new Promise(resolve => server.close(resolve)))
+  const errors = []
+  t.mock.method(console, 'error', (...args) => errors.push(args.join(' ')))
+  const url = `http://127.0.0.1:${server.address().port}/api/calendar/callback?state=s&code=c`
+  const locations = []
+  for (const [, outcome] of outcomes) {
+    next = outcome
+    const response = await fetch(url, { redirect: 'manual' })
+    assert.equal(response.status, 303)
+    locations.push(response.headers.get('location'))
+  }
+  assert.deepEqual(locations, [
+    'http://localhost:5173/?calendar=denied',
+    'http://localhost:5173/?calendar=error&reason=INVALID_OAUTH_STATE',
+    'http://localhost:5173/?calendar=error&reason=CALENDAR_RECONNECT_REQUIRED',
+    'http://localhost:5173/?calendar=error&reason=CALENDAR_CONNECTION_FAILED',
+  ])
+  assert.equal(errors.length, 1, 'only the unexpected failure is logged')
+
+  const unconfigured = createApp({ supabase: null, calendar: null, clientOrigin: 'http://localhost:5173' }).listen(0, '127.0.0.1')
+  await once(unconfigured, 'listening')
+  t.after(() => new Promise(resolve => unconfigured.close(resolve)))
+  const response = await fetch(`http://127.0.0.1:${unconfigured.address().port}/api/calendar/callback?state=s`, { redirect: 'manual' })
+  assert.equal(response.headers.get('location'), 'http://localhost:5173/?calendar=error&reason=CALENDAR_NOT_CONFIGURED')
 })

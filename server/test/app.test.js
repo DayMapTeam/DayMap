@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { before, after, test } from 'node:test'
 import { createApp } from '../src/app.js'
+import { describeConfiguration } from '../src/config.js'
 import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 
 const clientOrigin = 'https://daymap.example'
@@ -85,4 +86,18 @@ test('invalid CORS configuration fails instead of permitting a wildcard', () => 
   for (const clientOrigin of ['*', 'null', '', 'https://example.com/path', 'https://example.com/', 'ftp://example.com']) {
     assert.throws(() => createApp({ clientOrigin }))
   }
+})
+
+test('start-up configuration lines name missing variables but never values', () => {
+  const none = describeConfiguration({})
+  assert.match(none[0], /^Sign-in and saved days: off \(set SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY/)
+  assert.match(none[1], /^Google Calendar: off/)
+  const secret = 'do-not-print-this'
+  const calendarOnly = describeConfiguration({ DATABASE_URL: secret, GOOGLE_OAUTH_CLIENT_ID: secret,
+    GOOGLE_OAUTH_CLIENT_SECRET: secret, GOOGLE_OAUTH_REDIRECT_URI: secret, TOKEN_ENCRYPTION_KEY: secret })
+  assert.match(calendarOnly[1], /unusable until sign-in/)
+  const all = describeConfiguration({ SUPABASE_URL: secret, SUPABASE_PUBLISHABLE_KEY: secret, DATABASE_URL: secret,
+    GOOGLE_OAUTH_CLIENT_ID: secret, GOOGLE_OAUTH_CLIENT_SECRET: secret, GOOGLE_OAUTH_REDIRECT_URI: secret, TOKEN_ENCRYPTION_KEY: secret })
+  assert.deepEqual(all, ['Sign-in and saved days: on', 'Google Calendar: on'])
+  assert.ok([...none, ...calendarOnly, ...all].every(line => !line.includes(secret)))
 })

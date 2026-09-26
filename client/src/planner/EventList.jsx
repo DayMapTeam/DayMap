@@ -27,7 +27,7 @@ function matchesFilter(stop, needle) {
  * @param {string | null} props.newStopId A just-added stop, labelled New.
  * @param {(stopId: string) => void} props.onRequestDelete Ask before deleting this stop.
  */
-export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, planning, onGapPreview }) {
+export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, planning, onGapPreview, emptyState = null }) {
   const { analysis } = planning
   const { plan, draft, selectedStopId, selectStop, editStopDraft } = usePlan()
   const listRef = useRef(null)
@@ -98,6 +98,7 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
       <p className="event-list-count" role="status">
         {filtering && (stops.length === 0 ? 'No stops match.' : `Showing ${stops.length} of ${shown.stops.length} stops`)}
       </p>
+      {shown.stops.length === 0 && emptyState}
       <ol ref={listRef} className="event-list" aria-label="Stops">
         {stops.map((stop, index) => {
           const gap = index > 0 && !filtering && planning.displayGaps.find((g) => g.fromStopId === stops[index - 1].id && g.toStopId === stop.id)

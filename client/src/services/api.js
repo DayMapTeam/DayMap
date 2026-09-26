@@ -58,5 +58,19 @@ export function createApiClient({ baseUrl = '', getToken, fetchImpl = (...args) 
         method: 'PUT', body: { baseVersion, plan: { ...plan, version: baseVersion } },
       })
     },
+    calendarStatus({ signal } = {}) {
+      return request('/api/calendar/status', { signal })
+    },
+    /** The Google consent URL to send the browser to. */
+    async connectCalendar() {
+      return (await request('/api/calendar/connect', { method: 'POST' })).url
+    },
+    disconnectCalendar() {
+      return request('/api/calendar/disconnect', { method: 'POST' })
+    },
+    /** Merges one day's primary-calendar events into the saved plan: `{ plan, summary }`. */
+    importCalendarDay(date, timezone) {
+      return request('/api/calendar/import', { method: 'POST', body: { date, timezone } })
+    },
   }
 }

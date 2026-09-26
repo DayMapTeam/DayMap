@@ -109,6 +109,12 @@ export function createCalendarService({
       }
       return 'connected'
     },
+    /** Start-up check that the Calendar migrations (003 and 004) are applied. */
+    async check() {
+      const result = await pool.query(`select to_regclass('private.calendar_credentials') is not null
+        and to_regproc('private.finish_calendar_connection') is not null as ready`)
+      if (!result.rows[0]?.ready) throw new Error('Calendar tables or functions are missing. Apply migrations 003 and 004.')
+    },
     async status(userId) {
       const result = await pool.query('select 1 from private.calendar_credentials where user_id = $1', [userId])
       return { connected: result.rows.length > 0 }
