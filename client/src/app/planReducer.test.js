@@ -8,9 +8,10 @@ test('loading a fetched plan replaces data, resets selection, and isolates the r
   assert.equal(empty.plan, null)
   assert.equal(planReducer(empty, { type: 'select-stop', stopId: 'missing' }), empty)
   const response = structuredClone(demoPlan)
-  const loaded = planReducer({ ...empty, selectedStopId: 'old-stop' }, { type: 'load-plan', plan: response })
+  const loaded = planReducer({ ...empty, selectedStopId: 'old-stop', draft: { plan: response, baseVersion: 1 } }, { type: 'load-plan', plan: response })
   assert.deepEqual(loaded.plan, demoPlan)
   assert.equal(loaded.selectedStopId, null)
+  assert.equal(loaded.draft, null)
   response.stops[0].title = 'Mutated response'
   assert.notEqual(loaded.plan.stops[0].title, response.stops[0].title)
 })

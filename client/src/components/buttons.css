@@ -1,0 +1,39 @@
+/* Shared button styles. */
+
+.button-filled,
+.button-text {
+  min-height: 36px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 0;
+  border-radius: var(--radius-control);
+  transition:
+    background var(--duration-press) var(--ease-spring),
+    transform var(--duration-press) var(--ease-spring);
+}
+
+.button-filled {
+  padding: 0 18px;
+  color: var(--on-accent);
+  background: var(--blue);
+}
+
+.button-filled:disabled {
+  color: var(--label-2);
+  background: var(--fill);
+}
+
+.button-text {
+  padding: 0 var(--space-2);
+  color: var(--blue);
+  background: transparent;
+}
+
+.button-text:hover {
+  background: var(--blue-tint);
+}
+
+.button-filled:not(:disabled):active,
+.button-text:active {
+  transform: scale(var(--press-scale));
+}

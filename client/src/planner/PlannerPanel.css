@@ -1,0 +1,213 @@
+.planner {
+  position: absolute;
+  top: var(--overlay-top);
+  right: var(--overlay-inset);
+  bottom: var(--overlay-inset);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  width: var(--panel-width);
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+}
+
+/* display: flex above would otherwise override the hidden attribute. */
+.planner[hidden] {
+  display: none;
+}
+
+.planner-top {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+}
+
+.planner-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.planner-title {
+  flex: 1;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* Filter field: 36px, filled, no border. Placeholder uses --label-2 to keep 4.5:1 contrast. */
+.planner-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 var(--space-1) 0 var(--space-2);
+  background: var(--fill);
+  border-radius: var(--radius-control);
+  transition: background var(--duration-press) var(--ease-spring);
+}
+
+.planner-filter:focus-within {
+  background: var(--solid);
+  outline: var(--focus-ring);
+  outline-offset: 0;
+}
+
+.planner-filter-icon {
+  flex: none;
+  color: var(--label-2);
+}
+
+.planner-filter-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font-size: 14px;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.planner-filter-input::placeholder {
+  color: var(--label-2);
+}
+
+.planner-filter-input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.planner-filter-clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+}
+
+.planner-filter-clear-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--solid);
+  background: var(--label-3);
+  border-radius: 50%;
+}
+
+.planner-body {
+  position: relative; /* rows are scrolled to via offsetTop */
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-1) var(--space-4) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-1) 10px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--fill);
+  border-radius: var(--radius-pill);
+}
+
+.status-pill-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--label-3);
+  border-radius: 50%;
+}
+
+/* 44px hit target; negative margin keeps the title row compact. */
+.planner-collapse {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0;
+  padding: 0;
+  color: var(--label-2);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  transition:
+    background var(--duration-press) var(--ease-spring),
+    transform var(--duration-press) var(--ease-spring);
+}
+
+.planner-collapse:hover {
+  background: var(--fill);
+}
+
+.planner-collapse:active,
+.planner-reopen:active {
+  transform: scale(var(--press-scale));
+}
+
+.planner-reopen {
+  position: absolute;
+  top: var(--overlay-top);
+  right: var(--overlay-inset);
+  z-index: 5;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-4);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--label);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-float);
+  transition: transform var(--duration-press) var(--ease-spring);
+}
+
+/* Bottom sheet. Keep the breakpoint in sync with SHEET_QUERY in PlannerPanel.jsx. */
+@media (max-width: 719px) {
+  .planner {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    height: var(--sheet-peek);
+    border-width: 1px 0 0;
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    transition: height var(--duration-panel) var(--ease-spring);
+  }
+
+  .planner[data-open='true'] {
+    height: calc(100% - var(--header-height) - var(--space-2));
+  }
+
+  .planner-handle {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 100%;
+    height: var(--hit-target);
+    padding: 0;
+    background: transparent;
+    border: 0;
+  }
+
+  .planner-grabber {
+    width: 36px;
+    height: 5px;
+    background: var(--fill-2);
+    border-radius: var(--radius-pill);
+  }
+
+  .planner-top {
+    padding-top: 0;
+  }
+}

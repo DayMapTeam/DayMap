@@ -8,9 +8,10 @@
     "build": "vite build",
     "lint": "eslint . ../shared",
     "preview": "vite preview",
-    "test": "node --test src/app/planReducer.test.js src/services/plans.test.js"
+    "test": "node --test \"src/**/*.test.js\""
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.1.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
