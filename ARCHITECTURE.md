@@ -103,16 +103,18 @@ client/src/
   components/           # Shared UI primitives (Hannah coordinates)
   services/             # Express API and Supabase Auth clients
 server/src/
-  routes/               # Express handlers and validation
-  middleware/           # Authentication and error handling
-  integrations/         # Calendar, Places, Routes, later weather
-  planning/             # Scheduling and conflict/proposal calculation
-  repositories/         # Database access
+  routes/               # Express handlers and validation (Sudipta)
+  middleware/           # Authentication and error handling (Sudipta)
+  integrations/         # Calendar, Places, Routes, later weather (Rafid)
+  planning/             # Scheduling and conflict/proposal calculation (Sudipta)
+  repositories/         # Database access and secure token storage (Sudipta)
 shared/
   fixtures/             # Fictional Adelaide demo plan
   contracts/            # JSDoc shapes and agreed validation rules
-supabase/migrations/    # Versioned SQL schema and access policies
+supabase/migrations/    # Versioned SQL schema and access policies (Sudipta)
 ```
+
+**Integration split.** Rafid owns the provider adapters in `server/src/integrations/`: provider requests and response normalisation. Sudipta owns everything that exposes them to the app: authenticated endpoints, session binding, secure token storage, database writes, and the planning engine. They agree on each adapter's inputs and outputs before implementing it.
 
 - npm workspaces for `client` and `server`, one committed lockfile, one agreed Node LTS version. Exact dependency versions are pinned during scaffolding (DM-01).
 - `shared/contracts/` and `shared/fixtures/` are agreed by the whole team. Fixtures contain fictional Adelaide data only.
@@ -313,7 +315,7 @@ A single JSONB plan keeps the first model small. Split stops and legs into their
 
 ### Migrations
 
-- Every schema change, including access policies, is a versioned migration in `supabase/migrations/`. No undocumented dashboard edits. Shudipto owns migrations.
+- Every schema change, including access policies, is a versioned migration in `supabase/migrations/`. No undocumented dashboard edits. Sudipta owns migrations.
 - Migrations ship with access-isolation tests that prove one user cannot read or change another user's plans.
 - The team starts with one shared development Supabase project.
 

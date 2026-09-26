@@ -18,20 +18,20 @@ DayMap turns a day's activities into a geographic map and a linked planner. This
 | Person | Area | Owns | First deliverable | Reviewer |
 | --- | --- | --- | --- | --- |
 | Hannah | App layout and planner | `client/src/planner/`, `client/src/components/` | Floating event panel reading the shared sample plan | Rafid |
-| Rafid | Scaffold, shared frontend state, map | Root config, `client/src/app/`, `client/src/map/` | App shell plus an Adelaide map with selectable stops | Hannah |
-| Shudipto | Backend, Supabase, integrations | `server/`, `supabase/migrations/` | Express health endpoint, sample-plan endpoint, first database migration | Rafid |
+| Rafid | Map, external APIs, scaffold, shared frontend state | Root config, `client/src/app/`, `client/src/map/`, `server/src/integrations/` | Adelaide map with selectable stops; Google API setup and integration adapters | Hannah (UI), Sudipta (APIs) |
+| Sudipta | Backend, Supabase, authentication, persistence, planning engine | Rest of `server/`, `supabase/migrations/` | Express health and sample-plan endpoints, first database migration | Rafid |
 
 - **Ownership means coordinating, not working alone.** Agree with the owner before changing another area's component interface.
 - **Shared configuration** (`package.json`, lockfile, `.nvmrc`, lint/format config, Vite config) is coordinated by Rafid, to avoid conflicting scaffolds and lockfiles.
-- **Database migrations** are owned by Shudipto.
+- **Database migrations** are owned by Sudipta.
 - **The shared contract and fixture** (`shared/`) belong to all three.
 
-### Rebalancing the backend load
+### External API integration split
 
-The backend carries the most work, so the load shifts as each area stabilises:
-
-- Once the map works, Rafid helps connect Places and Routes (DM-07).
-- Once the planner works, Hannah builds the login, Calendar connection, and integration error screens against Shudipto's endpoints (DM-06, DM-07).
+- **Rafid** leads the external API integrations: Google Calendar, Places, Routes, and later weather. This is part of his primary responsibility, not later support. He owns provider requests and response normalisation.
+- **Sudipta** leads the backend that exposes those integrations to the app: authenticated endpoints, secure token storage, database access, validation, and scheduling.
+- Rafid and Sudipta agree on adapter inputs and outputs before implementing them.
+- **Hannah** builds the login, Calendar connection, and integration error screens alongside the planner.
 
 ## 2. Kickoff setup
 
@@ -39,15 +39,15 @@ Do this together in one short session before splitting up. Leave with one runnab
 
 | Task | Coordinator | Done when |
 | --- | --- | --- |
-| Repository access | Rafid | Hannah and Shudipto can clone and push feature branches from their own GitHub accounts |
+| Repository access | Rafid | Hannah and Sudipta can clone and push feature branches from their own GitHub accounts |
 | GitHub Project | Rafid | Board has Backlog, Ready, In progress, In review, and Done; every issue has an owner and a milestone |
 | Runtime and package manager | Rafid | One Node LTS version pinned in `.nvmrc`; everyone uses npm and the committed lockfile |
-| Scaffold and dev commands | Rafid, with Shudipto | React/Vite client and Express server start with one root command (DM-01) |
+| Scaffold and dev commands | Rafid, with Sudipta | React/Vite client and Express server start with one root command (DM-01) |
 | Shared contract and fixture | All three | Stop fields, stable IDs, missing locations, timezone, and map/card selection agreed; one fictional Adelaide sample plan committed |
 | Google Cloud project | Rafid | Maps JavaScript, Places, Routes, and Calendar APIs enabled as needed; billing/quota controls set; separate browser and server credentials |
-| Google OAuth | Shudipto | Consent screen, development test users, and exact local callback URLs configured; deployment callbacks documented once hosting is chosen |
-| Supabase development project | Shudipto | Team access, Auth configuration, first migration, row-level access policies, and a test user ready |
-| Environment templates | Rafid + Shudipto | Variable names and placeholders committed in `.env.example` files; real credentials shared privately |
+| Google OAuth | Rafid + Sudipta | Consent screen, development test users, and exact local callback URLs configured; deployment callbacks documented once hosting is chosen |
+| Supabase development project | Sudipta | Team access, Auth configuration, first migration, row-level access policies, and a test user ready |
+| Environment templates | Rafid + Sudipta | Variable names and placeholders committed in `.env.example` files; real credentials shared privately |
 | Visual conventions | Hannah | Spacing, colour, card dimensions, loading/error styles, and keyboard focus styles agreed |
 
 **Decide at kickoff:** the MVP transport mode, the Node LTS version, and everyone's GitHub username for issue assignment. The other open technical decisions and their deadlines are listed in [ARCHITECTURE.md §12](ARCHITECTURE.md#12-open-decisions).
@@ -72,15 +72,15 @@ flowchart LR
         DM01["DM-01 Scaffold and fixture<br/>Rafid"]
         DM02["DM-02 Layout and panel<br/>Hannah"]
         DM03["DM-03 3D map and stops<br/>Rafid"]
-        DM04["DM-04 Express, Auth, persistence<br/>Shudipto"]
+        DM04["DM-04 Express, Auth, persistence<br/>Sudipta"]
         DM05["DM-05 Connect map and planner<br/>Hannah + Rafid"]
     end
     subgraph B["Milestone B"]
-        DM06["DM-06 Calendar import<br/>Shudipto"]
+        DM06["DM-06 Calendar import<br/>Rafid"]
         DM07["DM-07 Places and routes<br/>Rafid"]
     end
     subgraph C["Milestone C"]
-        DM08["DM-08 Recalculate and propose<br/>Shudipto"]
+        DM08["DM-08 Recalculate and propose<br/>Sudipta"]
     end
     DM01 --> DM02 & DM03 & DM04
     DM02 & DM03 --> DM05
@@ -92,10 +92,10 @@ flowchart LR
 
 Two chains set the pace:
 
-- **Frontend:** DM-01 → DM-02 and DM-03 → DM-05 → DM-07 → DM-08.
-- **Backend:** DM-01 → DM-04 → DM-06 → DM-08.
+- **Map and journeys:** DM-01 → DM-02 and DM-03 → DM-05 → DM-07 → DM-08.
+- **Persistence and Calendar:** DM-01 → DM-04 → DM-06 → DM-08.
 
-The backend chain has the most work and depends on external setup (Supabase, Google OAuth), so that setup starts at kickoff. Frontend work continues against the shared fixture while backend work is in progress.
+The second chain depends on external setup (Supabase, Google OAuth), so that setup starts at kickoff. Frontend work continues against the shared fixture in the meantime.
 
 ### Milestone A: connected visual prototype
 
@@ -106,8 +106,8 @@ The backend chain has the most work and depends on external setup (Supabase, Goo
 | All three | Finalise the contract, scaffold, and sample data | DM-01 |
 | Hannah | Layout and planner | DM-02 |
 | Rafid | Map adapter and stop markers | DM-03 |
-| Shudipto | Backend and Supabase foundation | DM-04 |
-| Hannah + Rafid | Connect selection and editing; Shudipto checks contract compatibility | DM-05 |
+| Sudipta | Backend and Supabase foundation | DM-04 |
+| Hannah + Rafid | Connect selection and editing; Sudipta checks contract compatibility | DM-05 |
 
 **Demo:**
 
@@ -125,8 +125,9 @@ The backend chain has the most work and depends on external setup (Supabase, Goo
 
 | Who | Work | Issue |
 | --- | --- | --- |
-| Shudipto | Finish authenticated plan persistence, then Google Calendar import | DM-04, DM-06 |
-| Rafid | Location search and actual route geometry, pairing with Shudipto on the server integration | DM-07 |
+| Sudipta | Finish authenticated plan persistence, secure token storage, and endpoint support for the integrations | DM-04, DM-06 |
+| Rafid | Google Calendar authorisation and event import, pairing with Sudipta on session binding and server security | DM-06 |
+| Rafid | Location search and actual route geometry, pairing with Sudipta on the server integration | DM-07 |
 | Hannah | Login and connection states, location confirmation, travel times, error screens | UI for DM-06 and DM-07 |
 
 **Demo:** connect a test calendar, import today's events, resolve one missing location, and show actual journeys between located stops. Refresh the page and recover the saved plan.
@@ -139,7 +140,7 @@ DM-07 can be built against the fixture while DM-06 is in progress.
 
 | Who | Work | Issue |
 | --- | --- | --- |
-| Shudipto | Duration and buffer calculations, one recalculation proposal | DM-08 |
+| Sudipta | Duration and buffer calculations, one recalculation proposal | DM-08 |
 | Hannah | Proposal card with Accept and Keep current plan | UI for DM-08 |
 | Rafid | Preview affected legs on the map; help finish the end-to-end demo | Map for DM-08 |
 
@@ -155,7 +156,8 @@ Everything in the later backlog ([ARCHITECTURE.md §1](ARCHITECTURE.md#not-in-th
 
 | Risk | Mitigation |
 | --- | --- |
-| Backend work (DM-04, DM-06, DM-08) becomes the bottleneck | Start Supabase and OAuth setup at kickoff; Rafid and Hannah pick up Places/Routes and integration UI ([§1](#rebalancing-the-backend-load)); frontend keeps working against fixtures |
+| Rafid owns four issues (DM-01, DM-03, DM-06, DM-07), so Milestone B hinges on him | Start Google Cloud and OAuth setup at kickoff; Sudipta pairs on the server side of DM-06 and DM-07 ([§1](#external-api-integration-split)); DM-07 can start on the fixture before DM-06 lands |
+| Integration adapters and backend endpoints don't fit together | Rafid and Sudipta agree adapter inputs and outputs before implementing; the frontend keeps working against fixtures |
 | 3D map is missing or slow at demo locations or on the demo laptop | Check coverage and performance early in DM-03; keep a 2D or retry fallback |
 | Google OAuth setup delays Calendar import | Configure the consent screen and test users at kickoff; Milestone A and demo mode need no Calendar |
 | Unexpected Google API costs | Billing and quota controls at kickoff; debounce searches and edits; bound retries |
@@ -178,11 +180,11 @@ Everything in the later backlog ([ARCHITECTURE.md §1](ARCHITECTURE.md#not-in-th
 | [DM-01](#dm-01-scaffold-the-app-and-publish-the-shared-plan-fixture) | Scaffold the app and publish the shared plan fixture | Rafid | All three (contract) | A | P0 | None |
 | [DM-02](#dm-02-build-the-map-page-layout-and-floating-event-panel) | Build the map-page layout and floating event panel | Hannah | | A | P0 | DM-01 |
 | [DM-03](#dm-03-render-the-adelaide-3d-map-and-selectable-stops) | Render the Adelaide 3D map and selectable stops | Rafid | | A | P0 | DM-01, map credentials |
-| [DM-04](#dm-04-set-up-express-supabase-auth-and-plan-persistence) | Set up Express, Supabase Auth, and plan persistence | Shudipto | | A (foundation), B (persistence) | P0 | DM-01, Supabase setup |
+| [DM-04](#dm-04-set-up-express-supabase-auth-and-plan-persistence) | Set up Express, Supabase Auth, and plan persistence | Sudipta | | A (foundation), B (persistence) | P0 | DM-01, Supabase setup |
 | [DM-05](#dm-05-connect-map-and-planner-into-one-usable-flow) | Connect map and planner into one usable flow | Hannah | Rafid (pair) | A | P0 | DM-02, DM-03 |
-| [DM-06](#dm-06-connect-google-calendar-and-import-todays-events) | Connect Google Calendar and import today's events | Shudipto | Hannah (UI) | B | P1 | DM-04, OAuth setup |
-| [DM-07](#dm-07-resolve-places-and-draw-actual-journeys) | Resolve places and draw actual journeys | Rafid | Shudipto (server), Hannah (UI) | B | P1 | DM-05, DM-04 integration interface |
-| [DM-08](#dm-08-recalculate-the-remaining-day-and-offer-one-change) | Recalculate the remaining day and offer one change | Shudipto | Hannah (UI), Rafid (map) | C | P1 | DM-06, DM-07 |
+| [DM-06](#dm-06-connect-google-calendar-and-import-todays-events) | Connect Google Calendar and import today's events | Rafid | Sudipta (backend/security), Hannah (UI) | B | P1 | DM-04, OAuth setup |
+| [DM-07](#dm-07-resolve-places-and-draw-actual-journeys) | Resolve places and draw actual journeys | Rafid | Sudipta (server), Hannah (UI) | B | P1 | DM-05, DM-04 integration interface |
+| [DM-08](#dm-08-recalculate-the-remaining-day-and-offer-one-change) | Recalculate the remaining day and offer one change | Sudipta | Hannah (UI), Rafid (map) | C | P1 | DM-06, DM-07 |
 
 ### DM-01: Scaffold the app and publish the shared plan fixture
 
@@ -260,7 +262,7 @@ Everything in the later backlog ([ARCHITECTURE.md §1](ARCHITECTURE.md#not-in-th
 
 - Connect both surfaces through the shared provider.
 - Implement the place-popover-to-add-event interaction.
-- Shudipto checks contract compatibility.
+- Sudipta checks contract compatibility.
 
 **Acceptance criteria**
 
@@ -271,11 +273,13 @@ Everything in the later backlog ([ARCHITECTURE.md §1](ARCHITECTURE.md#not-in-th
 
 ### DM-06: Connect Google Calendar and import today's events
 
-**Labels:** `backend`, `integration`
+**Labels:** `integration`, `backend`
 
 **Scope**
 
-- Read-only Calendar authorisation, primary-calendar import, token handling, and a normaliser that returns DayMap stops ([ARCHITECTURE.md §8](ARCHITECTURE.md#8-google-calendar-integration)).
+- Rafid: the Google OAuth/API adapter, primary-calendar import, and an event normaliser that returns DayMap stops.
+- Sudipta: authenticated routes, session-bound callback state, encrypted token storage, and persistence.
+- Read-only Calendar access throughout ([ARCHITECTURE.md §8](ARCHITECTURE.md#8-google-calendar-integration)).
 
 **Acceptance criteria**
 
