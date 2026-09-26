@@ -3,15 +3,13 @@ import { createPortal } from 'react-dom'
 import { usePlan } from '../app/planContext.js'
 import { formatClock, formatDuration } from '../components/formatTime.js'
 import '../components/buttons.css'
-import { loadMapsLibrary } from '../services/googleMaps.js'
 import { TRAVEL_BUFFERS, chooseMode } from '../services/planningContext.js'
-import { createTransitOptionsProvider } from '../services/transitOptions.js'
 import { directionsUrl } from '../trip/tripRules.js'
 import { MODE_WORDS } from './stopLabels.js'
+import LineBadge from './LineBadge.jsx'
 import TravelModeIcon from './TravelModeIcon.jsx'
 import './JourneyPopup.css'
 
-const transitOptions = createTransitOptionsProvider(loadMapsLibrary)
 const MAX_SERVICES = 5
 const MODE_TITLES = { walk: 'Walk', transit: 'Public transport', drive: 'Car' }
 const MODE_NOTES = {
@@ -24,11 +22,6 @@ function estimateText(estimate) {
   if (estimate?.status === 'ready') return formatDuration(Math.max(1, Math.ceil(estimate.travelSeconds / 60)))
   if (estimate?.status === 'unavailable') return estimate.reason === 'no-route' ? 'No route' : 'Unavailable'
   return 'Checking…'
-}
-
-function LineBadge({ ride }) {
-  const style = ride.color ? { background: ride.color, color: ride.textColor ?? '#fff' } : undefined
-  return <span className="journey-line" style={style}>{ride.name}</span>
 }
 
 function Service({ option, timezone }) {
@@ -99,22 +92,13 @@ export default function JourneyPopup({ from, to, planning, onClose }) {
   const previousLeg = planning.analysis.legs.find((leg) => leg.toStopId === from.id && leg.status === 'ready')
   const carElsewhere = previousLeg && previousLeg.mode !== 'drive'
 
-  const key = `${from.location.lat},${from.location.lng}>${to.location.lat},${to.location.lng}@${departAt}`
-  const [services, setServices] = useState({ key: null, status: 'loading', options: [] })
-  const { requestAllModes } = planning
+  const { requestAllModes, requestTransit } = planning
   useEffect(() => {
     requestAllModes(from, to)
-  }, [requestAllModes, from, to])
-  useEffect(() => {
-    if (!live || !departAt) return undefined
-    let active = true
-    transitOptions({ from: from.location, to: to.location, departAt }).then(
-      (options) => { if (active) setServices({ key, status: 'ready', options }) },
-      () => { if (active) setServices({ key, status: 'error', options: [] }) },
-    )
-    return () => { active = false }
-  }, [live, key, departAt, from.location, to.location])
-  const shownServices = services.key === key ? services : { status: 'loading', options: [] }
+    requestTransit(from, to)
+  }, [requestAllModes, requestTransit, from, to])
+  const services = planning.transitServicesFor(from, to)
+  const shownServices = { ...services, status: services.status === 'ready' || services.status === 'error' ? services.status : 'loading' }
 
   useEffect(() => {
     const opener = document.activeElement

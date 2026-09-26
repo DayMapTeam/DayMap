@@ -5,11 +5,14 @@ import { listStopChanges } from './planEdits.js'
 import { chooseMode, chooseTravelProvider, createPlanningContext } from '../services/planningContext.js'
 import { createWalkingRouteStore } from '../services/walkingRouteStore.js'
 import { createRoutesProvider } from '../services/walkingRoutes.js'
+import { createTransitOptionsProvider } from '../services/transitOptions.js'
+import { createTransitStore } from '../services/transitStore.js'
 import { loadMapsLibrary, mapsApiKey } from '../services/googleMaps.js'
 import { buildTimeline, stopInterval } from '../../../shared/planning/timeline.js'
 import { gapRoutePairs } from '../../../shared/planning/proposals.js'
 
 const googleRoutes = createRoutesProvider(loadMapsLibrary)
+const googleTransit = createTransitOptionsProvider(loadMapsLibrary)
 
 export function usePlanAnalysis(plan, draft, now) {
   const shown = draft?.plan ?? plan
@@ -18,6 +21,8 @@ export function usePlanAnalysis(plan, draft, now) {
   const preference = 'auto'
   const [routes] = useState(() => createWalkingRouteStore(googleRoutes))
   const results = useSyncExternalStore(routes.subscribe, routes.getSnapshot)
+  const [transit] = useState(() => createTransitStore(googleTransit))
+  const transitResults = useSyncExternalStore(transit.subscribe, transit.getSnapshot)
   const ctx = useMemo(() => createPlanningContext(shown, now, draft?.editedStopIds,
     provider === 'google' ? (from, to, options) => routes.lookup(from, to, { ...options, results }) : undefined, preference),
   [shown, now, draft?.editedStopIds, provider, routes, results, preference])
@@ -76,6 +81,20 @@ export function usePlanAnalysis(plan, draft, now) {
     const departAt = departureFor(from)
     return Object.fromEntries(['walk', 'transit', 'drive'].map((mode) => [mode, ctx.travel(from, to, { mode, departAt })]))
   }, [ctx, departureFor])
+  // Buses and trains for one journey, shared by the planner line and the popup.
+  const transitServicesFor = useCallback((from, to) => transit.lookup(from.location, to.location, departureFor(from), transitResults),
+    [transit, transitResults, departureFor])
+  const requestTransit = useCallback((from, to) => {
+    if (provider === 'google') transit.request(from.location, to.location, departureFor(from))
+  }, [provider, transit, departureFor])
+  useEffect(() => {
+    for (const leg of analysis.legs) {
+      if (leg.status !== 'ready' || leg.mode !== 'transit') continue
+      const from = shown.stops.find((stop) => stop.id === leg.fromStopId)
+      const to = shown.stops.find((stop) => stop.id === leg.toStopId)
+      if (from && to) requestTransit(from, to)
+    }
+  }, [analysis.legs, shown, requestTransit])
   const requestAllModes = useCallback((from, to) => {
     if (provider !== 'google') return
     const departAt = departureFor(from)
@@ -92,5 +111,5 @@ export function usePlanAnalysis(plan, draft, now) {
     provider, loadingRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'pending'),
     failedRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'unavailable'),
     retryRoutes: routes.retryFailures, checkAlternatives, checkGapRoutes, requestJourneys,
-    departureFor, journeyEstimates, requestAllModes }
+    departureFor, journeyEstimates, requestAllModes, transitServicesFor, requestTransit }
 }

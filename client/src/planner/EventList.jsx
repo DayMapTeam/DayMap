@@ -4,6 +4,7 @@ import { listStopChanges } from '../app/planEdits.js'
 import { calendarLocationText, locationQuestionFor, placeStatus } from '../app/planLocations.js'
 import EventRow from './EventRow.jsx'
 import JourneyPopup from './JourneyPopup.jsx'
+import { journeySummary, pickService } from './journeySummary.js'
 import TravelConnector from './TravelConnector.jsx'
 import FreeTimeGap, { GapPreview } from './FreeTimeGap.jsx'
 import './EventList.css'
@@ -97,6 +98,13 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
     onOpenStopChange(null)
   }
 
+  const legBetween = (from, to) => analysis.legs.find((leg) => leg.fromStopId === from.id && leg.toStopId === to.id)
+  const summaryBetween = (from, to) => {
+    const leg = legBetween(from, to)
+    const service = leg?.mode === 'transit' && from.location && to.location ? pickService(planning.transitServicesFor(from, to)) : null
+    return journeySummary(leg, service, shown.timezone)
+  }
+
   // Looked up by ID each render, so the popup shows the current plan (for example after choosing a mode).
   const journeyFrom = journey && shown.stops.find((candidate) => candidate.id === journey.fromId)
   const journeyTo = journey && shown.stops.find((candidate) => candidate.id === journey.toId)
@@ -114,7 +122,8 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
           return <li key={stop.id}>
             {/* While filtering, neighbours in the list may not be neighbours in the day. */}
             {index > 0 && !filtering && <TravelConnector
-              leg={analysis.legs.find((leg) => leg.fromStopId === stops[index - 1].id && leg.toStopId === stop.id)}
+              leg={legBetween(stops[index - 1], stop)}
+              summary={summaryBetween(stops[index - 1], stop)}
               onOpen={stops[index - 1].location && stop.location && stops[index - 1].timing.kind !== 'all-day' && stop.timing.kind !== 'all-day'
                 ? () => setJourney({ fromId: stops[index - 1].id, toId: stop.id }) : null} />}
             {gap && <FreeTimeGap gap={gap} planning={planning}
