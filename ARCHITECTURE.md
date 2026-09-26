@@ -206,17 +206,16 @@ Each journey line reads like a Google Maps route summary (issue #46): the mode i
 
 **Adding a stop (issue #42)** uses the same estimates. A flexible stop starts once you can get there from the stop before it (travel + buffer, rounded to five minutes); later flexible stops move only as far as their own journeys need, and fixed stops never move. A fixed new stop keeps its time and says how late the journey there would make you. The add sheet requests missing journeys, says "Checking travel time…" while they load, and names what it allowed for. The reducer commits with the same planning context as the preview, so the result is what was shown. Unknown travel counts as zero only in the fit and is always reported.
 
-### Trip mode (issue #29)
+### Trip mode (issues #29, #48)
 
-`client/src/trip/` guides the person from stop to stop. The rules in `tripRules.js` are pure and unit-tested; `useTrip` feeds each position reading through them once.
+`client/src/trip/` guides the person from stop to stop. The rules in `tripRules.js` are pure and unit-tested; `useTrip` feeds each position reading through them once. The map stays passive; the planner is the main surface.
 
-- **Next stop** is the next planned, located, timed stop in the *accepted* plan after the stop the person is at (or the first that has not ended). **Go** starts a trip to it; **Directions** in a pin's popup starts one to any navigable stop.
-- **Leaving** the stop you are at (beyond ~150 m for three consecutive readings) starts directions to the next stop, with **Cancel**. A cancelled or declined start waits until the person returns and leaves again. Leaving more than 15 minutes before the stop ends asks "Heading to …?" instead. Nothing starts after the last stop.
-- **Arriving** (within ~50 m for two consecutive readings, or **I'm here**) ends the trip, shows a short message, and records that stop as where the person is. GPS accuracy widens both circles by up to 50 m; readings worse than 200 m are ignored.
-- **Privacy.** Location starts only after a tap (**Go** on a live day, or **Use my location**). Positions stay in memory and are never saved to the plan, the server, storage or logs. Only the opt-in is remembered, and it resumes on load only when the browser already granted permission.
-- **Plan data.** Trip state is UI state. It never edits the plan, the draft or the version; marking a stop completed stays an explicit action. The planner is not changed by a trip.
-- **Guidance.** A website cannot use Google's turn-by-turn navigation, and cannot read location while the tab is closed or the phone is locked. The trip card shows straight-line distance, compass direction and a rough walking ETA against the stop's start, and hands off to Google Maps (a plain link, no API request) for turn-by-turn directions. Route geometry on the map arrives with #26.
-- **Demo.** On demo plans, **Simulate walk** moves a dashed "you are here" marker in a straight line at 15× walking speed through the same rules. The demo day never asks for real location.
+- **Go.** The bottom left of the map shows only a Go button. Go heads to the next planned, located, timed stop in the *accepted* plan after the stop the person is at (or the first that has not ended), so an event just added into a gap is next. If the person is already at that place (by position, or because the stop they are at is in the same place) Go just records it and the map doesn't move. **Directions** in a pin's popup starts a trip to any navigable stop. During a trip the same spot shows a slim bar: destination, **I'm here**, **Recenter** (after the map was moved) and **×**.
+- **Location** is watched for as long as DayMap is open; the browser asks for permission when the app opens. Denied or unavailable location keeps Go and **I'm here** working. Positions stay in memory and are never saved to the plan, the server, storage or logs.
+- **Leaving** where you are settled — the stop you are at, or otherwise the first place DayMap saw you, such as home — by more than ~150 m for three consecutive readings starts directions to the next stop straight away, with a short **Cancel** notice. A cancelled start waits until the person returns and leaves again. Nothing starts after the last stop.
+- **Arriving** (within ~50 m for two consecutive readings, or **I'm here**) ends the trip and the camera flies back to where it was. Reaching a stop without a trip also records it. GPS accuracy widens both circles by up to 50 m; readings worse than 200 m are ignored.
+- **Plan data.** Trip state is UI state. It never edits the plan, the draft or the version; marking a stop completed stays an explicit action.
+- **Guidance.** A website cannot use Google's turn-by-turn navigation or read location while the tab is closed or the phone is locked. The camera follows the person heading-up during a trip; the journey popup hands off to Google Maps for turn-by-turn directions.
 
 ### `MapView` adapter
 
