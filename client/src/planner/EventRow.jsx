@@ -21,11 +21,13 @@ const KIND_NOTES = {
  * @param {boolean} props.open
  * @param {boolean} props.past Whether the stop has already ended.
  * @param {boolean} props.changed Whether the draft changes this stop.
+ * @param {boolean} props.added Whether the stop was just added.
  * @param {number | null} props.flashKey Changes each time "View in planner" reveals this row.
  * @param {(stopId: string) => void} props.onToggle
  * @param {(stopId: string, edit: object) => void} props.onSave
+ * @param {(stopId: string) => void} props.onDelete
  */
-export default function EventRow({ stop, date, timezone, selected, open, past, changed, flashKey, onToggle, onSave }) {
+export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onDelete }) {
   const { timing } = stop
   const detailsId = `stop-details-${stop.id}`
   const hasTimes = timing.scheduledStartAt !== null && timing.scheduledEndAt !== null
@@ -60,6 +62,7 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
           <span className="event-row-name">
             {stop.title}
             {changed && <span className="event-row-changed">Changed</span>}
+            {added && <span className="event-row-new">New</span>}
           </span>
           <span className="event-row-details">{details.join(' · ')}</span>
         </span>
@@ -81,6 +84,7 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
               date={date}
               timezone={timezone}
               onSave={(edit) => onSave(stop.id, edit)}
+              onDelete={() => onDelete(stop.id)}
               onCancel={() => onToggle(stop.id)}
             />
           ) : (
