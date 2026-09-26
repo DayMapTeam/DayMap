@@ -1,6 +1,6 @@
 # DayMap frontend
 
-React + JavaScript + Vite. The page shows an Adelaide 3D map, a floating planner, and browser Places search. The planner uses fictional sample data without login or a backend. Map rendering and place search require a restricted Google browser key.
+React + JavaScript + Vite. The page shows an Adelaide 3D map, a floating planner, and browser Places search. Signed out, the planner uses a fictional demo day with no backend. Signed in, it loads and saves the real day through the Express API (see **Sign-in and saved days**). Map rendering and place search require a restricted Google browser key.
 
 ## Run locally
 
@@ -21,6 +21,23 @@ npm run build
 ```
 
 There are no root npm scripts yet. Tests use Node's built-in test runner and introduce no additional dependencies. Lint includes the shared fixture outside `client/`; Vite allows that directory during development.
+
+## Sign-in and saved days
+
+Sign-in uses Supabase Auth in the browser; plan data goes through Express only.
+
+1. Put the shared Supabase project's `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in ignored `client/.env.local` (never a secret key), and the matching `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` in `server/.env` (see `server/PERSISTENCE.md`).
+2. In Supabase → Authentication → URL Configuration, add `http://localhost:5173` to the redirect URLs. Email + password works out of the box; **Continue with Google** also needs the Google provider enabled under Authentication → Providers.
+3. Run the server (`npm --prefix server run dev`) and the client. Vite proxies `/api` to `http://localhost:3001`; set `VITE_API_BASE_URL` only when the API is on another origin.
+
+What to expect:
+
+- Signed in, DayMap loads today's plan (browser timezone) or starts an empty day. Nothing is written until the first accepted change.
+- Each accepted change (add, delete, accept draft) is saved against the server's version, one request at a time. The header shows **Saving…**, **Saved** or **Not saved**. Drafts are never saved.
+- If the day changed in another tab or device, saving stops and a banner offers **Load latest** or **Keep mine**. Neither happens without a click.
+- Place IDs and journeys are not saved (provider retention, ARCHITECTURE §12); coordinates are, and journeys are recalculated on load.
+- Signed out, demo-day edits survive a refresh in this tab (sessionStorage) and never reach the server. **Reset demo day** in the account menu restores the fixture.
+- Without the Supabase variables the account menu says sign-in isn't set up, and the demo still works.
 
 ## Google setup and place search
 
@@ -82,7 +99,7 @@ import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 
 ## Shared state for Hannah's planner and Rafid's map
 
-`src/main.jsx` wraps the app once in `PlanProvider`. The `initialPlan` prop seeds a cloned snapshot on mount; later prop changes do not replace the plan. Future data loading/replacement needs a deliberate reducer action. Do not mutate `plan` or create a second provider around each surface.
+`src/main.jsx` wraps the app once in `PlanProvider`. The `initialPlan` prop seeds a cloned snapshot on mount; later prop changes do not replace the plan. Loading a different day (sign-in, sign-out, a conflict's **Load latest**) uses the `loadPlan(plan)` action, which also clears the draft and selection. Do not mutate `plan` or create a second provider around each surface.
 
 Both surfaces consume `usePlan()`:
 

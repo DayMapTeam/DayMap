@@ -1,0 +1,47 @@
+.sync-chip {
+  padding: 2px var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+  white-space: nowrap;
+  background: var(--fill);
+  border-radius: var(--radius-pill);
+}
+
+.sync-chip-saved {
+  color: var(--green-ink);
+  background: var(--green-tint);
+}
+
+.sync-chip-error,
+.sync-chip-conflict,
+.sync-chip-load-error {
+  color: var(--red-ink);
+  background: var(--red-tint);
+}
+
+/* Centred under the header, above the map, clear of the planner on desktop. */
+.sync-banner {
+  position: absolute;
+  top: var(--overlay-top);
+  left: 50%;
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(520px, calc(100vw - 2 * var(--overlay-inset)));
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  transform: translateX(-50%);
+}
+
+.sync-banner-text {
+  flex: 1 1 220px;
+  font-size: 14px;
+}
+
+.sync-banner-actions {
+  display: flex;
+  gap: var(--space-2);
+}

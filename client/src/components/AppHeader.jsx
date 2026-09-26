@@ -11,8 +11,9 @@ import './AppHeader.css'
  * @param {'demo' | 'live'} props.dataMode
  * @param {Date} props.now The planner's current time.
  * @param {boolean} props.isDemoTime Whether `now` is the fixed demo clock.
+ * @param {import('react').ReactNode} [props.children] Account and save controls, at the right.
  */
-export default function AppHeader({ date, timezone, dataMode, now, isDemoTime }) {
+export default function AppHeader({ date, timezone, dataMode, now, isDemoTime, children }) {
   return (
     <header className="app-header glass">
       <div className="app-header-logo">
@@ -29,6 +30,7 @@ export default function AppHeader({ date, timezone, dataMode, now, isDemoTime })
         {formatClock(now, timezone)}
         {isDemoTime && <span className="app-header-demo-time"> · demo time</span>}
       </time>
+      {children}
     </header>
   )
 }

@@ -184,6 +184,10 @@ export function planReducer(state, action) {
       return addStop(state, action)
     case 'undo-add':
       return undoAdd(state, action)
+    case 'load-plan':
+      // A different day (or a signed-in user's saved day) replaces everything,
+      // including a pending draft, which was built on the old plan.
+      return createPlanState(action.plan)
     default:
       return state
   }

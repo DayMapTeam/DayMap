@@ -1,7 +1,7 @@
 # DayMap API
 
 This Express server provides public health and demo endpoints plus authenticated
-day-plan persistence. The frontend on `origin/main` does not yet call the plan API.
+day-plan persistence. Signed-in frontend users load and save their day through the plan API.
 
 ## Local setup
 

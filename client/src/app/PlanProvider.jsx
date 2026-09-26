@@ -34,6 +34,9 @@ export function PlanProvider({ initialPlan, children }) {
   const undoAdd = useCallback((stopId) => {
     dispatch({ type: 'undo-add', stopId })
   }, [])
+  const loadPlan = useCallback((plan) => {
+    dispatch({ type: 'load-plan', plan })
+  }, [])
   const value = useMemo(() => ({
     plan: state.plan,
     draft: state.draft,
@@ -49,7 +52,8 @@ export function PlanProvider({ initialPlan, children }) {
     discardDraft,
     addStop,
     undoAdd,
-  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd])
+    loadPlan,
+  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, loadPlan])
 
   return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>
 }

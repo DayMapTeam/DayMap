@@ -60,3 +60,13 @@ test('fixture has unique IDs, valid coordinates and consistent UTC visit times',
     }
   }
 })
+
+test('loading a plan replaces the day and drops the draft and selection', () => {
+  const selected = planReducer(createPlanState(demoPlan), { type: 'select-stop', stopId: demoPlan.stops[1].id })
+  const loaded = { ...demoPlan, id: 'another-day', stops: [] }
+  const next = planReducer(selected, { type: 'load-plan', plan: loaded })
+  assert.deepEqual(next.plan, loaded)
+  assert.notEqual(next.plan, loaded, 'the provider keeps its own copy')
+  assert.equal(next.selectedStopId, null)
+  assert.equal(next.draft, null)
+})
