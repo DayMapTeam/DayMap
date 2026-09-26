@@ -124,7 +124,7 @@ supabase/migrations/    # Versioned SQL schema and access policies (Sudipta)
 
 Area owners are listed in [CONTRIBUTING.md §1](CONTRIBUTING.md#1-team-and-ownership).
 
-**Backend stage 1:** `server/src/app.js` and `server/src/index.js` now provide application construction and server startup. They sit above `routes/`, which is reserved for endpoint handlers. Other backend directories and endpoints remain planned and should be added with their features. See [server/README.md](server/README.md) for current commands. Client and server currently have separate packages/lockfiles; root workspaces remain a scaffold follow-up.
+**Backend foundation:** `server/src/app.js` and `server/src/index.js` now provide application construction and server startup. They sit above `routes/`, which is reserved for endpoint handlers. `routes/health.js` and `routes/demoPlan.js` implement the two public endpoints, with exact-origin CORS and shared JSON error handling. Other backend directories and endpoints remain planned and should be added with their features. See [server/README.md](server/README.md) for current commands. Client and server currently have separate packages/lockfiles; root workspaces remain a scaffold follow-up.
 
 ## 4. Frontend
 
@@ -279,7 +279,7 @@ const dayPlan = {
 
 ### Endpoints
 
-These endpoints are proposed, starting with DM-04.
+`GET /api/health` and `GET /api/demo-plan` are implemented. The remaining endpoints are proposed, starting with DM-04.
 
 | Endpoint | Purpose | Issue |
 | --- | --- | --- |
