@@ -175,18 +175,6 @@
   gap: var(--space-2);
 }
 
-.journey-line {
-  display: inline-block;
-  min-width: 28px;
-  padding: 1px 6px;
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
-  color: var(--on-accent);
-  background: var(--label-2);
-  border-radius: 6px;
-}
-
 .journey-service-vehicle {
   font-size: 14px;
   font-weight: 600;
@@ -236,7 +224,7 @@
   text-decoration: none;
 }
 
-.journey-step .journey-line,
+.journey-step .line-badge,
 .journey-step .travel-mode-icon {
   flex: none;
 }
