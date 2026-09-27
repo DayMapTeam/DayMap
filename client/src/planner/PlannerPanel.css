@@ -22,15 +22,21 @@
   display: none;
 }
 
+/* The add form fills the planner in place. Only while navigating, when the
+   planner is hidden, does it float over the map as a dialog. */
 .planner-backdrop {
+  display: none;
+}
+
+.app[data-navigating] .planner-backdrop {
   position: absolute;
   inset: 0;
   z-index: 18;
+  display: block;
   background: rgba(12, 19, 33, 0.32);
 }
 
-/* The same add dialog opens from search, the planner, and a test run. */
-.planner[data-takeover='true'] {
+.app[data-navigating] .planner[data-takeover='true'] {
   top: 50%;
   right: auto;
   bottom: auto;
@@ -223,7 +229,7 @@
     height: min(76dvh, calc(100% - var(--header-height) - var(--space-2)));
   }
 
-  .planner[data-takeover='true'] {
+  .app[data-navigating] .planner[data-takeover='true'] {
     top: auto;
     right: 0;
     bottom: 0;

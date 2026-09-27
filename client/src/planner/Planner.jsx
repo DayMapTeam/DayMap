@@ -65,6 +65,7 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   if (addPlaceRequest !== handledAddPlace) {
     setHandledAddPlace(addPlaceRequest)
     if (addPlaceRequest && canAdd) {
+      setOpen(true)
       setOpenStopId(null)
       setSheetPlace(addPlaceRequest.place)
       setSheetKind('event')
@@ -75,7 +76,7 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   if (runRequest !== handledRunRequest) {
     setHandledRunRequest(runRequest)
     if (runRequest) {
-      if (runRequest.kind === 'open') setOpen(true)
+      setOpen(true)
       setOpenStopId(null)
       if (runRequest.kind !== 'open' && canAdd) {
         setSheetPlace(null)
@@ -106,6 +107,7 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
       if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented || isTyping(event.target)) return
       if (!canAdd) return
       event.preventDefault()
+      setOpen(true)
       setOpenStopId(null)
       if (sheetKey === null) setSheetPlace(null)
       if (sheetKey === null) setSheetKind('event')
@@ -138,6 +140,7 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   }, [removeKey])
 
   function openSheet() {
+    setOpen(true)
     setOpenStopId(null)
     setSheetPlace(null)
     setSheetKind('event')
