@@ -5,7 +5,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: var(--overlay-inset);
+  padding: var(--overlay-top) var(--overlay-inset) var(--overlay-inset);
   background: var(--scrim);
 }
 
@@ -17,10 +17,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  width: min(440px, 100%);
-  max-height: calc(100dvh - 2 * var(--overlay-inset));
-  overflow: hidden;
-  padding: var(--space-5);
+  width: min(var(--panel-width), 100%);
+  height: 100%;
+  min-height: 0;
+  /* Only the body scrolls; focusing a service must not scroll the dialog. */
+  overflow: clip;
+  padding: var(--space-4);
   background: var(--glass-strong);
   border-radius: var(--radius-panel);
 }
@@ -94,6 +96,7 @@
 }
 
 .journey-mode {
+  position: relative;
   display: grid;
   grid-template-columns: 32px 1fr auto;
   gap: var(--space-3);
@@ -186,6 +189,8 @@
 }
 
 .journey-service-head {
+  /* Keep the hidden radio inside its card when the service list scrolls. */
+  position: relative;
   display: grid;
   gap: 2px;
   min-width: 0;
