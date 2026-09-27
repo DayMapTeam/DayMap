@@ -209,8 +209,9 @@ function NavBar({ trip, navigation, voice, now, timezone, reading, following, ha
  * @param {boolean} props.following Whether the camera follows you.
  * @param {boolean} props.hasPosition Whether your location is known.
  * @param {() => void} props.onRecenter
+ * @param {import('react').ReactNode} props.recoveryControl Compact departure/recovery disclosure.
  */
-export default function TripDock({ trip, navigation, voice, now, timezone, reading, onGo, following, hasPosition, onRecenter }) {
+export default function TripDock({ trip, navigation, voice, now, timezone, reading, onGo, following, hasPosition, onRecenter, recoveryControl }) {
   const { target, next } = trip
   if (target) {
     return (
@@ -218,6 +219,7 @@ export default function TripDock({ trip, navigation, voice, now, timezone, readi
         <NavBanner navigation={navigation} timezone={timezone} destination={target.title} />
         <div className="trip-dock trip-dock-navigating">
           <TripToast trip={trip} />
+          {recoveryControl}
           <NavBar {...{ trip, navigation, voice, now, timezone, reading, following, hasPosition, onRecenter }} />
         </div>
       </>
@@ -226,6 +228,7 @@ export default function TripDock({ trip, navigation, voice, now, timezone, readi
   return (
     <div className="trip-dock">
       <TripToast trip={trip} />
+      {recoveryControl}
       {next && (
         <button type="button" className="trip-go" aria-label={`Go to ${next.title}`} title={`Go to ${next.title}`} onClick={() => onGo(next.id)}>
           Go
