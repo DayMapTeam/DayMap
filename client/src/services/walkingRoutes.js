@@ -23,10 +23,6 @@ export function routePairKey(from, to, { mode = 'walk', departAt = null } = {}) 
   return departure ? JSON.stringify([mode, origin, destination, departure]) : null
 }
 
-export function walkingPairKey(from, to) {
-  return routePairKey(from, to)
-}
-
 /** Injectable loader keeps provider objects and credentials out of engine/tests. */
 export function createRoutesProvider(loadLibrary) {
   return async (from, destinations, { mode = 'walk', departAt = null } = {}) => {
@@ -49,8 +45,6 @@ export function createRoutesProvider(loadLibrary) {
     })
   }
 }
-
-export const createWalkingRoutesProvider = createRoutesProvider
 
 export function routeErrorReason(error) {
   const message = String(error?.code ?? '') + ' ' + String(error?.message ?? '')

@@ -4,7 +4,9 @@ import { demoPlan } from '../../../shared/fixtures/demoPlan.js'
 import { analyzePlan } from '../../../shared/planning/analyze.js'
 import { suggestFix } from '../../../shared/planning/proposals.js'
 import { createPlanState, planReducer } from '../app/planReducer.js'
-import { chooseMode, createPlanningContext, demoEstimate, demoWalkingEstimate } from './planningContext.js'
+import { chooseMode, createPlanningContext, demoEstimate } from './planningContext.js'
+
+const demoWalkingEstimate = (from, to) => demoEstimate(from, to, { mode: 'walk' })
 
 const now = new Date('2026-09-26T00:20:00Z') // 9:50 Adelaide demo time
 

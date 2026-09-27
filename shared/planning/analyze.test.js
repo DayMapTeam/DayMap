@@ -38,11 +38,52 @@ test('buffer shortfall is a warning, exact fit is neither warning nor free time'
 test('free time is after travel and buffer, at the destination', () => {
   const result = analyzePlan(plan, context(10))
   assert.deepEqual(result.freeTime, [{
-    id: 'free:a:b', fromStopId: 'a', toStopId: 'b', locationStopId: 'b',
+    id: 'free:a:b', fromStopId: 'a', toStopId: 'b', locationStopId: 'b', placement: 'after-travel',
     startAt: at(45), endAt: at(60), minutes: 15, provider: 'demo',
   }])
   assert.equal(analyzePlan(plan, context(11)).freeTime.length, 0)
   assert.equal(result.summary.freeMinutes, 15)
+})
+
+test('leaving just in time puts the free time before travel, at the origin', () => {
+  const late = structuredClone(plan)
+  late.stops[1].leaveTiming = 'late'
+  const result = analyzePlan(late, context(10))
+  assert.equal(result.legs[0].departAt, at(45))
+  assert.equal(result.legs[0].arriveAt, at(55))
+  assert.equal(result.legs[0].spareSeconds, 0)
+  assert.deepEqual(result.freeTime, [{
+    id: 'free:a:b', fromStopId: 'a', toStopId: 'b', locationStopId: 'a', placement: 'before-travel',
+    startAt: at(30), endAt: at(45), minutes: 15, provider: 'demo',
+  }])
+  // The departure lands on a five-minute mark; the rest stays as slack.
+  const odd = analyzePlan(late, context(8))
+  assert.equal(odd.legs[0].departAt, at(45))
+  assert.equal(odd.freeTime[0].minutes, 15)
+  // Nothing spare: no conflict is hidden, and the journey leaves when `a` ends.
+  const tight = analyzePlan(late, context(28))
+  assert.equal(tight.conflicts[0].code, 'tight')
+  assert.equal(tight.legs[0].departAt, at(30))
+})
+
+test('leaving just in time rechecks public transport at the later departure', () => {
+  const late = structuredClone(plan)
+  late.stops[1].leaveTiming = 'late'
+  // Services are slower later: 10 min at 30, 20 min at 45, 15 min at 35.
+  const minutes = { [at(30)]: 10, [at(45)]: 20, [at(35)]: 15 }
+  const ctx = { ...context(), modeFor: () => 'transit',
+    travel: (from, to, { departAt }) => departAt in minutes
+      ? { status: 'ready', travelSeconds: minutes[departAt] * 60, provider: 'google', timeDependent: true, departAt }
+      : { status: 'pending' } }
+  const result = analyzePlan(late, ctx)
+  assert.equal(result.legs[0].departAt, at(35))
+  assert.equal(result.legs[0].travelSeconds, 900)
+  assert.equal(result.freeTime[0].endAt, at(35))
+  // A later departure not yet looked up is requested, and meanwhile the journey leaves early.
+  delete minutes[at(35)]
+  const waiting = analyzePlan(late, ctx)
+  assert.equal(waiting.legs[0].departAt, at(30))
+  assert.deepEqual(waiting.pending, [{ fromStopId: 'a', toStopId: 'b', mode: 'transit', departAt: at(35) }])
 })
 
 test('missing location and unavailable routes never become zero-time journeys', () => {

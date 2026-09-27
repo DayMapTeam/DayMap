@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createRoutesProvider, createWalkingRoutesProvider, routeLocation, routePairKey, walkingPairKey } from './walkingRoutes.js'
+import { createRoutesProvider, routeLocation, routePairKey } from './walkingRoutes.js'
 import { createWalkingRouteStore } from './walkingRouteStore.js'
 import { chooseTravelProvider } from './planningContext.js'
 
@@ -11,7 +11,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 test('adapter uses WALKING, minimal fields and converts milliseconds to seconds', async () => {
   let request
-  const provider = createWalkingRoutesProvider(async (library) => {
+  const provider = createRoutesProvider(async (library) => {
     assert.equal(library, 'routes')
     return { RouteMatrix: { async computeRouteMatrix(input) {
       request = input
@@ -33,10 +33,10 @@ test('adapter uses WALKING, minimal fields and converts milliseconds to seconds'
 })
 
 test('keys are directional and location-based, independent of event times', () => {
-  assert.notEqual(walkingPairKey(a, b), walkingPairKey(b, a))
-  assert.equal(walkingPairKey(a, b), walkingPairKey({ ...a, timing: { scheduledEndAt: 'new time' } }, b))
-  assert.notEqual(walkingPairKey(a, b), walkingPairKey(a, { ...b, location: c.location }))
-  assert.equal(walkingPairKey(a, { location: null }), null)
+  assert.notEqual(routePairKey(a, b), routePairKey(b, a))
+  assert.equal(routePairKey(a, b), routePairKey({ ...a, timing: { scheduledEndAt: 'new time' } }, b))
+  assert.notEqual(routePairKey(a, b), routePairKey(a, { ...b, location: c.location }))
+  assert.equal(routePairKey(a, { location: null }), null)
   assert.equal(routeLocation({ placeId: 'abc' }), 'places/abc')
   assert.equal(routeLocation({ placeId: 'places/abc' }), 'places/abc')
 })

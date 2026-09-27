@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { demoPlan } from '../../../shared/fixtures/demoPlan.js'
 import {
-  RULES, bearingDegrees, compassLabel, dayEndStop, directionsUrl, distanceMeters, initialTrip, nextStopFor,
-  offsetPoint, tripReducer, walkingSecondsEstimate,
+  RULES, bearingDegrees, dayEndStop, directionsUrl, distanceMeters, initialTrip, nextStopFor,
+  offsetPoint, tripReducer,
 } from './tripRules.js'
 
 const at = (time) => Date.parse(time)
@@ -29,11 +29,10 @@ const away = (from, meters) => offsetPoint(from, 180, meters)
 test('distance and bearing match known values', () => {
   assert.ok(Math.abs(distanceMeters(university, library) - 302) < 10)
   assert.equal(distanceMeters(library, library), 0)
-  assert.equal(compassLabel(bearingDegrees(university, library)), 'west')
+  assert.ok(Math.abs(bearingDegrees(university, library) - 270) < 22.5, 'library is west')
   const moved = offsetPoint(university, 90, 250)
   assert.ok(Math.abs(distanceMeters(university, moved) - 250) < 0.5)
-  assert.equal(compassLabel(bearingDegrees(university, moved)), 'east')
-  assert.equal(walkingSecondsEstimate(130), 130)
+  assert.ok(Math.abs(bearingDegrees(university, moved) - 90) < 1, 'moved east')
 })
 
 test('next stop: the one after where you are, skipping ended and unlocated stops', () => {

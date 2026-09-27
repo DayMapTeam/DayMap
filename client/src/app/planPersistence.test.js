@@ -201,6 +201,16 @@ test('saved plans keep Calendar edits and removed events, and omit them when emp
   const saved = toSavedPlan({ ...withStops(base(), [calendarStop]), removedEvents })
   assert.deepEqual(saved.stops[0].localEdits, ['title', 'time'])
   assert.deepEqual(saved.removedEvents, [{ sourceCalendarId: 'primary', sourceEventId: 'e2', title: 'Standup' }])
+  // The confirmed place is saved like a stop's: coordinates, without the Google place ID.
+  const place = { label: 'Napier Building', placeId: 'ChIJ-abc', lat: -34.92, lng: 138.6 }
+  const located = toSavedPlan({ ...withStops(base(), [calendarStop]), removedEvents: [{ ...removedEvents[0], location: place }] })
+  assert.deepEqual(located.removedEvents[0].location, { ...place, placeId: null })
+  // Edits are saved with their timing in the stored shape.
+  const timing = { kind: 'flexible', durationMinutes: 30, scheduledStartAt: '2026-09-26T01:00:00.000Z', scheduledEndAt: '2026-09-26T01:30:00.000Z' }
+  const edited = toSavedPlan({ ...withStops(base(), [calendarStop]),
+    removedEvents: [{ ...removedEvents[0], travelMode: 'walk', localEdits: ['time'], timing }] })
+  assert.deepEqual(edited.removedEvents[0], { sourceCalendarId: 'primary', sourceEventId: 'e2', title: 'Standup',
+    travelMode: 'walk', localEdits: ['time'], timing: { ...timing, fixedStartAt: null, fixedEndAt: null, earliestStartAt: null, latestEndAt: null } })
 
   const empty = toSavedPlan({ ...withStops(base(), [{ ...calendarStop, localEdits: [] }, liveStop({ id: 'x', localEdits: ['title'] })]), removedEvents: [] })
   assert.equal('localEdits' in empty.stops[0], false)

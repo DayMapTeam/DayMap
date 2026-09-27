@@ -80,25 +80,28 @@ export function usePlanAnalysis(plan, draft, now) {
       return mode === 'transit' ? [{ from, to, mode, departAt }, { from, to, mode: 'walk' }] : [{ from, to, mode, departAt }]
     }))
   }, [provider, routes, preference])
-  // Every way of making one journey, for the journey popup. Departure is when
-  // `from` ends, or now if that has passed.
-  const departureFor = useCallback((from) => {
+  // Every way of making one journey, for the journey popup. Departure is the
+  // planned one (later for a journey left just in time), else when `from`
+  // ends, or now if that has passed.
+  const departureFor = useCallback((from, to = null) => {
+    const planned = to && analysis.legs.find((leg) => leg.fromStopId === from.id && leg.toStopId === to.id && leg.status === 'ready')
+    if (planned) return planned.departAt
     const end = stopInterval(from)?.end
     if (!Number.isFinite(end)) return null
     const current = now instanceof Date ? now.getTime() : now
     return new Date(Math.max(end, Math.ceil(current / 60000) * 60000)).toISOString()
-  }, [now])
+  }, [now, analysis.legs])
   const journeyEstimates = useCallback((from, to) => {
-    const departAt = departureFor(from)
+    const departAt = departureFor(from, to)
     return Object.fromEntries(['walk', 'transit', 'drive'].map((mode) => [mode, ctx.travel(from, to, { mode, departAt })]))
   }, [ctx, departureFor])
   // Buses and trains for one journey, shared by the planner line and the popup.
-  const transitServicesFor = useCallback((from, to) => transit.lookup(from.location, to.location, departureFor(from), transitResults),
+  const transitServicesFor = useCallback((from, to) => transit.lookup(from.location, to.location, departureFor(from, to), transitResults),
     [transit, transitResults, departureFor])
   const requestTransit = useCallback((from, to) => {
-    if (provider === 'google') transit.request(from.location, to.location, departureFor(from))
+    if (provider === 'google') transit.request(from.location, to.location, departureFor(from, to))
   }, [provider, transit, departureFor])
-  const chooseTransit = useCallback((from, to, optionId) => transit.choose(from.location, to.location, departureFor(from), optionId),
+  const chooseTransit = useCallback((from, to, optionId) => transit.choose(from.location, to.location, departureFor(from, to), optionId),
     [transit, departureFor])
   useEffect(() => {
     for (const leg of analysis.legs) {
@@ -112,7 +115,7 @@ export function usePlanAnalysis(plan, draft, now) {
   }, [analysis.legs, shown, requestTransit, bookends])
   const requestAllModes = useCallback((from, to) => {
     if (provider !== 'google') return
-    const departAt = departureFor(from)
+    const departAt = departureFor(from, to)
     routes.request(['walk', 'transit', 'drive'].map((mode) => ({ from, to, mode, departAt })))
   }, [provider, routes, departureFor])
   const changedIds = new Set(draft ? listStopChanges(plan, shown).map(({ after }) => after.id) : [])

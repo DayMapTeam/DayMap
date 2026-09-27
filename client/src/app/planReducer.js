@@ -1,6 +1,6 @@
 import { chooseOption } from './planAdd.js'
 import {
-  isDayNote, listStopChanges, validateStopEdit, withDayPlace, withLocalTimeMarks, withStopKind, withTravelMode,
+  isDayNote, listStopChanges, validateStopEdit, withDayPlace, withLocalTimeMarks, withStopKind, withTravelMode, withLeaveTiming,
 } from './planEdits.js'
 import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
@@ -145,7 +145,9 @@ function withoutStop(plan, stopId) {
   }
 }
 
-// Calendar events the person removed; re-import leaves them out.
+// Calendar events the person removed; re-import leaves them out. What the
+// person set in DayMap (place, travel mode, edited title or times, made
+// flexible) is kept, so bringing the event back restores it too.
 const MAX_REMOVED_EVENTS = 500
 
 function withRemovedEvent(plan, stop) {
@@ -154,7 +156,14 @@ function withRemovedEvent(plan, stop) {
   const known = removed.some((event) =>
     event.sourceCalendarId === stop.sourceCalendarId && event.sourceEventId === stop.sourceEventId)
   if (known) return plan
-  const event = { sourceCalendarId: stop.sourceCalendarId, sourceEventId: stop.sourceEventId, title: stop.title }
+  const localEdits = stop.localEdits ?? []
+  // Re-import keeps DayMap's times only when they were edited or the event was made flexible.
+  const ownTiming = localEdits.includes('time') || stop.timing.kind === 'flexible'
+  const event = { sourceCalendarId: stop.sourceCalendarId, sourceEventId: stop.sourceEventId, title: stop.title,
+    ...(stop.location ? { location: stop.location } : {}),
+    ...(stop.travelMode ? { travelMode: stop.travelMode } : {}),
+    ...(localEdits.length ? { localEdits: [...localEdits] } : {}),
+    ...(ownTiming ? { timing: stop.timing } : {}) }
   return { ...plan, removedEvents: [...removed, event].slice(-MAX_REMOVED_EVENTS) }
 }
 
@@ -170,7 +179,6 @@ function withRemovedEvent(plan, stop) {
 function removeStop(state, { stopId }) {
   const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
   if (!stop) return state
-  if (stop.timing.kind === 'all-day' && !isDayNote(stop)) return state
   if (state.draft?.suggestion) return removeStop(revertSuggestion(state), { stopId })
 
   const version = state.plan.version + 1
@@ -281,14 +289,15 @@ function setKind(state, { stopId, kind }) {
 }
 
 /**
- * Choose how to travel to a stop (null: automatic). The choice is the explicit
- * accept, so it changes the accepted plan and a pending draft alike.
+ * A choice about the journey to a stop (how to travel, when to leave). The
+ * choice is the explicit accept, so it changes the accepted plan and a
+ * pending draft alike. `change` returns the new stop, or null for no change.
  */
-function setTravelMode(state, { stopId, mode }) {
-  if (state.draft?.suggestion) return setTravelMode(revertSuggestion(state), { stopId, mode })
+function setJourneyChoice(state, stopId, change) {
+  if (state.draft?.suggestion) return setJourneyChoice(revertSuggestion(state), stopId, change)
   const apply = (plan) => {
     const stop = plan.stops.find((candidate) => candidate.id === stopId)
-    const next = stop && withTravelMode(stop, mode)
+    const next = stop && change(stop)
     return next ? { ...plan, stops: plan.stops.map((candidate) => (candidate.id === stopId ? next : candidate)) } : plan
   }
   const plan = apply(state.plan)
@@ -367,7 +376,9 @@ export function planReducer(state, action) {
     case 'set-day-place':
       return setDayPlace(state, action)
     case 'set-stop-travel-mode':
-      return setTravelMode(state, action)
+      return setJourneyChoice(state, action.stopId, (stop) => withTravelMode(stop, action.mode))
+    case 'set-stop-leave-timing':
+      return setJourneyChoice(state, action.stopId, (stop) => withLeaveTiming(stop, action.timing))
     case 'set-stop-kind':
       return setKind(state, action)
     case 'set-stop-location':

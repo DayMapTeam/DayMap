@@ -330,20 +330,16 @@ Everything in the later backlog ([ARCHITECTURE.md §1](ARCHITECTURE.md#not-in-th
 
 ### Local setup
 
-Once DM-01 is merged, the README's setup instructions are authoritative. The planned commands are:
+The README's [setup instructions](README.md#run-daymap-on-your-own-computer) are authoritative. In short:
 
 ```sh
 git clone https://github.com/DayMapTeam/DayMap.git
 cd DayMap
-nvm install
-nvm use
-npm ci
-cp client/.env.example client/.env.local
-cp server/.env.example server/.env
-npm run dev
+npm run setup    # tools check, packages, local database, settings files
+npm run dev      # API on 3001 and website on 5173, in one terminal
 ```
 
-**These commands do not work yet.** DM-01 adds root `dev`, `build`, and `lint` scripts. A `test` script comes with the first meaningful planning or access-control tests. Planned ports: client `5173`, server `3001`, with Vite proxying `/api` to the server.
+`npm run doctor` checks the setup when something doesn't work. Vite proxies `/api` to the server. Tests: `npm test` in `client/` and `server/`, and in the root for the setup scripts.
 
 ### Branches and pull requests
 

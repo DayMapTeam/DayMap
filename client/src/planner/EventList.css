@@ -72,6 +72,31 @@
   transform: scale(var(--press-scale));
 }
 
+/* Rows that can be dragged to a new time. A finger holds first, so swipes still scroll. */
+.event-row[data-movable] {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.event-item[data-dragging] {
+  z-index: 2;
+  background: var(--solid);
+  box-shadow: var(--shadow-float);
+  transition: none;
+}
+
+.event-item[data-dragging] .event-row {
+  cursor: grabbing;
+  transform: none;
+}
+
+.event-row-time[data-moving] {
+  color: var(--blue);
+  font-weight: 600;
+}
+
 /* Centred on the first line of the name (15px × 1.4 line height). */
 .event-row-dot {
   width: 10px;

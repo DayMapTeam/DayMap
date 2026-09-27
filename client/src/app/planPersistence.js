@@ -1,4 +1,4 @@
-const STOP_FIELDS = ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'status', 'travelMode']
+const STOP_FIELDS = ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'status', 'travelMode', 'leaveTiming']
 const TIMING_FIELDS = ['kind', 'durationMinutes', 'fixedStartAt', 'fixedEndAt',
   'earliestStartAt', 'latestEndAt', 'scheduledStartAt', 'scheduledEndAt']
 const DEMO_KEY = 'daymap:demo-plan'
@@ -39,7 +39,17 @@ export function locationQuestion(stop) {
   return { id: `location:${stop.id}`, stopId: stop.id, field: 'location', prompt: `Where is “${stop.title}”?`, status: 'unanswered' }
 }
 
-const removedEvent = ({ sourceCalendarId, sourceEventId, title }) => ({ sourceCalendarId, sourceEventId, title })
+const savedPlace = (value) => (value ? { label: value.label, placeId: null, lat: value.lat, lng: value.lng } : null)
+
+const savedTiming = (timing) => Object.fromEntries(TIMING_FIELDS.map((field) => [field, timing[field] ?? null]))
+
+const removedEvent = ({ sourceCalendarId, sourceEventId, title, location, travelMode, localEdits, timing }) => ({
+  sourceCalendarId, sourceEventId, title,
+  ...(location ? { location: savedPlace(location) } : {}),
+  ...(travelMode ? { travelMode } : {}),
+  ...(localEdits?.length ? { localEdits: [...localEdits] } : {}),
+  ...(timing ? { timing: savedTiming(timing) } : {}),
+})
 
 /**
  * The plan as the server stores it. Journeys are recalculated on load, and
@@ -50,10 +60,8 @@ const removedEvent = ({ sourceCalendarId, sourceEventId, title }) => ({ sourceCa
 export function toSavedPlan(plan) {
   const stops = plan.stops.map((stop) => ({
     ...Object.fromEntries(STOP_FIELDS.map((field) => [field, stop[field] ?? null])),
-    location: stop.location
-      ? { label: stop.location.label, placeId: null, lat: stop.location.lat, lng: stop.location.lng }
-      : null,
-    timing: Object.fromEntries(TIMING_FIELDS.map((field) => [field, stop.timing[field] ?? null])),
+    location: savedPlace(stop.location),
+    timing: savedTiming(stop.timing),
     // What the person changed on a Google Calendar event, so re-import keeps it.
     ...(stop.source === 'google-calendar' && stop.localEdits?.length ? { localEdits: [...stop.localEdits] } : {}),
   }))
@@ -67,11 +75,10 @@ export function toSavedPlan(plan) {
       questions.push(locationQuestion(stop))
     }
   }
-  const place = (value) => (value ? { label: value.label, placeId: null, lat: value.lat, lng: value.lng } : null)
   return {
     id: plan.id, date: plan.date, timezone: plan.timezone, version: plan.version,
     dataMode: plan.dataMode, stops, legs: [], conflicts: [], questions,
-    startPlace: place(plan.startPlace), endPlace: place(plan.endPlace),
+    startPlace: savedPlace(plan.startPlace), endPlace: savedPlace(plan.endPlace),
     // Calendar events the person removed, so re-import doesn't bring them back.
     ...(plan.removedEvents?.length ? { removedEvents: plan.removedEvents.map(removedEvent) } : {}),
   }
