@@ -1,6 +1,11 @@
 // Rules for user edits to a stop. Shared by the reducer (which rejects invalid
 // edits) and the planner form (which explains them).
 
+import { toTimeInputValue } from '../components/formatTime.js'
+import { zonedTimeToTimestamp } from '../components/zonedTime.js'
+import { planDayBounds } from '../../../shared/planning/dayBounds.js'
+import { localDate } from './planPersistence.js'
+
 /**
  * @typedef {object} StopEdit
  * @property {string} title
@@ -8,23 +13,147 @@
  * @property {string} scheduledEndAt UTC timestamp
  */
 
+/** The shortest visit a resize can leave, in minutes. */
+export const MIN_STOP_MINUTES = 5
+const MAX_STOP_MINUTES = 1440
+const MINUTE = 60000
+const LOCAL_EDITS = ['title', 'time']
+const sameInstant = (a, b) => (a === null || b === null ? a === b : Date.parse(a) === Date.parse(b))
+
 /**
- * Check an edit to a flexible stop.
+ * Whether the person can change a stop's title and times: planned fixed or
+ * flexible stops with planned times. All-day and finished stops stay as they are.
+ *
+ * @param {object} stop Stop in the §5 shape.
+ */
+export function canEditStop(stop) {
+  const { timing } = stop
+  return stop.status === 'planned' && ['fixed', 'flexible'].includes(timing.kind)
+    && timing.scheduledStartAt !== null && timing.scheduledEndAt !== null
+}
+
+/**
+ * Check an edit to a stop. Fixed stops take any times up to a day long; a
+ * flexible stop with a window must stay inside it.
  *
  * @param {object} stop Stop in the §5 shape.
  * @param {StopEdit} edit
- * @returns {null | 'not-editable' | 'missing-title' | 'end-before-start' | 'outside-window'}
+ * @returns {null | 'not-editable' | 'missing-title' | 'end-before-start' | 'too-long' | 'outside-window'}
  */
 export function validateStopEdit(stop, edit) {
-  if (stop.timing.kind !== 'flexible') return 'not-editable'
+  if (!canEditStop(stop)) return 'not-editable'
   if (edit.title.trim() === '') return 'missing-title'
   const start = Date.parse(edit.scheduledStartAt)
   const end = Date.parse(edit.scheduledEndAt)
   if (!(end > start)) return 'end-before-start'
+  if (end - start > MAX_STOP_MINUTES * MINUTE) return 'too-long'
+  if (stop.timing.kind !== 'flexible') return null
   const { earliestStartAt, latestEndAt } = stop.timing
   if (earliestStartAt !== null && start < Date.parse(earliestStartAt)) return 'outside-window'
   if (latestEndAt !== null && end > Date.parse(latestEndAt)) return 'outside-window'
   return null
+}
+
+const nextDate = (date) => new Date(Date.parse(`${date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10)
+
+/**
+ * The times an edit form means, from its "HH:MM" start and end inputs. A field
+ * left at the stop's current time keeps its exact timestamp, so a name-only
+ * edit never moves a stop (even one that starts the day before, or at 09:00:30).
+ * A changed start is on the plan's date. A changed end is on the start's
+ * local date. Only a stop that already crosses midnight (10:00pm–1:00am from
+ * Calendar) rolls an end at or before its start to the next day; elsewhere
+ * that is a typo and fails validation, the same as the length buttons never
+ * pushing a stop past midnight.
+ *
+ * @param {object} stop Stop in the §5 shape, with scheduled times.
+ * @param {{ start: string, end: string }} inputs "HH:MM", 24-hour.
+ * @param {{ date: string, timezone: string }} day The plan's date and IANA timezone.
+ * @returns {{ scheduledStartAt: string, scheduledEndAt: string }}
+ */
+export function timesFromInputs(stop, { start, end }, { date, timezone }) {
+  const { scheduledStartAt, scheduledEndAt } = stop.timing
+  const startAt = scheduledStartAt !== null && start === toTimeInputValue(scheduledStartAt, timezone)
+    ? scheduledStartAt
+    : zonedTimeToTimestamp(date, start, timezone)
+  if (scheduledEndAt !== null && end === toTimeInputValue(scheduledEndAt, timezone)) {
+    return { scheduledStartAt: startAt, scheduledEndAt }
+  }
+  const startDate = localDate(new Date(startAt), timezone)
+  const crossesMidnight = scheduledStartAt !== null && scheduledEndAt !== null
+    && localDate(new Date(scheduledEndAt), timezone) !== localDate(new Date(scheduledStartAt), timezone)
+  let endAt = zonedTimeToTimestamp(startDate, end, timezone)
+  if (crossesMidnight && Date.parse(endAt) <= Date.parse(startAt)) endAt = zonedTimeToTimestamp(nextDate(startDate), end, timezone)
+  return { scheduledStartAt: startAt, scheduledEndAt: endAt }
+}
+
+/**
+ * Why a stop's length can't change by `deltaMinutes` (its end moves, its
+ * start stays), or null when it can. 'past-day-end' means the end would newly
+ * pass midnight at the end of the plan's day; a stop that already crosses it
+ * may still grow or shrink.
+ *
+ * @param {object} stop Stop in the §5 shape.
+ * @param {number} deltaMinutes
+ * @param {{ date: string, timezone: string }} plan
+ * @returns {null | 'not-editable' | 'too-short' | 'too-long' | 'outside-window' | 'past-day-end'}
+ */
+export function resizeBlock(stop, deltaMinutes, plan) {
+  if (!canEditStop(stop) || !Number.isFinite(deltaMinutes)) return 'not-editable'
+  const start = Date.parse(stop.timing.scheduledStartAt)
+  const oldEnd = Date.parse(stop.timing.scheduledEndAt)
+  const end = oldEnd + deltaMinutes * MINUTE
+  if (end - start < MIN_STOP_MINUTES * MINUTE) return 'too-short'
+  if (end - start > MAX_STOP_MINUTES * MINUTE) return 'too-long'
+  const { latestEndAt } = stop.timing
+  if (stop.timing.kind === 'flexible' && latestEndAt !== null && end > Date.parse(latestEndAt)) return 'outside-window'
+  const dayEnd = planDayBounds(plan.date, plan.timezone).end
+  if (end > dayEnd && oldEnd <= dayEnd) return 'past-day-end'
+  return null
+}
+
+/**
+ * The edit that keeps a stop's title and start and moves its end by
+ * `deltaMinutes`, or null exactly when resizeBlock gives a reason.
+ *
+ * @param {object} stop Stop in the §5 shape.
+ * @param {number} deltaMinutes
+ * @param {{ date: string, timezone: string }} plan
+ * @returns {StopEdit | null}
+ */
+export function resizedStopEdit(stop, deltaMinutes, plan) {
+  if (resizeBlock(stop, deltaMinutes, plan) !== null) return null
+  const { scheduledStartAt, scheduledEndAt } = stop.timing
+  return {
+    title: stop.title,
+    scheduledStartAt,
+    scheduledEndAt: deltaMinutes === 0
+      ? scheduledEndAt
+      : new Date(Date.parse(scheduledEndAt) + deltaMinutes * MINUTE).toISOString(),
+  }
+}
+
+/**
+ * `after` with 'time' added to the `localEdits` of every Google Calendar stop
+ * whose planned times differ from `before`, however they changed (an edit, an
+ * accepted suggestion, a stop added in front). Re-import then keeps DayMap's
+ * times. Returns `after` itself when nothing needs marking.
+ */
+export function withLocalTimeMarks(before, after) {
+  const beforeById = new Map(before.stops.map((stop) => [stop.id, stop]))
+  const moved = (stop) => {
+    const old = beforeById.get(stop.id)
+    if (stop.source !== 'google-calendar' || old === undefined || stop.localEdits?.includes('time')) return false
+    return !sameInstant(old.timing.scheduledStartAt, stop.timing.scheduledStartAt)
+      || !sameInstant(old.timing.scheduledEndAt, stop.timing.scheduledEndAt)
+  }
+  if (!after.stops.some(moved)) return after
+  return {
+    ...after,
+    stops: after.stops.map((stop) => (moved(stop)
+      ? { ...stop, localEdits: LOCAL_EDITS.filter((field) => field === 'time' || stop.localEdits?.includes(field)) }
+      : stop)),
+  }
 }
 
 /**

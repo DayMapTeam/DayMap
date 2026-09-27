@@ -48,7 +48,8 @@
 
 .event-row {
   display: grid;
-  grid-template-columns: 10px 1fr auto 12px;
+  /* 16px leaves room for the star's 44px tap target before the text. */
+  grid-template-columns: 16px 1fr auto 12px;
   align-items: start;
   column-gap: var(--space-3);
   width: 100%;
@@ -76,6 +77,7 @@
   width: 10px;
   height: 10px;
   margin-top: 5.5px;
+  justify-self: start;
   border-radius: 50%;
   background: var(--blue);
 }
@@ -135,6 +137,58 @@
   transform: rotate(90deg);
 }
 
+/*
+ * Star: fixed (filled, dark like fixed pins) or flexible (outline, blue like
+ * flexible pins). A sibling of the row button, drawn over the dot's column and
+ * centred where the dot would be, so it lines up with the travel connectors.
+ * The ::before widens the tap target to --hit-target without moving the icon:
+ * it reaches the panel's edge on the left and stops before the row text.
+ */
+.event-star {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 32px;
+  padding: 0;
+  color: var(--blue);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-thumb);
+  transition:
+    background var(--duration-press) var(--ease-spring),
+    transform var(--duration-press) var(--ease-spring);
+}
+
+.event-star::before {
+  position: absolute;
+  top: calc((32px - var(--hit-target)) / 2);
+  left: -6px;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  content: '';
+}
+
+.event-star[aria-pressed='true'] {
+  color: var(--label);
+}
+
+.event-star:not([aria-disabled='true']):hover {
+  background: var(--fill);
+}
+
+.event-star:not([aria-disabled='true']):active {
+  transform: scale(var(--press-scale));
+}
+
+.event-star[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Finished stops: --label-2 keeps 4.5:1 contrast; "Finished" is written in the details. */
 .event-row[data-past] .event-row-name {
   color: var(--label-2);
@@ -148,7 +202,7 @@
 .event-details {
   display: grid;
   gap: 10px;
-  padding: 0 10px 14px 32px;
+  padding: 0 10px 14px 38px;
   animation: event-details-in var(--duration-panel) var(--ease-spring);
 }
 
@@ -237,6 +291,68 @@
   font-size: 13px;
   background: var(--red-tint);
   border-radius: var(--radius-control);
+}
+
+/* Named overlaps, so a longer stop running into another is noticed. */
+.event-overlap-note {
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--orange-ink);
+  background: var(--orange-tint);
+  border-radius: var(--radius-control);
+}
+
+/* Quick length buttons: an inset row like the form's fields. */
+.event-length {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.event-length-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  min-height: var(--hit-target);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  background: var(--fill);
+  border-radius: var(--radius-card);
+}
+
+.event-length-controls {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.event-length-value {
+  min-width: 5.5em;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.event-length-button {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Stays focusable so focus doesn't jump away; the reason is written underneath. */
+.event-length-button[aria-disabled='true'] {
+  color: var(--label-2);
+  cursor: default;
+}
+
+.event-length-button[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+.event-length-button[aria-disabled='true']:active {
+  transform: none;
 }
 
 .event-form-actions,
@@ -371,21 +487,6 @@
   grid-template-columns: 1fr;
   width: 100%;
   min-height: var(--hit-target);
-}
-
-.event-kind {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: var(--space-2);
-}
-
-.event-kind-label {
-  width: auto;
-}
-
-.segmented[aria-disabled='true'] {
-  opacity: 0.6;
 }
 
 .travel-connector-button,

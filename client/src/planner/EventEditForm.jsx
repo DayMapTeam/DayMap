@@ -1,7 +1,6 @@
 import { useId, useState } from 'react'
-import { validateStopEdit } from '../app/planEdits.js'
+import { timesFromInputs, validateStopEdit } from '../app/planEdits.js'
 import { formatClock, toTimeInputValue } from '../components/formatTime.js'
-import { zonedTimeToTimestamp } from '../components/zonedTime.js'
 import '../components/buttons.css'
 
 function errorMessage(code, stop, timezone) {
@@ -12,6 +11,8 @@ function errorMessage(code, stop, timezone) {
       return 'Enter a start and an end time.'
     case 'end-before-start':
       return 'The end time needs to be after the start time.'
+    case 'too-long':
+      return 'A stop can’t be longer than 24 hours.'
     case 'outside-window':
       return `This stop can move between ${formatClock(stop.timing.earliestStartAt, timezone)} and ${formatClock(stop.timing.latestEndAt, timezone)}. Choose times inside that window.`
     default:
@@ -23,15 +24,18 @@ const ERROR_FIELDS = {
   'missing-title': ['title'],
   'missing-time': ['start', 'end'],
   'end-before-start': ['end'],
+  'too-long': ['start', 'end'],
   'outside-window': ['start', 'end'],
 }
 
 /**
- * Edit form for a flexible stop. Saving puts the change in a draft; the
- * accepted plan only changes when the user accepts the draft.
+ * Edit form for a fixed or flexible stop. Saving puts the change in a draft;
+ * the accepted plan only changes when the user accepts the draft. When the
+ * stop's times change from outside (the quick length buttons), the time
+ * fields follow them and a typed name is kept.
  *
  * @param {object} props
- * @param {object} props.stop Flexible stop in the §5 shape.
+ * @param {object} props.stop Editable stop in the §5 shape (see canEditStop).
  * @param {string} props.date Plan date, "YYYY-MM-DD".
  * @param {string} props.timezone Plan IANA timezone.
  * @param {(edit: import('../app/planEdits.js').StopEdit) => void} props.onSave
@@ -44,6 +48,14 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel, 
   const [start, setStart] = useState(toTimeInputValue(stop.timing.scheduledStartAt, timezone))
   const [end, setEnd] = useState(toTimeInputValue(stop.timing.scheduledEndAt, timezone))
   const [error, setError] = useState(null)
+  const stopTimes = `${stop.timing.scheduledStartAt}|${stop.timing.scheduledEndAt}`
+  const [shownTimes, setShownTimes] = useState(stopTimes)
+  if (shownTimes !== stopTimes) {
+    setShownTimes(stopTimes)
+    setStart(toTimeInputValue(stop.timing.scheduledStartAt, timezone))
+    setEnd(toTimeInputValue(stop.timing.scheduledEndAt, timezone))
+    setError(null)
+  }
   const errorId = `${id}-error`
   const invalid = (field) => ERROR_FIELDS[error]?.includes(field) || undefined
 
@@ -53,11 +65,8 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel, 
       setError('missing-time')
       return
     }
-    const edit = {
-      title: title.trim(),
-      scheduledStartAt: zonedTimeToTimestamp(date, start, timezone),
-      scheduledEndAt: zonedTimeToTimestamp(date, end, timezone),
-    }
+    // Unchanged fields keep their exact times, so events that cross midnight stay intact.
+    const edit = { title: title.trim(), ...timesFromInputs(stop, { start, end }, { date, timezone }) }
     const code = validateStopEdit(stop, edit)
     if (code !== null) {
       setError(code)

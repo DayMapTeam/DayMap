@@ -64,7 +64,10 @@ the associated user ID.
   Google revocation. It returns `{ "disconnected": true, "revoked": boolean }`.
   If revocation is unavailable, local access is still deleted.
 - `POST /api/calendar/import` takes `{ "date": "YYYY-MM-DD", "timezone": "<IANA>" }`
-  and returns `{ "plan": {...}, "summary": { "added", "updated", "removed" } }`
+  and optionally `"restoreRemoved": true` (bring back every removed event) or
+  `"restoreEvents": [{ "sourceCalendarId", "sourceEventId" }]` (at most 500;
+  bring back just those), and returns
+  `{ "plan": {...}, "summary": { "added", "updated", "removed", "hidden" } }`
   (201 when it created the day's plan, otherwise 200). See **Event import** below.
 
 Starting another connection replaces that user's unfinished attempt. A callback
@@ -158,8 +161,18 @@ or creates one with `dataMode: 'live'`:
 - Updates the title and times of existing Calendar stops, keeping their ID,
   status and any location the user already confirmed. A deferred location
   question stays deferred. A Calendar event the person made flexible (#38)
-  keeps its DayMap times; only its title follows Calendar.
+  keeps its DayMap times; only its title follows Calendar. A stop the person
+  renamed or re-timed in DayMap (`localEdits: ['title' | 'time']`, #61) keeps
+  that title or those times.
 - Removes Calendar stops whose event no longer exists, unless completed.
+- Leaves out events the person removed in DayMap (`plan.removedEvents`) and
+  counts them in `summary.hidden`. `restoreRemoved: true` clears that list and
+  imports them again; `restoreEvents` does the same for just those events.
+  A removed event no longer in Calendar for that day (deleted, declined or
+  moved) is dropped from the list, so the hidden count stays true.
+- Any accepted change to a Calendar stop's times in DayMap (an edit, an
+  accepted suggestion, a stop added in front that moves it) records
+  `localEdits: ['time']`, so a quiet re-import never moves it back.
 - Never touches manual stops.
 
 The merged plan passes the same validation as `PUT /api/plans/:id` and is saved

@@ -1,0 +1,68 @@
+/* Calendar events the person removed, with a way to bring them back. */
+.removed-events {
+  width: 100%;
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.removed-events-summary {
+  width: fit-content;
+  min-height: var(--hit-target);
+  padding: 12px 0;
+  font-weight: 600;
+  color: var(--blue);
+  cursor: pointer;
+}
+
+.removed-events-body {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.removed-events-reason {
+  color: var(--orange-ink);
+}
+
+.removed-events-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--fill);
+  border-radius: var(--radius-card);
+}
+
+.removed-events-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit-target);
+  padding: 0 var(--space-1) 0 var(--space-3);
+}
+
+.removed-events-item + .removed-events-item {
+  border-top: 1px solid var(--separator);
+}
+
+.removed-events-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--label);
+  overflow-wrap: anywhere;
+}
+
+.removed-events-item .button-text,
+.removed-events-all {
+  flex: none;
+}
+
+.removed-events-all {
+  justify-self: start;
+}
+
+.removed-events .button-text:disabled {
+  color: var(--label-2);
+  background: transparent;
+}

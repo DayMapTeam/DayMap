@@ -40,3 +40,23 @@ test('errors keep the server code; network failures and missing sessions are dis
   await assert.rejects(signedOut.getDayPlan('2026-09-27', 'UTC'), { code: 'INVALID_SESSION' })
   assert.equal(called, false, 'no request without a session')
 })
+
+test('Calendar import asks to restore removed events only when told to', async () => {
+  const bodies = []
+  const api = createApiClient({
+    getToken: async () => 't', fetchImpl: async (url, init) => { bodies.push(JSON.parse(init.body)); return json(200, {}) },
+  })
+  await api.importCalendarDay('2026-09-27', 'UTC')
+  await api.importCalendarDay('2026-09-27', 'UTC', { restoreRemoved: true })
+  await api.importCalendarDay('2026-09-27', 'UTC', { restoreRemoved: 'yes' })
+  const event = { sourceCalendarId: 'primary', sourceEventId: 'gym', title: 'Gym' }
+  await api.importCalendarDay('2026-09-27', 'UTC', { restoreEvents: [event] })
+  await api.importCalendarDay('2026-09-27', 'UTC', { restoreEvents: event })
+  assert.deepEqual(bodies, [
+    { date: '2026-09-27', timezone: 'UTC' },
+    { date: '2026-09-27', timezone: 'UTC', restoreRemoved: true },
+    { date: '2026-09-27', timezone: 'UTC' },
+    { date: '2026-09-27', timezone: 'UTC', restoreEvents: [{ sourceCalendarId: 'primary', sourceEventId: 'gym' }] },
+    { date: '2026-09-27', timezone: 'UTC' },
+  ])
+})

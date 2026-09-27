@@ -269,3 +269,15 @@ test('an event added with From–To times keeps them and stays flexible', () => 
   assert.equal(added.timing.fixedStartAt, null)
   assert.equal(fitNewStop(demoPlan, { ...timed, endAt: null }, { now: NOW }).error, 'missing-time')
 })
+
+test('a Calendar event an add moves is marked, so re-import keeps its new time', () => {
+  const plan = structuredClone(demoPlan)
+  Object.assign(stopIn(plan, library), { source: 'google-calendar', sourceEventId: 'study', sourceCalendarId: 'primary' })
+  const added = add(createPlanState(plan), flexible(45), lecture)
+  const moved = stopIn(added.plan, library)
+  assert.equal(moved.timing.scheduledStartAt, '2026-09-26T01:15:00Z')
+  assert.deepEqual(moved.localEdits, ['time'])
+  assert.equal(stopIn(added.plan, market).localEdits, undefined)
+  // Undo returns the event to its Calendar time, unmarked.
+  assert.equal(stopIn(planReducer(added, { type: 'undo-add', stopId: 'stop-new' }).plan, library).localEdits, undefined)
+})

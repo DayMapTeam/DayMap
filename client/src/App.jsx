@@ -198,6 +198,7 @@ function App() {
         revealRequest={revealRequest}
         planning={planning}
         emptyState={<EmptyDay calendar={userId ? calendar : null} />}
+        calendar={userId ? calendar : null}
       />
       {popup !== null && (
         <StopPopup

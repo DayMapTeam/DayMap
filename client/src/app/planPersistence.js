@@ -39,6 +39,8 @@ export function locationQuestion(stop) {
   return { id: `location:${stop.id}`, stopId: stop.id, field: 'location', prompt: `Where is “${stop.title}”?`, status: 'unanswered' }
 }
 
+const removedEvent = ({ sourceCalendarId, sourceEventId, title }) => ({ sourceCalendarId, sourceEventId, title })
+
 /**
  * The plan as the server stores it. Journeys are recalculated on load, and
  * Google place IDs wait for the provider-retention decision (ARCHITECTURE §12),
@@ -52,6 +54,8 @@ export function toSavedPlan(plan) {
       ? { label: stop.location.label, placeId: null, lat: stop.location.lat, lng: stop.location.lng }
       : null,
     timing: Object.fromEntries(TIMING_FIELDS.map((field) => [field, stop.timing[field] ?? null])),
+    // What the person changed on a Google Calendar event, so re-import keeps it.
+    ...(stop.source === 'google-calendar' && stop.localEdits?.length ? { localEdits: [...stop.localEdits] } : {}),
   }))
   const byStop = new Map(stops.map((stop) => [stop.id, stop]))
   const questions = (plan.questions ?? [])
@@ -68,6 +72,8 @@ export function toSavedPlan(plan) {
     id: plan.id, date: plan.date, timezone: plan.timezone, version: plan.version,
     dataMode: plan.dataMode, stops, legs: [], conflicts: [], questions,
     startPlace: place(plan.startPlace), endPlace: place(plan.endPlace),
+    // Calendar events the person removed, so re-import doesn't bring them back.
+    ...(plan.removedEvents?.length ? { removedEvents: plan.removedEvents.map(removedEvent) } : {}),
   }
 }
 

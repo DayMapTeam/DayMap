@@ -78,19 +78,22 @@ export const DAY_END_ID = 'day-end'
 
 /**
  * Where the day ends (home, a hotel) as the last stop a trip can go to: from
- * the end of the last timed stop until midnight. Null without an end place.
+ * the end of the last timed stop until midnight (or just after a stop that
+ * runs past it). Null without an end place.
  */
 export function dayEndStop(plan) {
   if (!isValidPoint(plan.endPlace)) return null
   const timed = buildTimeline(plan).filter((stop) => stop.timing.kind !== 'all-day' && stop.timing.scheduledEndAt)
   const { start, end } = planDayBounds(plan.date, plan.timezone)
   const from = timed.length ? Date.parse(timed.at(-1).timing.scheduledEndAt) : start
+  // An event that runs past midnight pushes the end of the day after it.
+  const until = Math.max(end, from + 60000)
   const iso = (ms) => new Date(ms).toISOString()
   return {
     id: DAY_END_ID, title: plan.endPlace.label, source: 'manual', sourceEventId: null, sourceCalendarId: null,
     location: plan.endPlace, travelMode: null, status: 'planned',
     timing: { kind: 'flexible', durationMinutes: null, fixedStartAt: null, fixedEndAt: null, earliestStartAt: null,
-      latestEndAt: null, scheduledStartAt: iso(Math.min(from, end - 60000)), scheduledEndAt: iso(end) },
+      latestEndAt: null, scheduledStartAt: iso(Math.min(from, until - 60000)), scheduledEndAt: iso(until) },
   }
 }
 

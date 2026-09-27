@@ -112,7 +112,7 @@ test('re-import is idempotent and never duplicates stops', () => {
   const saved = { ...first.plan, version: 1 }
   const again = planWith(eventsToStops([lecture, standup], day), saved)
   assert.equal(again.changed, false)
-  assert.deepEqual(again.summary, { added: 0, updated: 0, removed: 0 })
+  assert.deepEqual(again.summary, { added: 0, updated: 0, removed: 0, hidden: 0 })
   assert.equal(again.plan.stops.length, 2)
 })
 
@@ -140,7 +140,7 @@ test('moved events update in place; deleted events go unless completed; manual s
   const { plan, summary, changed } = planWith(eventsToStops([moved], day), saved)
 
   assert.equal(changed, true)
-  assert.deepEqual(summary, { added: 0, updated: 1, removed: 1 })
+  assert.deepEqual(summary, { added: 0, updated: 1, removed: 1, hidden: 0 })
   assert.equal(plan.version, 3, 'the caller saves against the loaded version')
   assert.deepEqual(plan.stops.map(stop => stop.id), [lectureId, holidayId, manual.id])
   const updated = plan.stops[0]
@@ -207,7 +207,7 @@ test('POST /api/calendar/import creates, then re-imports without a new version',
   const created = await post({ date, timezone })
   assert.equal(created.status, 201)
   const first = await created.json()
-  assert.deepEqual(first.summary, { added: 2, updated: 0, removed: 0 })
+  assert.deepEqual(first.summary, { added: 2, updated: 0, removed: 0, hidden: 0 })
   assert.equal(first.plan.version, 1)
   assert.equal(first.plan.dataMode, 'live')
   assert.equal(rows.size, 1)
@@ -228,7 +228,7 @@ test('import updates the saved plan through the versioned save', async t => {
   const response = await post({ date, timezone })
   assert.equal(response.status, 200)
   const body = await response.json()
-  assert.deepEqual(body.summary, { added: 0, updated: 0, removed: 1 })
+  assert.deepEqual(body.summary, { added: 0, updated: 0, removed: 1, hidden: 0 })
   assert.equal(body.plan.version, 2)
   assert.equal([...rows.values()][0].version, 2)
 })
@@ -297,4 +297,170 @@ test('where the day starts and ends is validated and kept by Calendar import', (
     assert.throws(() => validateSave(plan.id, { baseVersion: plan.version, plan: { ...plan, endPlace: bad } }), { code: 'INVALID_PLAN' })
   }
   validateSave(plan.id, { baseVersion: plan.version, plan: { ...plan, startPlace: null } })
+})
+
+test('events the person removed stay out of re-import until restored', () => {
+  const first = planWith(eventsToStops([lecture, standup], day)).plan
+  const standupId = calendarStopId('primary', 'standup_20260928')
+  const saved = { ...first, version: 2, stops: first.stops.filter(stop => stop.id !== standupId),
+    questions: first.questions.filter(question => question.stopId !== standupId),
+    removedEvents: [{ sourceCalendarId: 'primary', sourceEventId: 'standup_20260928', title: 'Team standup' }] }
+  validateSave(saved.id, { baseVersion: saved.version, plan: saved })
+
+  const again = planWith(eventsToStops([lecture, standup], day), saved)
+  assert.equal(again.changed, false)
+  assert.deepEqual(again.summary, { added: 0, updated: 0, removed: 0, hidden: 1 })
+  assert.deepEqual(again.plan.stops.map(stop => stop.id), [calendarStopId('primary', 'lecture')])
+  assert.deepEqual(again.plan.removedEvents, saved.removedEvents)
+
+  const restored = mergeCalendarImport(saved, eventsToStops([lecture, standup], day),
+    { planId, date, timezone, restoreRemoved: true })
+  assert.equal(restored.changed, true)
+  assert.deepEqual(restored.summary, { added: 1, updated: 0, removed: 0, hidden: 0 })
+  assert.ok(restored.plan.stops.some(stop => stop.id === standupId))
+  assert.equal('removedEvents' in restored.plan, false)
+  validateSave(restored.plan.id, { baseVersion: restored.plan.version, plan: restored.plan })
+
+  // Restoring an event that has since left Calendar still clears the list.
+  const gone = mergeCalendarImport(saved, eventsToStops([lecture], day), { planId, date, timezone, restoreRemoved: true })
+  assert.equal(gone.changed, true)
+  assert.equal('removedEvents' in gone.plan, false)
+  // Nothing to restore: an unchanged import stays unchanged.
+  assert.equal(mergeCalendarImport(first, eventsToStops([lecture, standup], day),
+    { planId, date, timezone, restoreRemoved: true }).changed, false)
+})
+
+test('a title or time the person changed in DayMap survives re-import', () => {
+  const saved = structuredClone(planWith(eventsToStops([lecture, standup], day)).plan)
+  const [renamed, moved] = saved.stops
+  renamed.title = 'Lecture (Napier 102)'
+  renamed.localEdits = ['title']
+  // Still fixed, but 30 minutes later.
+  moved.timing = { ...moved.timing, fixedStartAt: '2026-09-28T03:30:00.000Z', fixedEndAt: '2026-09-28T04:15:00.000Z',
+    scheduledStartAt: '2026-09-28T03:30:00.000Z', scheduledEndAt: '2026-09-28T04:15:00.000Z' }
+  moved.localEdits = ['time']
+  validateSave(saved.id, { baseVersion: saved.version, plan: saved })
+
+  const later = { ...lecture, start: { dateTime: '2026-09-28T09:30:00+09:30' } }
+  const retitled = { ...standup, summary: 'Standup (new name)' }
+  const { plan, summary, changed } = planWith(eventsToStops([later, retitled], day), saved)
+  assert.equal(changed, true)
+  assert.deepEqual(summary, { added: 0, updated: 2, removed: 0, hidden: 0 })
+  assert.equal(plan.stops[0].title, 'Lecture (Napier 102)', 'the edited title is kept')
+  assert.equal(plan.stops[0].timing.fixedStartAt, '2026-09-28T00:00:00.000Z', 'its times still follow Calendar')
+  assert.deepEqual(plan.stops[0].localEdits, ['title'])
+  assert.deepEqual(plan.stops[1].timing, moved.timing, 'the edited times are kept')
+  assert.equal(plan.stops[1].title, 'Standup (new name)', 'its title still follows Calendar')
+  assert.deepEqual(plan.stops[1].localEdits, ['time'])
+  validateSave(plan.id, { baseVersion: plan.version, plan })
+})
+
+test('localEdits and removedEvents are validated', () => {
+  const saved = structuredClone(planWith(eventsToStops([lecture], day)).plan)
+  const validate = change => {
+    const plan = structuredClone(saved)
+    change(plan)
+    return () => validateSave(plan.id, { baseVersion: plan.version, plan })
+  }
+  assert.doesNotThrow(validate(plan => { plan.stops[0].localEdits = ['time', 'title'] }))
+  for (const bad of [[], ['title', 'title'], ['location'], 'title', null]) {
+    assert.throws(validate(plan => { plan.stops[0].localEdits = bad }), { code: 'INVALID_PLAN' })
+  }
+  assert.throws(validate(plan => {
+    plan.stops[0] = { ...plan.stops[0], source: 'manual', sourceEventId: null, sourceCalendarId: null, localEdits: ['title'] }
+  }), { code: 'INVALID_PLAN' }, 'only Calendar stops')
+
+  const event = { sourceCalendarId: 'primary', sourceEventId: 'gone', title: 'Gone' }
+  assert.doesNotThrow(validate(plan => { plan.removedEvents = [event] }))
+  assert.doesNotThrow(validate(plan => { plan.removedEvents = [] }))
+  for (const bad of [{ ...event, extra: 1 }, { ...event, title: '' }, { sourceCalendarId: 'primary', sourceEventId: 'x' }, 'gone']) {
+    assert.throws(validate(plan => { plan.removedEvents = [bad] }), { code: 'INVALID_PLAN' })
+  }
+  assert.throws(validate(plan => { plan.removedEvents = event }), { code: 'INVALID_PLAN' })
+  assert.throws(validate(plan => { plan.removedEvents = Array(501).fill(event) }), { code: 'INVALID_PLAN' })
+})
+
+test('POST /api/calendar/import restores removed events only when asked', async t => {
+  const { post, rows } = await server(t)
+  await post({ date, timezone })
+  const [stored] = rows.values()
+  const standupId = calendarStopId('primary', 'standup_20260928')
+  rows.set(stored.id, { ...stored, plan: { ...stored.plan,
+    stops: stored.plan.stops.filter(stop => stop.id !== standupId),
+    questions: stored.plan.questions.filter(question => question.stopId !== standupId),
+    removedEvents: [{ sourceCalendarId: 'primary', sourceEventId: 'standup_20260928', title: 'Team standup' }] } })
+
+  const hidden = await (await post({ date, timezone })).json()
+  assert.deepEqual(hidden.summary, { added: 0, updated: 0, removed: 0, hidden: 1 })
+  assert.equal(hidden.plan.stops.length, 1)
+  assert.equal((await post({ date, timezone, restoreRemoved: 'yes' })).status, 400)
+  const restored = await (await post({ date, timezone, restoreRemoved: true })).json()
+  assert.deepEqual(restored.summary, { added: 1, updated: 0, removed: 0, hidden: 0 })
+  assert.equal(restored.plan.stops.length, 2)
+  assert.equal('removedEvents' in restored.plan, false)
+})
+
+test('one removed event can be brought back, and events gone from Calendar are forgotten', () => {
+  const holidayRef = { sourceCalendarId: 'primary', sourceEventId: 'holiday' }
+  const standupRef = { sourceCalendarId: 'primary', sourceEventId: 'standup_20260928' }
+  const first = planWith(eventsToStops([lecture], day)).plan
+  const saved = { ...first, version: 2,
+    removedEvents: [{ ...standupRef, title: 'Team standup' }, { ...holidayRef, title: 'Conference' }] }
+
+  const some = mergeCalendarImport(saved, eventsToStops([lecture, standup, holiday], day),
+    { planId, date, timezone, restoreEvents: [holidayRef] })
+  assert.equal(some.changed, true)
+  assert.deepEqual(some.summary, { added: 1, updated: 0, removed: 0, hidden: 1 })
+  assert.ok(some.plan.stops.some(stop => stop.sourceEventId === 'holiday'))
+  assert.ok(!some.plan.stops.some(stop => stop.sourceEventId === 'standup_20260928'))
+  assert.deepEqual(some.plan.removedEvents, [{ ...standupRef, title: 'Team standup' }])
+  validateSave(some.plan.id, { baseVersion: some.plan.version, plan: some.plan })
+
+  // The standup was deleted in Google (and the conference moved to another day): nothing is hidden any more.
+  const pruned = planWith(eventsToStops([lecture], day), saved)
+  assert.equal(pruned.changed, true, 'forgetting them is a change to save')
+  assert.deepEqual(pruned.summary, { added: 0, updated: 0, removed: 0, hidden: 0 })
+  assert.equal('removedEvents' in pruned.plan, false)
+
+  // Only the events still in Calendar stay remembered.
+  const partly = planWith(eventsToStops([lecture, standup], day), saved)
+  assert.deepEqual(partly.plan.removedEvents, [{ ...standupRef, title: 'Team standup' }])
+  assert.equal(partly.summary.hidden, 1)
+})
+
+test('POST /api/calendar/import validates restoreEvents and restores just those', async t => {
+  const { post, rows } = await server(t)
+  await post({ date, timezone })
+  const [stored] = rows.values()
+  const standupId = calendarStopId('primary', 'standup_20260928')
+  const ref = { sourceCalendarId: 'primary', sourceEventId: 'standup_20260928' }
+  rows.set(stored.id, { ...stored, plan: { ...stored.plan,
+    stops: stored.plan.stops.filter(stop => stop.id !== standupId),
+    questions: stored.plan.questions.filter(question => question.stopId !== standupId),
+    removedEvents: [{ ...ref, title: 'Team standup' }] } })
+
+  for (const restoreEvents of [ref, [{ ...ref, title: 'x' }], [{ sourceCalendarId: 'primary' }], [{ ...ref, sourceEventId: '' }],
+    Array(501).fill(ref)]) {
+    assert.equal((await post({ date, timezone, restoreEvents })).status, 400)
+  }
+  const other = await (await post({ date, timezone, restoreEvents: [{ ...ref, sourceEventId: 'lecture' }] })).json()
+  assert.equal(other.summary.hidden, 1, 'restoring a different event leaves this one hidden')
+  const restored = await (await post({ date, timezone, restoreEvents: [ref] })).json()
+  assert.deepEqual(restored.summary, { added: 1, updated: 0, removed: 0, hidden: 0 })
+  assert.equal('removedEvents' in restored.plan, false)
+})
+
+test('an event that runs past midnight imports, saves and keeps an edited end', () => {
+  const party = { id: 'party', summary: 'Party', start: { dateTime: '2026-09-28T22:00:00+09:30' }, end: { dateTime: '2026-09-29T01:00:00+09:30' } }
+  const { plan } = planWith(eventsToStops([party], day))
+  assert.equal(plan.stops[0].timing.kind, 'fixed')
+  assert.equal(plan.stops[0].timing.durationMinutes, 180)
+  validateSave(plan.id, { baseVersion: plan.version, plan })
+  const saved = structuredClone(plan)
+  Object.assign(saved.stops[0].timing, { durationMinutes: 210,
+    fixedEndAt: '2026-09-28T16:00:00.000Z', scheduledEndAt: '2026-09-28T16:00:00.000Z' })
+  saved.stops[0].localEdits = ['time']
+  validateSave(saved.id, { baseVersion: saved.version, plan: saved })
+  const again = planWith(eventsToStops([party], day), saved)
+  assert.equal(again.plan.stops[0].timing.scheduledEndAt, '2026-09-28T16:00:00.000Z')
 })

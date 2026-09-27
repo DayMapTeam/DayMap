@@ -285,14 +285,21 @@ const dayPlan = {
       scheduledStartAt: null,
       scheduledEndAt: null
     },
-    status: 'planned' // 'planned' | 'completed' | 'skipped'
+    status: 'planned', // 'planned' | 'completed' | 'skipped'
+    travelMode: null, // 'walk' | 'transit' | 'drive'; null = automatic
+    // Google Calendar stops only, and only when non-empty: what the person changed
+    // in DayMap, so re-import keeps DayMap's title and/or times (issue #61).
+    localEdits: ['title', 'time'] // optional
   }],
   legs: [],
   conflicts: [],
   questions: [],
   // Where the day starts and ends (home, a hotel): a place without times, or null (issue #52).
   startPlace: null, // { label, placeId: null, lat, lng }
-  endPlace: null
+  endPlace: null,
+  // Optional, only when non-empty (at most 500, oldest dropped first): Calendar events
+  // the person removed, so re-import doesn't bring them back (issue #61).
+  removedEvents: [] // [{ sourceCalendarId, sourceEventId, title }]
 };
 ```
 
@@ -408,6 +415,7 @@ Token rules:
 - Handle cancellations, date-only all-day events, virtual meetings, and missing or ambiguous addresses.
 - A missing location becomes a planner question, never a guessed map pin.
 - Imported events start `fixed`. The person can make any timed event flexible (or fixed again) in its details; a Calendar event made flexible keeps DayMap's times on re-import, and only its title follows Calendar.
+- Imported events are DayMap's copy. The person can rename, move, resize or remove any of them (fixed ones too; "fixed" only means suggestions never move it). A renamed or re-timed event records `localEdits` and keeps DayMap's title or times on re-import; any accepted change to its times counts, including an accepted suggestion or an added stop that moves it. A removed event is remembered in `plan.removedEvents` and stays out of later imports (counted as `summary.hidden`) until the person brings them all back (`restoreRemoved: true`) or some of them (`restoreEvents: [{ sourceCalendarId, sourceEventId }]`). A removed event no longer in Calendar for that day is forgotten on the next import.
 - Import is read-only. DayMap never writes to Google Calendar.
 
 ## 9. Routing and scheduling
