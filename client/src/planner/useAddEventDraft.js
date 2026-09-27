@@ -23,14 +23,14 @@ function placeToLocation(place) {
  * @param {ReturnType<import('../app/usePlanAnalysis.js').usePlanAnalysis>} options.planning
  *   Its journey estimates are allowed for, and missing ones are requested.
  */
-export function useAddEventDraft({ now, planning, initialPlace = null }) {
+export function useAddEventDraft({ now, planning, initialPlace = null, initialRole = 'event', initialDayRole = 'both' }) {
   const { plan, addStop, setDayPlace } = usePlan()
   const [id] = useState(() => crypto.randomUUID())
   const [title, setTitleState] = useState(() => initialPlace ? splitPlaceLabel(initialPlace.label).name : '')
   const [location, setLocation] = useState(() => initialPlace ? placeToLocation(initialPlace) : null)
   // A place name never decides whether the person's day is over.
-  const [role, changeRole] = useState('event')
-  const [dayRole, setDayRole] = useState('both')
+  const [role, changeRole] = useState(initialRole)
+  const [dayRole, setDayRole] = useState(initialDayRole)
   // Times the person typed; until then the suggestion stays live as travel estimates arrive.
   const [edited, setEdited] = useState(null)
   const { ctx, requestJourneys } = planning
@@ -79,14 +79,14 @@ export function useAddEventDraft({ now, planning, initialPlace = null }) {
   function changeText(text) {
     setTitleState(text)
     setLocation(null)
-    changeRole('event')
+    changeRole(initialRole)
     setEdited(null)
   }
 
   function pickPlace(place) {
     setTitleState(splitPlaceLabel(place.label).name)
     setLocation(placeToLocation(place))
-    changeRole('event')
+    changeRole(initialRole)
     setEdited(null)
   }
 

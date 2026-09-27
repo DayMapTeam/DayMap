@@ -27,7 +27,7 @@ export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction
   const reopenRef = useRef(null)
   const focusAfterToggle = useRef(false)
 
-  const showReopen = !open && !isSheet
+  const showReopen = !open && !isSheet && !takeover
 
   // After the user toggles, keep focus on whichever control is now visible.
   useEffect(() => {
@@ -44,6 +44,7 @@ export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction
 
   return (
     <>
+      {takeover && <div className="planner-backdrop" aria-hidden="true" />}
       {showReopen && (
         <button
           ref={reopenRef}
@@ -59,6 +60,7 @@ export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction
       <section
         id="planner"
         className="planner glass"
+        data-takeover={Boolean(takeover) || undefined}
         aria-labelledby={takeover ? undefined : 'planner-title'}
         aria-label={takeover ? 'Planner' : undefined}
         data-open={open}
@@ -66,7 +68,7 @@ export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction
       >
         {/* inert, not hidden: the panel stays visible behind the overlay but can't be reached. */}
         <div className="planner-content" inert={overlay ? true : undefined}>
-          {isSheet && (
+          {isSheet && !takeover && (
             <button
               ref={toggleRef}
               type="button"
@@ -80,7 +82,7 @@ export default function PlannerPanel({ open, onOpenChange, toolbar, headerAction
             </button>
           )}
           {takeover ? (
-            <div className="planner-takeover" inert={isSheet && !open}>{takeover}</div>
+            <div className="planner-takeover">{takeover}</div>
           ) : (
             <>
               <div className="planner-top">

@@ -12,10 +12,12 @@ export function useReturnFocus(fallbackSelectors) {
   useEffect(() => {
     const trigger = document.activeElement
     return () => {
-      const usable = trigger instanceof HTMLElement && trigger !== document.body && trigger.isConnected
+      const visible = (element) => element instanceof HTMLElement && element.isConnected &&
+        !element.closest('[hidden], [inert]') && element.getClientRects().length > 0
+      const usable = trigger !== document.body && visible(trigger)
       const target = usable
         ? trigger
-        : fallbackSelectors.split(' || ').map((selector) => document.querySelector(selector)).find(Boolean)
+        : fallbackSelectors.split(' || ').map((selector) => document.querySelector(selector)).find(visible)
       target?.focus({ preventScroll: true })
     }
   }, [fallbackSelectors])

@@ -232,6 +232,8 @@ function idleReading(state, reading, plan, now) {
  */
 export function tripReducer(state, action) {
   switch (action.type) {
+    case 'reset':
+      return initialTrip
     case 'reading': {
       const { reading, plan, now } = action
       if (!isValidPoint(reading) || (reading.accuracy ?? 0) > RULES.ignoreAccuracyAboveMeters) return state

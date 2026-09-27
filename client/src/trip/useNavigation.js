@@ -17,7 +17,7 @@ const googleNavigation = createNavigationRouteProvider(loadMapsLibrary)
  * @param {{ lat: number, lng: number } | null} input.fallbackOrigin Where to route from without a position.
  * @returns {{ status: string, route: object | null, progress: object | null, mode: string | null }}
  */
-export function useNavigation({ target, plannedMode, reading, fallbackOrigin }) {
+export function useNavigation({ target, plannedMode, reading, fallbackOrigin, routeOverride = null }) {
   const [state, dispatch] = useReducer(navigationReducer, initialNavigation)
   const latest = useRef({ reading, fallbackOrigin, plannedMode })
   useEffect(() => {
@@ -36,14 +36,20 @@ export function useNavigation({ target, plannedMode, reading, fallbackOrigin }) 
 
   const { requestId, request } = state
   useEffect(() => {
-    if (!mapsApiKey || !request?.from) return undefined
+    if (!mapsApiKey || !request?.from || routeOverride?.targetId === state.targetId) return undefined
     let active = true
     googleNavigation({ ...request, departAt: new Date().toISOString() }).then(
       (route) => { if (active) dispatch({ type: 'routed', requestId, route, at: Date.now() }) },
       () => { if (active) dispatch({ type: 'failed', requestId }) },
     )
     return () => { active = false }
-  }, [requestId, request])
+  }, [requestId, request, routeOverride, state.targetId])
+
+  useEffect(() => {
+    if (routeOverride?.targetId === state.targetId && state.route !== routeOverride.route) {
+      dispatch({ type: 'routed', requestId, route: routeOverride.route, at: Date.now() })
+    }
+  }, [routeOverride, state.targetId, state.route, requestId])
 
   const progress = useMemo(() => (state.route && reading ? routeProgress(state.route, reading) : null), [state.route, reading])
   const status = !mapsApiKey && state.targetId ? 'unavailable' : state.status

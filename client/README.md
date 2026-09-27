@@ -39,6 +39,30 @@ What to expect:
 - Signed out, accepted events survive refresh in this tab (sessionStorage) and never reach the server. Each new date starts empty. The sample day has separate storage; **Back to my day** restores your local day. Signing in loads the account’s day; it does not merge local or sample events into the account. **Reset demo day** is available only in the sample day.
 - Without Supabase settings, local planning and the optional demo still work.
 
+## Rehearse a walk without travelling
+
+**Test run** sits near Go at the bottom left of the map. **Whole day** starts at
+the plan’s explicit **Day start** (for example, Home), follows every located
+timed event in order, and visits **Day end** if one is set. Set Day start in the
+planner first; imported events also need a confirmed map place. **One journey**
+still lets you replay any consecutive pair of located events.
+
+DayMap requests Google walking routes and moves a visibly simulated marker smoothly along
+their street paths. The camera follows it continuously, and the next leg is
+requested while the current leg plays. Directions, distance,
+arrival and the planner clock use accelerated time. Choose 10×/30×/60×/120×,
+pause, or end the run at any point. At each event, the run briefly pauses and
+then continues to the next journey. After the final stop, the normal map and
+planner return. Switching tabs pauses the run so it cannot jump ahead while hidden.
+
+During a whole-day run, use **+ Add stop** or **Edit day**. The run pauses and
+opens the planner. For example, add a grocery stop between two event times and
+accept it. **Return to run** fetches a walking route from the simulated position
+to the updated next event. Accept or discard pending edits before resuming.
+The replay stays in browser memory; it never changes the device GPS or saves
+simulated progress. Planner edits are saved through the normal plan flow.
+Google Maps and Routes must be configured for street routes.
+
 ## Setting an event's place
 
 Open an event in the planner and choose **Set place** (or **Change place**). For an imported Calendar event the search starts with the Calendar's location text, so one tap usually confirms it. **No place needed** is for online meetings; the row then says "No place", and re-imports keep that. Choosing is the explicit accept: it updates the accepted plan (and any pending draft), answers the location question, and is saved. Times never change. The helpers are in `src/app/planLocations.js`.

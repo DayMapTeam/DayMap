@@ -22,6 +22,26 @@
   display: none;
 }
 
+.planner-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  background: rgba(12, 19, 33, 0.32);
+}
+
+/* The same add dialog opens from search, the planner, and a test run. */
+.planner[data-takeover='true'] {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  z-index: 19;
+  width: min(480px, calc(100% - var(--overlay-inset) * 2));
+  height: min(680px, calc(100% - var(--overlay-inset) * 2));
+  transform: translate(-50%, -50%);
+  box-shadow: var(--shadow-float);
+}
+
 .planner-top {
   display: flex;
   flex: none;
@@ -200,7 +220,18 @@
   }
 
   .planner[data-open='true'] {
-    height: calc(100% - var(--header-height) - var(--space-2));
+    height: min(76dvh, calc(100% - var(--header-height) - var(--space-2)));
+  }
+
+  .planner[data-takeover='true'] {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: min(76dvh, calc(100% - var(--header-height) - var(--space-2)));
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    transform: none;
   }
 
   .planner-handle {

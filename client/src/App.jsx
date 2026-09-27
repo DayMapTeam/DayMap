@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlan } from './app/planContext.js'
 import { usePlanAnalysis } from './app/usePlanAnalysis.js'
 import { readDemoPlan, sessionStore, writeDemoPlan } from './app/planPersistence.js'
@@ -26,6 +26,7 @@ import { useNavigation } from './trip/useNavigation.js'
 import { useVoiceGuidance } from './trip/useVoiceGuidance.js'
 import { useWakeLock } from './trip/useWakeLock.js'
 import { useTrip } from './trip/useTrip.js'
+import { useWalkthrough } from './trip/useWalkthrough.js'
 import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 import './App.css'
 
@@ -36,9 +37,13 @@ function App() {
   const { plan, draft, selectedStopId, selectStop, clearSelection, loadPlan } = usePlan()
   const account = useAccount()
   const userId = account.user?.id ?? null
+  const walkthrough = useWalkthrough(plan)
+  const [editingRun, setEditingRun] = useState(false)
+  const [runRequest, setRunRequest] = useState(null)
+  const [runSheetOpen, setRunSheetOpen] = useState(false)
   // Hold the day while navigating, so midnight never swaps the plan mid-trip.
   const [tripRunning, setTripRunning] = useState(false)
-  const sync = usePlanSync(userId, { hold: tripRunning })
+  const sync = usePlanSync(userId, { hold: tripRunning || walkthrough.session?.kind === 'day' })
   const calendar = useCalendar({ userId, sync, plan, draft })
   const resetDemo = useCallback(() => {
     writeDemoPlan(sessionStore(), null)
@@ -70,15 +75,42 @@ function App() {
     setSearchPopup(null)
     setSearchKey((value) => value + 1)
   }, [])
-  const { now, isDemoTime } = usePlanClock(plan)
+  const planClock = usePlanClock(plan)
+  const now = walkthrough.now ?? planClock.now
+  const { isDemoTime } = planClock
   const planning = usePlanAnalysis(plan, draft, now)
   const journeyLegs = useJourneyLegs(planning, now)
   const [revealRequest, setRevealRequest] = useState(null)
 
   // Trips use the accepted plan and the device's position, watched while DayMap is open.
   const location = useLocation()
-  const reading = location.position
+  const reading = walkthrough.reading ?? location.position
   const trip = useTrip({ plan, now, reading })
+  const { go: goTrip, reset: resetTrip } = trip
+  const { session: walkSession, reset: resetWalk, pause: pauseWalk, resume: resumeWalk } = walkthrough
+  const startedWalkthrough = useRef(null)
+  const hadWalkthrough = useRef(false)
+  useEffect(() => {
+    if (walkSession) {
+      hadWalkthrough.current = true
+      if (startedWalkthrough.current !== walkSession.id) {
+        startedWalkthrough.current = walkSession.id
+        goTrip(walkSession.toId)
+      }
+    } else if (hadWalkthrough.current) {
+      hadWalkthrough.current = false
+      resetTrip()
+    }
+  }, [walkSession, goTrip, resetTrip])
+  const resetWalkthrough = useCallback(() => {
+    resetWalk()
+    setEditingRun(false)
+  }, [resetWalk])
+  const openRunPlanner = useCallback((kind) => {
+    if (walkSession) pauseWalk()
+    setEditingRun(Boolean(walkSession))
+    setRunRequest({ kind, key: crypto.randomUUID() })
+  }, [walkSession, pauseWalk])
   const tripTargetId = trip.target?.id ?? null
   // Live guidance: a route from where you are (or the stop before) to the destination.
   const plannedLeg = planning.analysis.legs.find((leg) => leg.toStopId === tripTargetId)
@@ -88,6 +120,7 @@ function App() {
     plannedMode: plannedLeg?.mode ?? null,
     reading,
     fallbackOrigin: trip.atStop?.location ?? previousStop?.location ?? null,
+    routeOverride: walkthrough.routeOverride,
   })
   // Navigation mode: like Google Maps on a phone, the map takes the whole screen.
   const navigating = tripTargetId !== null
@@ -122,6 +155,12 @@ function App() {
     setFollowState((current) => (current.tripId === null ? current : { ...current, paused: true, pausedAt: Date.now() }))
   }, [])
   const recenter = useCallback(() => setFollowState((current) => ({ ...current, paused: false })), [])
+  const resumeRun = useCallback(() => {
+    if (runSheetOpen || draft !== null) return
+    setEditingRun(false)
+    resumeWalk()
+    recenter()
+  }, [runSheetOpen, draft, resumeWalk, recenter])
   const { paused: followPaused, pausedAt } = followState
   useEffect(() => {
     if (!followPaused) return undefined
@@ -162,7 +201,7 @@ function App() {
   if (popup !== null && popup.stopId !== selectedStopId) setPopup(null)
 
   return (
-    <div className="app" data-navigating={navigating || undefined}>
+    <div className="app" data-navigating={((navigating || walkSession?.kind === 'day') && !editingRun) || undefined}>
       <MapView
         stops={planning.shown.stops}
         legs={navigating ? noLegs : journeyLegs}
@@ -175,8 +214,10 @@ function App() {
         previewPlace={previewPlace}
         onSelectPreview={selectPreview}
         userPosition={shownPosition}
-        tripActive={navigating}
+        tripActive={navigating || walkSession?.kind === 'day'}
         follow={follow}
+        simulationSession={walkSession}
+        simulationFollowing={following && !editingRun}
         onUserCameraMove={pauseFollow}
         route={navigating ? navigation.route : null}
         routeSplit={navigating ? routeSplit : null}
@@ -220,11 +261,22 @@ function App() {
         following={following}
         hasPosition={reading !== null}
         onRecenter={recenter}
+        walkthrough={walkthrough}
+        onResetWalkthrough={resetWalkthrough}
+        editingRun={editingRun}
+        runSheetOpen={runSheetOpen}
+        runDraftPending={draft !== null}
+        onEditRun={() => openRunPlanner('open')}
+        onAddRun={() => openRunPlanner('add')}
+        onSetRunStart={() => openRunPlanner('day-start')}
+        onResumeRun={resumeRun}
       />
       <Planner
         now={now}
         revealRequest={revealRequest}
         addPlaceRequest={addPlaceRequest}
+        runRequest={runRequest}
+        onSheetStateChange={setRunSheetOpen}
         onPlaceAdded={searchPlaceAdded}
         planning={planning}
         emptyState={<EmptyDay calendar={userId ? calendar : null} />}

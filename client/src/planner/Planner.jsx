@@ -34,7 +34,8 @@ function isTyping(target) {
  * @param {import('react').ReactNode} [props.emptyState] Shown when the day has no stops.
  * @param {ReturnType<import('../app/useCalendar.js').useCalendar> | null} [props.calendar] Connected Calendar, for bringing back removed events; null when signed out.
  */
-export default function Planner({ now, revealRequest, planning, emptyState, calendar = null, addPlaceRequest = null, onPlaceAdded }) {
+export default function Planner({ now, revealRequest, planning, emptyState, calendar = null, addPlaceRequest = null,
+  runRequest = null, onPlaceAdded, onSheetStateChange }) {
   const { plan, draft, undoAdd, removeStop, undoRemove, lastRemove = null } = usePlan()
   const [filter, setFilter] = useState('')
   const [open, setOpen] = usePlannerOpen()
@@ -44,7 +45,10 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   // Changes each time the add sheet opens, so it starts empty: a number, or null when closed.
   const [sheetKey, setSheetKey] = useState(null)
   const [sheetPlace, setSheetPlace] = useState(null)
+  const [sheetKind, setSheetKind] = useState('event')
+  useEffect(() => { onSheetStateChange?.(sheetKey !== null) }, [sheetKey, onSheetStateChange])
   const [handledAddPlace, setHandledAddPlace] = useState(null)
+  const [handledRunRequest, setHandledRunRequest] = useState(null)
   // { stopId, message, key, showNew }
   const [recentAdd, setRecentAdd] = useState(null)
   // The stop waiting for "Are you sure?": { stopId, returnFocus }, or null.
@@ -61,10 +65,23 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   if (addPlaceRequest !== handledAddPlace) {
     setHandledAddPlace(addPlaceRequest)
     if (addPlaceRequest && canAdd) {
-      setOpen(true)
       setOpenStopId(null)
       setSheetPlace(addPlaceRequest.place)
+      setSheetKind('event')
       setSheetKey(addPlaceRequest.key)
+    }
+  }
+
+  if (runRequest !== handledRunRequest) {
+    setHandledRunRequest(runRequest)
+    if (runRequest) {
+      if (runRequest.kind === 'open') setOpen(true)
+      setOpenStopId(null)
+      if (runRequest.kind !== 'open' && canAdd) {
+        setSheetPlace(null)
+        setSheetKind(runRequest.kind)
+        setSheetKey(runRequest.key)
+      }
     }
   }
 
@@ -89,9 +106,9 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
       if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented || isTyping(event.target)) return
       if (!canAdd) return
       event.preventDefault()
-      setOpen(true)
       setOpenStopId(null)
       if (sheetKey === null) setSheetPlace(null)
+      if (sheetKey === null) setSheetKind('event')
       setSheetKey((previous) => previous ?? Date.now())
     }
     document.addEventListener('keydown', handleKeyDown)
@@ -121,9 +138,9 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   }, [removeKey])
 
   function openSheet() {
-    setOpen(true)
     setOpenStopId(null)
     setSheetPlace(null)
+    setSheetKind('event')
     setSheetKey(Date.now())
   }
 
@@ -209,7 +226,9 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
             now={now}
             planning={planning}
             initialPlace={sheetPlace}
-            returnFocusSelector={sheetPlace ? '.place-search-add || #place-search-input' : '.planner-add'}
+            initialRole={sheetKind === 'day-start' ? 'day-place' : 'event'}
+            initialDayRole={sheetKind === 'day-start' ? 'start' : 'both'}
+            returnFocusSelector={sheetPlace ? '.place-search-add || #place-search-input' : '.planner-add || .planner-reopen'}
             onCommitted={committed}
             onCancel={() => setSheetKey(null)}
           />
