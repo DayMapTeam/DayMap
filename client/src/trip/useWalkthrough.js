@@ -217,6 +217,17 @@ export function useWalkthrough(plan) {
     setSession((value) => value ? { ...value, sampledAt: performance.now(), playing: true,
       autoAdvance: value.kind === 'day' } : value)
   }, [advance, beginLeg, finish, reset])
+  // Presenting: jump straight to the destination and on to the next leg.
+  const skip = useCallback(() => {
+    pauseRequested.current = false
+    const current = sessionRef.current
+    if (!current) return
+    const arrived = { ...current, elapsedSeconds: current.durationSeconds, sampledAt: performance.now(),
+      playing: false, autoAdvance: false, finishTicks: 2 }
+    sessionRef.current = arrived
+    setSession(arrived)
+    advance()
+  }, [advance])
   const setSpeed = useCallback((speed) => {
     if (![10, 30, 60, 120].includes(speed)) return
     const at = performance.now()
@@ -242,5 +253,5 @@ export function useWalkthrough(plan) {
 
   return { mode, setMode, pairs, pair, selectedPairId, setSelectedPairId, itinerary, dayIssue,
     session, status, error, reading, now, routeOverride,
-    start, pause, resume, setSpeed, reset, dismissFinished }
+    start, pause, resume, skip, setSpeed, reset, dismissFinished }
 }

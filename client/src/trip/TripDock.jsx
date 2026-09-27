@@ -223,6 +223,9 @@ function WalkthroughControls({ walkthrough, onReset, blocked, editingRun, runShe
               : <button type="button" className="nav-pill" disabled={status === 'loading'} onClick={session.playing ? walkthrough.pause : walkthrough.resume}>
                 {session.playing ? 'Pause' : session.finishTicks >= 2 ? 'Continue' : 'Resume'}
               </button>}
+            {!editingRun && <button type="button" className="nav-pill" disabled={status === 'loading'} onClick={walkthrough.skip}>
+              {session.kind === 'day' ? 'Skip to next stop' : 'Skip to arrival'}
+            </button>}
             <label className="walkthrough-speed">Speed
               <select value={session.speed} onChange={(event) => walkthrough.setSpeed(Number(event.target.value))}>
                 <option value="10">10×</option><option value="30">30×</option><option value="60">60×</option><option value="120">120×</option>
