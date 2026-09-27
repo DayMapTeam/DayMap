@@ -1,5 +1,6 @@
 import './buttons.css'
 import './CalendarSection.css'
+import RemovedCalendarEvents from './RemovedCalendarEvents.jsx'
 
 const STATUS = {
   checking: 'Checking…',
@@ -30,10 +31,10 @@ export default function CalendarSection({ calendar }) {
           <div className="calendar-section-actions">
             <button
               type="button"
-              className="button-filled"
+              className="button-filled calendar-section-import"
               disabled={!calendar.canImport}
               title={calendar.importHint ?? undefined}
-              onClick={calendar.importDay}
+              onClick={() => calendar.importDay()}
             >
               {busy === 'import' ? 'Importing…' : 'Import today’s events'}
             </button>
@@ -42,6 +43,7 @@ export default function CalendarSection({ calendar }) {
             </button>
           </div>
           {calendar.importHint && busy === null && <p className="calendar-section-text">{calendar.importHint}</p>}
+          <RemovedCalendarEvents calendar={calendar} returnFocusSelector=".calendar-section-import" />
         </>
       )}
       {state === 'disconnected' && (

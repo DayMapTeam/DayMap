@@ -46,7 +46,7 @@
   --mode-bus: #0a84ff;
   --mode-walk: #30b0c7;
   --mode-drive: #5e5ce6;
-  --route-done: #8e8e93; /* journeys already travelled, on the map */
+  --route-done: #d1d1d6; /* journeys already travelled, on the map (drawn see-through) */
 
   /*
    * Map placeholder until DM-03. Stays a gradient: committing a Google map
@@ -60,7 +60,6 @@
   --radius-card: 14px;
   --radius-legend: 12px;
   --radius-control: 10px;
-  --radius-segmented: 9px;
   --radius-thumb: 8px;
   --radius-pill: 999px;
 

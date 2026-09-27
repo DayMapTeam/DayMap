@@ -1,43 +1,5 @@
 import { useId } from 'react'
 
-const WHEN_OPTIONS = [
-  ['flexible', 'Fit it in for me'],
-  ['fixed', 'At a set time'],
-]
-
-/**
- * Flexible ("Fit it in for me") or fixed ("At a set time"), as a segmented
- * control built from radio buttons.
- *
- * @param {object} props
- * @param {'flexible' | 'fixed'} props.value
- * @param {(kind: 'flexible' | 'fixed') => void} props.onChange
- * @param {[string, string][]} [props.options] [kind, label] pairs, in order.
- * @param {string} [props.label] Accessible name of the group.
- * @param {boolean} [props.disabled]
- */
-export function WhenModeToggle({ value, onChange, options = WHEN_OPTIONS, label: groupLabel = 'When', disabled = false }) {
-  const name = useId()
-  return (
-    <div className="segmented" role="radiogroup" aria-label={groupLabel} aria-disabled={disabled || undefined}>
-      {options.map(([kind, label]) => (
-        <label key={kind} className="segmented-option">
-          <input
-            className="visually-hidden"
-            type="radio"
-            name={name}
-            value={kind}
-            checked={value === kind}
-            disabled={disabled}
-            onChange={() => onChange(kind)}
-          />
-          <span className="segmented-label">{label}</span>
-        </label>
-      ))}
-    </div>
-  )
-}
-
 /**
  * @param {object} props
  * @param {string} props.start "HH:MM"

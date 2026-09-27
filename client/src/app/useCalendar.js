@@ -71,13 +71,13 @@ export function useCalendar({ userId, sync, plan, draft }) {
     }
   }, [])
 
-  const importDay = useCallback(async ({ quiet = false } = {}) => {
+  const importDay = useCallback(async ({ quiet = false, restoreRemoved = false, restoreEvents } = {}) => {
     const base = planRef.current
     const { date, timezone } = sync.day
     setBusy('import')
     if (!quiet) setNotice({ tone: 'progress', text: 'Importing today’s events from Google Calendar…' })
     try {
-      const { plan: saved, summary } = await api.importCalendarDay(date, timezone)
+      const { plan: saved, summary } = await api.importCalendarDay(date, timezone, { restoreRemoved, restoreEvents })
       if (!sync.adopt(saved, base)) {
         setNotice({ tone: 'info', text: calendarErrorMessage({ code: 'VERSION_CONFLICT' }) })
         return
@@ -125,7 +125,12 @@ export function useCalendar({ userId, sync, plan, draft }) {
     canImport: ready,
     importHint,
     connect,
-    importDay: () => importDay(),
+    // Click handlers pass an event here, so only an explicit `restoreRemoved: true`
+    // or a `restoreEvents` array ({ sourceCalendarId, sourceEventId }[]) restores.
+    importDay: (options) => importDay({
+      restoreRemoved: options?.restoreRemoved === true,
+      restoreEvents: Array.isArray(options?.restoreEvents) ? options.restoreEvents : undefined,
+    }),
     disconnect,
     dismissNotice: () => setNotice(null),
   }

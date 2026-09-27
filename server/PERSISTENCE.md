@@ -24,6 +24,29 @@ The frontend signs in with Supabase Auth and saves the accepted plan through the
    the API examples below using their access tokens. Do not put tokens in Git,
    screenshots, or PR descriptions.
 
+## Local Supabase (no shared project needed)
+
+`supabase/config.toml` runs the whole stack (Postgres, Auth, PostgREST) in Docker.
+With Docker running and Node 22:
+
+```sh
+npx supabase start -x realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor
+```
+
+The first run downloads images, then applies every file in `supabase/migrations/`.
+It prints the local `API_URL` (`http://127.0.0.1:54321`) and `PUBLISHABLE_KEY`.
+Put them in `server/.env` (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`) and
+`client/.env.local` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`). These
+are Supabase's fixed local defaults, not secrets. Email/password sign-up works
+immediately, since local confirmation emails are off (sent mail appears at
+`http://127.0.0.1:54324`). Google sign-in and Calendar still need Google OAuth
+credentials. The Calendar `DATABASE_URL` is
+`postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
+
+Use `npx supabase stop` to stop the stack (data is kept) and `npx supabase db reset` to
+wipe it and reapply the migrations. Studio (`-x` above leaves it on) is at
+`http://127.0.0.1:54323` for browsing tables.
+
 Profiles contain timezone/preferences and are created explicitly by their owner;
 there is no signup trigger or profile endpoint yet. Day plans reference Auth users
 directly, so saving does not depend on a profile row already existing.

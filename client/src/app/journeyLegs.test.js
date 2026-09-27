@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildRouteLegs, legLabel, legStates, routeRequest } from './routeLegs.js'
+import { buildJourneyLegs, legLabel, legStates } from './journeyLegs.js'
 
 const at = (time) => Date.parse(`2026-09-26T${time}:00Z`)
 const timed = (id, depart, arrive) => ({ id, departMs: at(depart), arriveMs: at(arrive) })
@@ -23,7 +23,6 @@ test('after the last journey everything is done', () => {
 test('chip text is the way of travelling and the time, rounded up to a minute', () => {
   assert.equal(legLabel('walk', 590), 'Walk · 10 min')
   assert.equal(legLabel('drive', 20), 'Drive · 1 min')
-  assert.equal(legLabel('transit', 22 * 60, 'Bus'), 'Bus · 22 min')
   assert.equal(legLabel('transit', 75 * 60), 'Transit · 1 hr 15 min')
 })
 
@@ -45,32 +44,26 @@ const leg = (from, to, depart, extra = {}) => ({
   departAt: `2026-09-26T${depart}:00Z`, arriveAt: null, status: 'unavailable', travelSeconds: null, ...extra,
 })
 
-test('a journey without a pinned end or a way of travelling is not requested', () => {
-  assert.equal(routeRequest(leg('market', 'nowhere', '03:00'), stops), null)
-  assert.equal(routeRequest(leg('home', 'library', '00:30', { mode: null }), stops), null)
-  assert.equal(routeRequest(leg('home', 'library', '00:30', { provider: 'same-place' }), stops), null)
-  assert.equal(routeRequest(leg('home', 'library', '00:30'), stops).to.id, 'library')
+test('a journey without a pinned end, a way of travelling or any distance is not drawn', () => {
+  const legs = [
+    leg('market', 'nowhere', '03:00'),
+    leg('home', 'library', '00:30', { mode: null }),
+    leg('home', 'library', '00:30', { provider: 'same-place' }),
+    leg('home', 'home', '00:30'),
+  ]
+  assert.deepEqual(buildJourneyLegs(legs, stops, at('00:00')), [])
 })
 
-test('only journeys whose route arrived are drawn, never as a straight line', () => {
+test('each journey is a direct line between its two stops, labelled with the planner estimate', () => {
   const legs = [
     leg('home', 'library', '00:30', { status: 'ready', travelSeconds: 600, arriveAt: '2026-09-26T00:40:00Z' }),
     leg('library', 'market', '02:00', { mode: 'transit' }),
   ]
-  const path = [{ lat: -34.92, lng: 138.6 }, { lat: -34.9204, lng: 138.6029 }]
-  const lookup = (request) => (request.to.id === 'library'
-    ? { status: 'ready', path, distanceMeters: 800, seconds: 700, vehicle: null }
-    : { status: 'pending' })
-  const drawn = buildRouteLegs(legs, stops, at('00:35'), lookup)
-  assert.deepEqual(drawn, [{
-    id: 'leg:home:library', mode: 'walk', state: 'current', path, distanceMeters: 800, label: 'Walk · 10 min',
-  }])
-})
-
-test('a journey already under way takes its time from the route', () => {
-  const legs = [leg('library', 'market', '02:00', { mode: 'transit' })]
-  const lookup = () => ({ status: 'ready', path: [{ lat: 0, lng: 0 }, { lat: 0, lng: 0.01 }], distanceMeters: 1100, seconds: 1320, vehicle: 'Bus' })
-  const [drawn] = buildRouteLegs(legs, stops, at('02:10'), lookup)
-  assert.equal(drawn.state, 'current')
-  assert.equal(drawn.label, 'Bus · 22 min')
+  const [walk, ride] = buildJourneyLegs(legs, stops, at('00:35'))
+  assert.deepEqual(walk, {
+    id: 'leg:home:library', state: 'current',
+    path: [{ lat: -34.92, lng: 138.6 }, { lat: -34.9204, lng: 138.6029 }], label: 'Walk · 10 min',
+  })
+  assert.equal(ride.state, 'next')
+  assert.equal(ride.label, 'Transit', 'no estimate yet: no time, never zero')
 })

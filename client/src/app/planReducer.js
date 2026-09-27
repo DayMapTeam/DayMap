@@ -1,12 +1,14 @@
 import { chooseOption } from './planAdd.js'
-import { isDayNote, listStopChanges, validateStopEdit, withDayPlace, withStopKind, withTravelMode } from './planEdits.js'
+import {
+  isDayNote, listStopChanges, validateStopEdit, withDayPlace, withLocalTimeMarks, withStopKind, withTravelMode,
+} from './planEdits.js'
 import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
 import { planFingerprint } from '../../../shared/planning/fingerprint.js'
 
 /** Initialise an isolated plan snapshot for each provider. */
 export function createPlanState(initialPlan) {
-  return { plan: structuredClone(initialPlan), selectedStopId: null, draft: null, lastAdd: null }
+  return { plan: structuredClone(initialPlan), selectedStopId: null, draft: null, lastAdd: null, lastRemove: null }
 }
 
 /**
@@ -22,7 +24,8 @@ function addStop(state, { newStop, afterStopId, baseVersion, now, ctx = null }) 
   const version = state.plan.version + 1
   return {
     ...state,
-    plan: { ...option.plan, version },
+    // Calendar events the fit moved keep their new times on re-import.
+    plan: { ...withLocalTimeMarks(state.plan, option.plan), version },
     selectedStopId: newStop.id,
     lastAdd: { stopId: newStop.id, previousPlan: state.plan, version },
   }
@@ -41,9 +44,26 @@ function undoAdd(state, { stopId }) {
   }
 }
 
+const LOCAL_EDITS = ['title', 'time']
+const sameTime = (a, b) => Date.parse(a) === Date.parse(b)
+
+/**
+ * Which fields of a Google Calendar stop the person has changed from the
+ * accepted plan, plus those already recorded there, so re-import keeps them.
+ */
+function localEditsFor(accepted, next) {
+  const recorded = new Set(accepted.localEdits ?? [])
+  if (next.title !== accepted.title) recorded.add('title')
+  if (!sameTime(next.timing.scheduledStartAt, accepted.timing.scheduledStartAt)
+    || !sameTime(next.timing.scheduledEndAt, accepted.timing.scheduledEndAt)) recorded.add('time')
+  return LOCAL_EDITS.filter((field) => recorded.has(field))
+}
+
 /**
  * Apply a stop edit to the draft (or start one from the accepted plan).
  * Timing changes mark the stop's legs stale until they are recalculated.
+ * A fixed stop stays fixed at its new times. A Google Calendar stop records
+ * what the person changed (`localEdits`), so re-import doesn't undo it.
  */
 function editStopDraft(state, { stopId, edit }) {
   if (state.draft?.suggestion) {
@@ -66,6 +86,16 @@ function editStopDraft(state, { stopId, edit }) {
   target.timing.scheduledStartAt = edit.scheduledStartAt
   target.timing.scheduledEndAt = edit.scheduledEndAt
   target.timing.durationMinutes = isDayNote(target) ? null : (Date.parse(edit.scheduledEndAt) - Date.parse(edit.scheduledStartAt)) / 60000
+  if (target.timing.kind === 'fixed') {
+    target.timing.fixedStartAt = edit.scheduledStartAt
+    target.timing.fixedEndAt = edit.scheduledEndAt
+  }
+  if (target.source === 'google-calendar') {
+    const accepted = state.plan.stops.find((candidate) => candidate.id === stopId) ?? stop
+    const localEdits = localEditsFor(accepted, target)
+    if (localEdits.length > 0) target.localEdits = localEdits
+    else delete target.localEdits
+  }
   if (timingChanged) {
     plan.legs = plan.legs.map((leg) =>
       leg.fromStopId === stopId || leg.toStopId === stopId ? { ...leg, status: 'stale' } : leg,
@@ -111,34 +141,112 @@ function withoutStop(plan, stopId) {
     stops: plan.stops.filter((stop) => stop.id !== stopId),
     legs: plan.legs.filter((leg) => leg.fromStopId !== stopId && leg.toStopId !== stopId),
     questions: (plan.questions ?? []).filter((question) => question.stopId !== stopId),
+    conflicts: (plan.conflicts ?? []).filter((conflict) => !conflict.stopIds?.includes(stopId)),
   }
 }
 
+// Calendar events the person removed; re-import leaves them out.
+const MAX_REMOVED_EVENTS = 500
+
+function withRemovedEvent(plan, stop) {
+  if (stop.source !== 'google-calendar') return plan
+  const removed = plan.removedEvents ?? []
+  const known = removed.some((event) =>
+    event.sourceCalendarId === stop.sourceCalendarId && event.sourceEventId === stop.sourceEventId)
+  if (known) return plan
+  const event = { sourceCalendarId: stop.sourceCalendarId, sourceEventId: stop.sourceEventId, title: stop.title }
+  return { ...plan, removedEvents: [...removed, event].slice(-MAX_REMOVED_EVENTS) }
+}
+
 /**
- * Delete a flexible stop the user confirmed, with its legs. The confirmation
- * is the explicit accept, so this changes the accepted plan and bumps its
- * version. A pending edit draft loses the stop too but keeps its other edits.
+ * Delete a stop the user confirmed, with its legs, questions and conflicts.
+ * Any stop can go, fixed or from Google Calendar too; a Calendar event is
+ * remembered in `removedEvents` so re-import doesn't bring it back. The
+ * confirmation is the explicit accept, so this changes the accepted plan and
+ * bumps its version, and it can be undone until the plan changes again. A
+ * pending edit draft loses the stop too but keeps its other edits; undo
+ * gives back the stop's pending edits as well.
  */
 function removeStop(state, { stopId }) {
   const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
-  if (!stop || (stop.timing.kind !== 'flexible' && !isDayNote(stop))) return state
+  if (!stop) return state
+  if (stop.timing.kind === 'all-day' && !isDayNote(stop)) return state
   if (state.draft?.suggestion) return removeStop(revertSuggestion(state), { stopId })
 
   const version = state.plan.version + 1
-  const plan = { ...withoutStop(state.plan, stopId), version }
+  const plan = { ...withRemovedEvent(withoutStop(state.plan, stopId), stop), version }
   let { draft } = state
+  // The stop as the pending draft had edited it, so undo can bring the edits back.
+  const draftStop = draft?.editedStopIds?.includes(stopId)
+    ? draft.plan.stops.find((candidate) => candidate.id === stopId) ?? null
+    : null
   if (draft !== null) {
-    const draftPlan = withoutStop(draft.plan, stopId)
+    const draftPlan = withRemovedEvent(withoutStop(draft.plan, stopId), stop)
     draft = listStopChanges(plan, draftPlan).length === 0
       ? null
-      : { ...draft, plan: draftPlan, baseVersion: draft.baseVersion === state.plan.version ? version : draft.baseVersion }
+      : {
+          ...draft, plan: draftPlan,
+          editedStopIds: (draft.editedStopIds ?? []).filter((id) => id !== stopId),
+          baseVersion: draft.baseVersion === state.plan.version ? version : draft.baseVersion,
+        }
   }
   return {
     ...state,
     plan,
     draft,
     selectedStopId: state.selectedStopId === stopId ? null : state.selectedStopId,
+    lastRemove: { stopId, title: stop.title, previousPlan: state.plan, version, draftStop },
   }
+}
+
+/** A plan with `stop` put back where it was in `previousPlan`, with its questions and conflicts. */
+function withStopRestored(plan, previousPlan, stop) {
+  const index = previousPlan.stops.findIndex((candidate) => candidate.id === stop.id)
+  const stops = plan.stops.filter((candidate) => candidate.id !== stop.id)
+  const before = previousPlan.stops.slice(0, index).map((candidate) => candidate.id)
+  const at = stops.reduce((last, candidate, position) => (before.includes(candidate.id) ? position + 1 : last), 0)
+  stops.splice(at, 0, stop)
+  const next = {
+    ...plan,
+    stops,
+    questions: [...(plan.questions ?? []), ...(previousPlan.questions ?? []).filter((question) => question.stopId === stop.id)],
+    conflicts: [...(plan.conflicts ?? []), ...(previousPlan.conflicts ?? []).filter((conflict) => conflict.stopIds?.includes(stop.id))],
+  }
+  if (previousPlan.removedEvents === undefined) delete next.removedEvents
+  else next.removedEvents = previousPlan.removedEvents
+  return next
+}
+
+// Undo puts the stop back as it was before the removal, but only while
+// nothing else has changed the accepted plan. Pending edits to the stop come
+// back into the draft (a new one if removing it had emptied the draft);
+// otherwise a pending draft gets the accepted stop.
+function undoRemove(state, { stopId }) {
+  const { lastRemove } = state
+  if (lastRemove === null || lastRemove.stopId !== stopId || lastRemove.version !== state.plan.version) return state
+  if (state.draft?.suggestion) return undoRemove(revertSuggestion(state), { stopId })
+  const version = state.plan.version + 1
+  const plan = { ...lastRemove.previousPlan, version }
+  const { draftStop = null } = lastRemove
+  const stop = draftStop ?? plan.stops.find((candidate) => candidate.id === stopId)
+  let draft = null
+  if (state.draft !== null) {
+    const otherIds = (state.draft.editedStopIds ?? []).filter((id) => id !== stopId)
+    draft = {
+      ...state.draft,
+      plan: withStopRestored(state.draft.plan, lastRemove.previousPlan, stop),
+      editedStopIds: draftStop ? [...otherIds, stopId] : otherIds,
+      baseVersion: state.draft.baseVersion === state.plan.version ? version : state.draft.baseVersion,
+    }
+  } else if (draftStop !== null) {
+    const draftPlan = {
+      ...plan,
+      stops: plan.stops.map((candidate) => (candidate.id === stopId ? draftStop : candidate)),
+      legs: plan.legs.map((leg) => (leg.fromStopId === stopId || leg.toStopId === stopId ? { ...leg, status: 'stale' } : leg)),
+    }
+    draft = { baseVersion: version, plan: draftPlan, stale: false, editedStopIds: [stopId] }
+  }
+  return { ...state, plan, draft, lastRemove: null }
 }
 
 /**
@@ -245,7 +353,8 @@ export function planReducer(state, action) {
           return draft.suggestionInvalid ? state : { ...state, draft: { ...draft, suggestionInvalid: true } }
         }
       }
-      return { ...state, plan: { ...draft.plan, version: state.plan.version + 1 }, draft: null }
+      // Calendar events moved by the draft (edits or suggestions) keep their new times on re-import.
+      return { ...state, plan: { ...withLocalTimeMarks(state.plan, draft.plan), version: state.plan.version + 1 }, draft: null }
     }
     case 'discard-draft':
       return state.draft === null ? state : { ...state, draft: null }
@@ -253,6 +362,8 @@ export function planReducer(state, action) {
       return addStop(state, action)
     case 'undo-add':
       return undoAdd(state, action)
+    case 'undo-remove':
+      return undoRemove(state, action)
     case 'set-day-place':
       return setDayPlace(state, action)
     case 'set-stop-travel-mode':

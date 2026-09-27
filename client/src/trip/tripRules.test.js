@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { demoPlan } from '../../../shared/fixtures/demoPlan.js'
 import {
-  RULES, bearingDegrees, compassLabel, directionsUrl, distanceMeters, initialTrip, nextStopFor,
+  RULES, bearingDegrees, compassLabel, dayEndStop, directionsUrl, distanceMeters, initialTrip, nextStopFor,
   offsetPoint, tripReducer, walkingSecondsEstimate,
 } from './tripRules.js'
 
@@ -242,4 +242,15 @@ test('after the last event, the next stop is where the day ends', () => {
   const left = feed({ ...initialTrip, atStopId: 'stop-square' }, [away(square, 300), away(square, 300), away(square, 300)], { plan, now: LATER })
   assert.equal(left.targetId, 'day-end', 'leaving the last stop heads home')
   assert.equal(nextStopFor(demoPlan, { atStopId: 'stop-square', now: LATER }), null)
+})
+
+test('where the day ends comes after an event that runs past midnight', () => {
+  const home = { label: 'Home', placeId: null, lat: -34.95, lng: 138.62 }
+  const plan = structuredClone({ ...demoPlan, endPlace: home })
+  // The afternoon break becomes 11:00pm–1:00am.
+  Object.assign(plan.stops.at(-1).timing, { durationMinutes: 120, earliestStartAt: null, latestEndAt: null,
+    scheduledStartAt: '2026-09-26T13:30:00Z', scheduledEndAt: '2026-09-26T15:30:00Z' })
+  const end = dayEndStop(plan)
+  assert.equal(end.timing.scheduledStartAt, '2026-09-26T15:30:00.000Z')
+  assert.ok(Date.parse(end.timing.scheduledEndAt) > Date.parse(end.timing.scheduledStartAt))
 })

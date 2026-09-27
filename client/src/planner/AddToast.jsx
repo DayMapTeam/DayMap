@@ -1,5 +1,5 @@
 /**
- * Confirmation after adding a stop, with Undo while it is shown.
+ * Confirmation after adding or removing a stop, with Undo while it is shown.
  *
  * @param {object} props
  * @param {string} props.message
