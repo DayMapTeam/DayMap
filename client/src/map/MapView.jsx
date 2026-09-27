@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { numberStops } from '../app/stopNumbers.js'
 import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
-import { arcApex, arcPath, arcStyle, chipFont, dashes, travelChipSvg } from './journeyArc.js'
+import { arcApex, arcPath, arcStyle } from './journeyArc.js'
 import { markerColors, markerTemplate, stopMarkerSvg } from './stopMarker.js'
+import { chipFont, travelChipSvg } from './travelChip.js'
 import { navigationArrowSvg, userMarkerSvg } from './userMarker.js'
 import './MapView.css'
 
@@ -46,29 +47,19 @@ function measureText(text, font) {
 }
 
 /**
- * The map elements for one journey: its arc (dashed on foot), the faint
- * ground route under the current journey, and the travel chip at the apex.
+ * The map elements for one journey: its destination line, one smooth arc
+ * from stop to stop with a bright core and a soft glow, and the travel chip
+ * at the apex.
  */
 function journeyElements(runtime, leg) {
   const { Polyline, PlainMarker, colors } = runtime
   const style = arcStyle(leg.state, colors)
-  const arc = arcPath(leg.path, leg.distanceMeters)
-  const line = (path, options) => new Polyline({ ...options, path })
-  const elements = []
-  if (style.ground) {
-    elements.push(line(leg.path.map(({ lat, lng }) => ({ lat, lng, altitude: 0 })), {
-      altitudeMode: 'CLAMP_TO_GROUND', strokeColor: style.ground, strokeWidth: 3,
-      drawsOccludedSegments: true, zIndex: style.zIndex,
-    }))
-  }
-  const arcOptions = {
-    altitudeMode: 'RELATIVE_TO_GROUND', strokeColor: style.stroke, strokeWidth: style.width,
-    ...(style.outer ? { outerColor: style.outer, outerWidth: style.outerWidth } : {}),
+  const arc = arcPath(leg.path[0], leg.path.at(-1))
+  const elements = [new Polyline({
+    path: arc, altitudeMode: 'RELATIVE_TO_GROUND', strokeColor: style.stroke, strokeWidth: style.width,
+    outerColor: style.outer, outerWidth: style.outerWidth,
     drawsOccludedSegments: style.occluded, zIndex: style.zIndex,
-  }
-  // Walking is dashed and riding or driving solid; the current journey is always solid blue.
-  const pieces = leg.mode === 'walk' && leg.state !== 'current' ? dashes(arc) : [arc]
-  for (const piece of pieces) elements.push(line(piece, arcOptions))
+  })]
 
   const apex = arcApex(arc)
   const chip = new PlainMarker({
@@ -99,8 +90,9 @@ function journeyElements(runtime, leg) {
  * - follow: { center, heading } moves the camera with the person during a trip,
  *   or null. Only trips move the camera like this; nothing in the background does.
  * - onUserCameraMove(): the person dragged, scrolled or used keys on the map.
- * - legs: the day's journeys ({ id, mode, state, path, distanceMeters, label }
- *   from useRouteLegs), each drawn as an arc over its route with a travel chip.
+ * - legs: the day's journeys ({ id, state, path, label } from useJourneyLegs;
+ *   path is [from, to]), each drawn as a curved destination
+ *   line between its stops with a travel chip.
  * - route: the trip's route ({ steps: [{ kind, path, ride }] }) drawn on the ground, or null.
  * - routeSplit: { travelled, remaining } from splitRoute, to grey out what's behind you.
  */
@@ -390,7 +382,7 @@ export default function MapView({
     show(lines.travelled, routeSplit?.travelled ?? [])
   }, [runtime, route, routeSplit])
 
-  // The day's journeys. A journey is redrawn only when its state, route or
+  // The day's journeys. A journey is redrawn only when its state, stops or
   // chip changes, so the clock ticking doesn't rebuild the whole map.
   const journeysRef = useRef(new Map())
   useEffect(() => {
@@ -403,7 +395,7 @@ export default function MapView({
       drawn.delete(id)
     }
     for (const leg of legs) {
-      const signature = JSON.stringify([leg.state, leg.mode, leg.label, leg.distanceMeters, leg.path])
+      const signature = JSON.stringify([leg.state, leg.label, leg.path])
       const existing = drawn.get(leg.id)
       if (existing?.signature === signature) continue
       for (const element of existing?.elements ?? []) element.remove()
