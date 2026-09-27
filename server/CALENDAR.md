@@ -164,10 +164,15 @@ or creates one with `dataMode: 'live'`:
   keeps its DayMap times; only its title follows Calendar. A stop the person
   renamed or re-timed in DayMap (`localEdits: ['title' | 'time']`, #61) keeps
   that title or those times.
+- Adds new and brought-back events at their place in the day's time order,
+  not at the end.
 - Removes Calendar stops whose event no longer exists, unless completed.
 - Leaves out events the person removed in DayMap (`plan.removedEvents`) and
   counts them in `summary.hidden`. `restoreRemoved: true` clears that list and
   imports them again; `restoreEvents` does the same for just those events.
+  A brought-back event gets back what the person had set for it in DayMap (the
+  removed entry's optional `location`, `travelMode`, `localEdits` and `timing`),
+  merged by the same rules as a re-import of an existing stop.
   A removed event no longer in Calendar for that day (deleted, declined or
   moved) is dropped from the list, so the hidden count stays true.
 - Any accepted change to a Calendar stop's times in DayMap (an edit, an

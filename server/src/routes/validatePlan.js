@@ -9,6 +9,12 @@ function check(condition, message) {
 function keys(value, allowed) {
   check(object(value) && Object.keys(value).every(key => allowed.includes(key)), 'Unexpected or invalid fields.')
 }
+// A confirmed place with coordinates; place IDs await the retention decision.
+function checkPlace(place, message) {
+  keys(place, ['label', 'placeId', 'lat', 'lng'])
+  check(text(place.label) && place.placeId === null && Number.isFinite(place.lat) && Math.abs(place.lat) <= 90
+    && Number.isFinite(place.lng) && Math.abs(place.lng) <= 180, message)
+}
 
 export function validateDay(date, timezone) {
   check(typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
@@ -37,24 +43,26 @@ export function validateSave(id, body) {
   for (const field of ['startPlace', 'endPlace']) {
     const place = plan[field]
     if (place === undefined || place === null) continue
-    keys(place, ['label', 'placeId', 'lat', 'lng'])
-    check(text(place.label) && place.placeId === null && Number.isFinite(place.lat) && Math.abs(place.lat) <= 90
-      && Number.isFinite(place.lng) && Math.abs(place.lng) <= 180, `Invalid ${field}.`)
+    checkPlace(place, `Invalid ${field}.`)
   }
   // Calendar events the person removed, so re-import leaves them out: absent, or up to 500.
+  // The optional fields are what the person had set in DayMap (place, travel mode,
+  // edited title/times), put back if the event is brought back.
   if (plan.removedEvents !== undefined) {
     check(Array.isArray(plan.removedEvents) && plan.removedEvents.length <= 500, 'Invalid removedEvents.')
     for (const event of plan.removedEvents) {
-      keys(event, ['sourceCalendarId', 'sourceEventId', 'title'])
+      keys(event, ['sourceCalendarId', 'sourceEventId', 'title', 'location', 'travelMode', 'localEdits', 'timing'])
       check(text(event.sourceCalendarId) && text(event.sourceEventId) && text(event.title), 'Invalid removed event.')
+      if (event.location !== undefined) checkPlace(event.location, 'Invalid removed event location.')
+      checkTravelMode(event.travelMode)
+      checkLocalEdits(event.localEdits)
+      if (event.timing !== undefined) checkTiming(event.timing)
     }
   }
   const ids = new Set()
   for (const stop of plan.stops) {
     keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode', 'localEdits'])
-    // How the person chose to travel to this stop; absent or null means automatic.
-    check(stop.travelMode === undefined || stop.travelMode === null || ['walk', 'transit', 'drive'].includes(stop.travelMode),
-      'Invalid travelMode.')
+    checkTravelMode(stop.travelMode)
     check(text(stop.id) && (plan.dataMode === 'demo' || uuid.test(stop.id)) && !ids.has(stop.id), 'Stop IDs must be unique; live IDs must be UUIDs.')
     ids.add(stop.id)
     check(text(stop.title) && ['manual', 'google-calendar'].includes(stop.source)
@@ -63,10 +71,8 @@ export function validateSave(id, body) {
       check(stop[field] === null || text(stop[field]), `Invalid ${field}.`)
     }
     check(stop.source !== 'google-calendar' || (text(stop.sourceEventId) && text(stop.sourceCalendarId)), 'Calendar stops need source identifiers.')
-    // What the person changed on a Calendar event, kept on re-import: absent, or distinct 'title' / 'time'.
-    check(stop.localEdits === undefined || (stop.source === 'google-calendar' && Array.isArray(stop.localEdits)
-      && stop.localEdits.length > 0 && stop.localEdits.every(field => ['title', 'time'].includes(field))
-      && new Set(stop.localEdits).size === stop.localEdits.length), 'Invalid localEdits.')
+    check(stop.localEdits === undefined || stop.source === 'google-calendar', 'Invalid localEdits.')
+    checkLocalEdits(stop.localEdits)
     if (stop.location !== null) {
       keys(stop.location, ['label', 'placeId', 'lat', 'lng'])
       const { label, placeId, lat, lng } = stop.location
@@ -75,30 +81,7 @@ export function validateSave(id, body) {
         && Number.isFinite(lng) && Math.abs(lng) <= 180, 'Invalid location.')
       check(placeId === null, 'Place-provider persistence awaits the retention decision.')
     }
-    const timing = stop.timing
-    const times = ['fixedStartAt', 'fixedEndAt', 'earliestStartAt', 'latestEndAt', 'scheduledStartAt', 'scheduledEndAt']
-    keys(timing, ['kind', 'durationMinutes', ...times])
-    check(['fixed', 'flexible', 'all-day'].includes(timing.kind), 'Invalid timing kind.')
-    check((timing.kind === 'all-day' && timing.durationMinutes === null)
-      || (Number.isFinite(timing.durationMinutes) && timing.durationMinutes > 0 && timing.durationMinutes <= 1440), 'Invalid visit duration in minutes.')
-    for (const field of times) {
-      const value = timing[field]
-      check(value === null || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)
-        && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().replace('.000Z', 'Z') === value.replace('.000Z', 'Z')), 'Times must be valid UTC timestamps or null.')
-    }
-    for (const [start, end] of [['fixedStartAt', 'fixedEndAt'], ['scheduledStartAt', 'scheduledEndAt']]) {
-      check((timing[start] === null && timing[end] === null)
-        || (timing[start] !== null && timing[end] !== null && Date.parse(timing[start]) < Date.parse(timing[end])), 'Invalid time range.')
-    }
-    if (timing.kind === 'fixed') {
-      check(timing.fixedStartAt !== null && timing.fixedEndAt !== null, 'Fixed commitments need start and end times.')
-      check(timing.scheduledStartAt === null || (timing.scheduledStartAt === timing.fixedStartAt && timing.scheduledEndAt === timing.fixedEndAt), 'Fixed commitments cannot be rescheduled.')
-    } else {
-      check(timing.fixedStartAt === null && timing.fixedEndAt === null, 'Only fixed stops have fixed timestamps.')
-    }
-    if (timing.kind === 'all-day') {
-      check(times.every(field => timing[field] === null), 'All-day stops cannot have invented arrival times.')
-    }
+    checkTiming(stop.timing)
   }
   // These are user-visible annotations, never provider payloads or credentials.
   for (const question of plan.questions) {
@@ -115,4 +98,42 @@ export function validateSave(id, body) {
     check(stop.location !== null || plan.questions.some(q => q.stopId === stop.id && q.field === 'location'), 'Unlocated stops need a location question.')
   }
   return { baseVersion, plan }
+}
+
+// How the person chose to travel to a stop; absent or null means automatic.
+function checkTravelMode(travelMode) {
+  check(travelMode === undefined || travelMode === null || ['walk', 'transit', 'drive'].includes(travelMode), 'Invalid travelMode.')
+}
+
+// What the person changed on a Calendar event, kept on re-import: absent, or distinct 'title' / 'time'.
+function checkLocalEdits(localEdits) {
+  check(localEdits === undefined || (Array.isArray(localEdits) && localEdits.length > 0
+    && localEdits.every(field => ['title', 'time'].includes(field))
+    && new Set(localEdits).size === localEdits.length), 'Invalid localEdits.')
+}
+
+function checkTiming(timing) {
+  const times = ['fixedStartAt', 'fixedEndAt', 'earliestStartAt', 'latestEndAt', 'scheduledStartAt', 'scheduledEndAt']
+  keys(timing, ['kind', 'durationMinutes', ...times])
+  check(['fixed', 'flexible', 'all-day'].includes(timing.kind), 'Invalid timing kind.')
+  check((timing.kind === 'all-day' && timing.durationMinutes === null)
+    || (Number.isFinite(timing.durationMinutes) && timing.durationMinutes > 0 && timing.durationMinutes <= 1440), 'Invalid visit duration in minutes.')
+  for (const field of times) {
+    const value = timing[field]
+    check(value === null || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)
+      && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().replace('.000Z', 'Z') === value.replace('.000Z', 'Z')), 'Times must be valid UTC timestamps or null.')
+  }
+  for (const [start, end] of [['fixedStartAt', 'fixedEndAt'], ['scheduledStartAt', 'scheduledEndAt']]) {
+    check((timing[start] === null && timing[end] === null)
+      || (timing[start] !== null && timing[end] !== null && Date.parse(timing[start]) < Date.parse(timing[end])), 'Invalid time range.')
+  }
+  if (timing.kind === 'fixed') {
+    check(timing.fixedStartAt !== null && timing.fixedEndAt !== null, 'Fixed commitments need start and end times.')
+    check(timing.scheduledStartAt === null || (timing.scheduledStartAt === timing.fixedStartAt && timing.scheduledEndAt === timing.fixedEndAt), 'Fixed commitments cannot be rescheduled.')
+  } else {
+    check(timing.fixedStartAt === null && timing.fixedEndAt === null, 'Only fixed stops have fixed timestamps.')
+  }
+  if (timing.kind === 'all-day') {
+    check(times.every(field => timing[field] === null), 'All-day stops cannot have invented arrival times.')
+  }
 }

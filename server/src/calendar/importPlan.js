@@ -14,6 +14,52 @@ function keptRemovedEvents(removed, imported, { restoreRemoved, restoreEvents })
   return removed.filter(event => !restore.has(sourceKey(event)) && present.has(sourceKey(event)))
 }
 
+/**
+ * A Calendar stop as imported (`next`), keeping what DayMap owns from `stop`:
+ * its ID, status, confirmed place and chosen travel mode. A stop the person
+ * made flexible keeps its DayMap times, and what the person changed in DayMap
+ * (`localEdits`: 'title', 'time') keeps DayMap's value.
+ */
+function mergeCalendarStop(stop, next) {
+  const localEdits = stop.localEdits ?? []
+  const merged = { ...next, id: stop.id, location: stop.location, status: stop.status,
+    ...(stop.travelMode ? { travelMode: stop.travelMode } : {}),
+    ...(localEdits.length ? { localEdits } : {}) }
+  // A Calendar event the person made flexible is DayMap's to schedule; only its title follows Calendar.
+  if (stop.timing.kind === 'flexible' && next.timing.kind === 'fixed') merged.timing = stop.timing
+  // What the person changed in DayMap wins over Calendar.
+  if (localEdits.includes('title')) merged.title = stop.title
+  if (localEdits.includes('time')) merged.timing = stop.timing
+  return merged
+}
+
+/** The stop a removed event was, from what its entry kept, to merge a brought-back event with. */
+function removedAsStop(event, next) {
+  return { id: next.id, title: event.title, location: event.location ?? null, status: next.status,
+    timing: event.timing ?? next.timing,
+    ...(event.travelMode ? { travelMode: event.travelMode } : {}),
+    ...(event.localEdits ? { localEdits: event.localEdits } : {}) }
+}
+
+/** When a stop starts, or null for all-day and unscheduled stops. */
+function startOf(stop) {
+  if (stop.timing.kind === 'all-day') return null
+  const start = Date.parse(stop.timing.scheduledStartAt ?? stop.timing.fixedStartAt)
+  return Number.isFinite(start) ? start : null
+}
+
+/**
+ * Add a new or brought-back stop before the first stop that starts after it,
+ * so it takes its place in the day (and on the map) rather than going last.
+ * Stops without a start go last, as before.
+ */
+function insertInTimeOrder(stops, stop) {
+  const start = startOf(stop)
+  const index = start === null ? -1 : stops.findIndex(other => startOf(other) !== null && startOf(other) > start)
+  if (index === -1) stops.push(stop)
+  else stops.splice(index, 0, stop)
+}
+
 function withRemovedEvents(plan, removedEvents) {
   const next = { ...plan }
   if (removedEvents.length) next.removedEvents = removedEvents
@@ -25,14 +71,14 @@ function withRemovedEvents(plan, removedEvents) {
  * Merge one day's imported Calendar stops into the saved plan (or a new one).
  *
  * - Deduplicates by calendar ID + event ID.
- * - Updates the title and times of existing Calendar stops, keeping their ID,
- *   status, chosen travel mode and any location the user already confirmed.
- *   A stop the user made flexible keeps its DayMap times, and what the person
- *   changed in DayMap (`localEdits`: 'title', 'time') keeps DayMap's value.
+ * - Updates the title and times of existing Calendar stops (see mergeCalendarStop).
+ * - Adds new and brought-back events at their place in the day's time order.
  * - Removes Calendar stops whose event is gone, unless already completed.
  * - Leaves out events the person removed in DayMap (`plan.removedEvents`),
  *   counted as `hidden`, unless `restoreRemoved` brings them all back or
  *   `restoreEvents` ({ sourceCalendarId, sourceEventId }[]) brings back some.
+ *   A brought-back event gets back what the person had set for it in DayMap
+ *   (place, travel mode, edited title or times), by the same rules.
  *   Removed events no longer in Calendar for this day are forgotten.
  * - Never touches manual stops.
  *
@@ -47,6 +93,11 @@ export function mergeCalendarImport(existing, imported,
   const removedAfter = keptRemovedEvents(removedBefore, imported, { restoreRemoved, restoreEvents })
   // Entries are only ever dropped, so a different length means a different list.
   const removedChanged = removedAfter.length !== removedBefore.length
+  // What the person had set in DayMap for the events being brought back.
+  const stillRemoved = new Set(removedAfter.map(sourceKey))
+  const restored = new Map(removedBefore
+    .filter(event => !stillRemoved.has(sourceKey(event)))
+    .map(event => [sourceKey(event), event]))
   const base = removedChanged ? withRemovedEvents(saved, removedAfter) : saved
   const removedKeys = new Set((base.removedEvents ?? []).map(sourceKey))
   const existingKeys = new Set(base.stops.filter(isCalendarStop).map(sourceKey))
@@ -74,22 +125,17 @@ export function mergeCalendarImport(existing, imported,
       continue
     }
     incoming.delete(sourceKey(stop))
-    const localEdits = stop.localEdits ?? []
-    const merged = { ...next, id: stop.id, location: stop.location, status: stop.status,
-      ...(stop.travelMode ? { travelMode: stop.travelMode } : {}),
-      ...(localEdits.length ? { localEdits } : {}) }
-    // A Calendar event the person made flexible is DayMap's to schedule; only its title follows Calendar.
-    if (stop.timing.kind === 'flexible' && next.timing.kind === 'fixed') merged.timing = stop.timing
-    // What the person changed in DayMap wins over Calendar.
-    if (localEdits.includes('title')) merged.title = stop.title
-    if (localEdits.includes('time')) merged.timing = stop.timing
+    const merged = mergeCalendarStop(stop, next)
     if (merged.title !== stop.title || JSON.stringify(merged.timing) !== JSON.stringify(stop.timing)) summary.updated++
     stops.push(merged)
     if (merged.location === null) replaceQuestion.set(stop.id, { ...importedQuestion.get(next.id), stopId: stop.id })
   }
-  for (const stop of incoming.values()) {
-    stops.push(stop)
-    replaceQuestion.set(stop.id, importedQuestion.get(stop.id))
+  for (const next of incoming.values()) {
+    const event = restored.get(sourceKey(next))
+    const stop = event ? mergeCalendarStop(removedAsStop(event, next), next) : next
+    const question = importedQuestion.get(next.id)
+    insertInTimeOrder(stops, stop)
+    replaceQuestion.set(stop.id, stop.location && question ? { ...question, status: 'answered' } : question)
     summary.added++
   }
 

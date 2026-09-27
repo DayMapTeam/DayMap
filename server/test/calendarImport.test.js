@@ -373,7 +373,15 @@ test('localEdits and removedEvents are validated', () => {
   const event = { sourceCalendarId: 'primary', sourceEventId: 'gone', title: 'Gone' }
   assert.doesNotThrow(validate(plan => { plan.removedEvents = [event] }))
   assert.doesNotThrow(validate(plan => { plan.removedEvents = [] }))
-  for (const bad of [{ ...event, extra: 1 }, { ...event, title: '' }, { sourceCalendarId: 'primary', sourceEventId: 'x' }, 'gone']) {
+  const place = { label: 'Napier Building', placeId: null, lat: -34.92, lng: 138.6 }
+  assert.doesNotThrow(validate(plan => { plan.removedEvents = [{ ...event, location: place }] }))
+  assert.doesNotThrow(validate(plan => {
+    plan.removedEvents = [{ ...event, travelMode: 'walk', localEdits: ['time'], timing: plan.stops[0].timing }]
+  }))
+  for (const bad of [{ ...event, extra: 1 }, { ...event, title: '' }, { sourceCalendarId: 'primary', sourceEventId: 'x' }, 'gone',
+    { ...event, location: null }, { ...event, location: { ...place, placeId: 'places/x' } }, { ...event, location: { ...place, lat: 200 } },
+    { ...event, travelMode: 'fly' }, { ...event, localEdits: [] }, { ...event, localEdits: ['location'] },
+    { ...event, timing: { kind: 'fixed' } }, { ...event, timing: null }]) {
     assert.throws(validate(plan => { plan.removedEvents = [bad] }), { code: 'INVALID_PLAN' })
   }
   assert.throws(validate(plan => { plan.removedEvents = event }), { code: 'INVALID_PLAN' })
@@ -426,6 +434,79 @@ test('one removed event can be brought back, and events gone from Calendar are f
   const partly = planWith(eventsToStops([lecture, standup], day), saved)
   assert.deepEqual(partly.plan.removedEvents, [{ ...standupRef, title: 'Team standup' }])
   assert.equal(partly.summary.hidden, 1)
+})
+
+test('a brought-back event returns to its place in the day, not the end', () => {
+  const lunch = { id: 'lunch', status: 'confirmed', summary: 'Lunch',
+    start: { dateTime: '2026-09-28T11:00:00+09:30' }, end: { dateTime: '2026-09-28T12:00:00+09:30' } }
+  const imported = eventsToStops([lecture, lunch, standup], day)
+  const first = planWith(imported).plan
+  const order = plan => plan.stops.map(stop => stop.sourceEventId)
+  assert.deepEqual(order(first), ['lecture', 'lunch', 'standup_20260928'])
+
+  const lunchId = calendarStopId('primary', 'lunch')
+  const saved = { ...first, version: 2, stops: first.stops.filter(stop => stop.id !== lunchId),
+    questions: first.questions.filter(question => question.stopId !== lunchId),
+    removedEvents: [{ sourceCalendarId: 'primary', sourceEventId: 'lunch', title: 'Lunch' }] }
+  const back = mergeCalendarImport(saved, imported,
+    { planId, date, timezone, restoreEvents: [{ sourceCalendarId: 'primary', sourceEventId: 'lunch' }] }).plan
+  assert.deepEqual(order(back), ['lecture', 'lunch', 'standup_20260928'])
+  validateSave(back.id, { baseVersion: back.version, plan: back })
+})
+
+test('a brought-back event gets back the place the person had confirmed', () => {
+  const place = { label: 'Napier Building', placeId: null, lat: -34.92, lng: 138.6 }
+  const standupRef = { sourceCalendarId: 'primary', sourceEventId: 'standup_20260928' }
+  const holidayRef = { sourceCalendarId: 'primary', sourceEventId: 'holiday' }
+  const first = planWith(eventsToStops([lecture], day)).plan
+  const saved = { ...first, version: 2, removedEvents: [
+    { ...standupRef, title: 'Team standup', location: place }, { ...holidayRef, title: 'Conference' }] }
+  validateSave(saved.id, { baseVersion: saved.version, plan: saved })
+
+  const { plan } = mergeCalendarImport(saved, eventsToStops([lecture, standup, holiday], day),
+    { planId, date, timezone, restoreRemoved: true })
+  const standupStop = plan.stops.find(stop => stop.sourceEventId === 'standup_20260928')
+  const holidayStop = plan.stops.find(stop => stop.sourceEventId === 'holiday')
+  assert.deepEqual(standupStop.location, place)
+  assert.equal(plan.questions.find(question => question.stopId === standupStop.id).status, 'answered')
+  assert.equal(holidayStop.location, null, 'no place was confirmed, so none is guessed')
+  assert.equal(plan.questions.find(question => question.stopId === holidayStop.id).status, 'unanswered')
+  validateSave(plan.id, { baseVersion: plan.version, plan })
+
+  // What the person changed in DayMap comes back too, by the same rules as a re-import.
+  const imported = eventsToStops([lecture, standup], day)
+  const calendarStandup = imported.stops.find(stop => stop.sourceEventId === 'standup_20260928')
+  const movedTiming = { ...calendarStandup.timing, fixedStartAt: '2026-09-28T03:30:00.000Z', fixedEndAt: '2026-09-28T04:15:00.000Z',
+    scheduledStartAt: '2026-09-28T03:30:00.000Z', scheduledEndAt: '2026-09-28T04:15:00.000Z' }
+  const edited = { ...first, version: 2, removedEvents: [{ ...standupRef, title: 'Standup (my name)', location: place,
+    travelMode: 'drive', localEdits: ['title', 'time'], timing: movedTiming }] }
+  validateSave(edited.id, { baseVersion: edited.version, plan: edited })
+  const back = mergeCalendarImport(edited, imported, { planId, date, timezone, restoreEvents: [standupRef] }).plan
+  const editedStop = back.stops.find(stop => stop.sourceEventId === 'standup_20260928')
+  assert.equal(editedStop.title, 'Standup (my name)')
+  assert.deepEqual(editedStop.timing, movedTiming)
+  assert.equal(editedStop.travelMode, 'drive')
+  assert.deepEqual(editedStop.localEdits, ['title', 'time'], 'the next re-import keeps them too')
+  validateSave(back.id, { baseVersion: back.version, plan: back })
+  // Without localEdits, the title and times follow Calendar.
+  const plain = mergeCalendarImport({ ...edited, removedEvents: [{ ...standupRef, title: 'Old name' }] }, imported,
+    { planId, date, timezone, restoreEvents: [standupRef] }).plan
+  const plainStop = plain.stops.find(stop => stop.sourceEventId === 'standup_20260928')
+  assert.equal(plainStop.title, calendarStandup.title)
+  assert.deepEqual(plainStop.timing, calendarStandup.timing)
+  // An event the person made flexible stays flexible, at DayMap's times.
+  const flexibleTiming = { kind: 'flexible', durationMinutes: 45, fixedStartAt: null, fixedEndAt: null,
+    earliestStartAt: null, latestEndAt: null, scheduledStartAt: '2026-09-28T05:00:00.000Z', scheduledEndAt: '2026-09-28T05:45:00.000Z' }
+  const flexible = mergeCalendarImport({ ...edited, removedEvents: [{ ...standupRef, title: 'Team standup', timing: flexibleTiming }] },
+    imported, { planId, date, timezone, restoreEvents: [standupRef] }).plan
+  assert.deepEqual(flexible.stops.find(stop => stop.sourceEventId === 'standup_20260928').timing, flexibleTiming)
+  validateSave(flexible.id, { baseVersion: flexible.version, plan: flexible })
+
+  // Still hidden: the place stays remembered and nothing is added.
+  const hidden = mergeCalendarImport(saved, eventsToStops([lecture, standup, holiday], day),
+    { planId, date, timezone, restoreEvents: [holidayRef] })
+  assert.ok(!hidden.plan.stops.some(stop => stop.sourceEventId === 'standup_20260928'))
+  assert.deepEqual(hidden.plan.removedEvents, [{ ...standupRef, title: 'Team standup', location: place }])
 })
 
 test('POST /api/calendar/import validates restoreEvents and restores just those', async t => {
