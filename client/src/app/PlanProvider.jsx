@@ -43,6 +43,9 @@ export function PlanProvider({ initialPlan, children }) {
   const setStopTravelMode = useCallback((stopId, mode) => {
     dispatch({ type: 'set-stop-travel-mode', stopId, mode })
   }, [])
+  const setStopLeaveTiming = useCallback((stopId, timing) => {
+    dispatch({ type: 'set-stop-leave-timing', stopId, timing })
+  }, [])
   const setStopKind = useCallback((stopId, kind) => {
     dispatch({ type: 'set-stop-kind', stopId, kind })
   }, [])
@@ -72,10 +75,11 @@ export function PlanProvider({ initialPlan, children }) {
     undoRemove,
     setDayPlace,
     setStopTravelMode,
+    setStopLeaveTiming,
     setStopKind,
     setStopLocation,
     loadPlan,
-  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, undoRemove, setDayPlace, setStopTravelMode, setStopKind, setStopLocation, loadPlan])
+  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, undoRemove, setDayPlace, setStopTravelMode, setStopLeaveTiming, setStopKind, setStopLocation, loadPlan])
 
   return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>
 }
