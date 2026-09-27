@@ -5,7 +5,7 @@ import { readDemoPlan, sessionStore, writeDemoPlan } from './app/planPersistence
 import { useAccount } from './app/useAccount.js'
 import { useCalendar } from './app/useCalendar.js'
 import { usePlanSync } from './app/usePlanSync.js'
-import { useRouteLegs } from './app/useRouteLegs.js'
+import { useJourneyLegs } from './app/useJourneyLegs.js'
 import AccountMenu from './components/AccountMenu.jsx'
 import AppHeader from './components/AppHeader.jsx'
 import CalendarSection from './components/CalendarSection.jsx'
@@ -43,7 +43,7 @@ function App() {
   const [previewPlace, setPreviewPlace] = useState(null)
   const { now, isDemoTime } = usePlanClock(plan)
   const planning = usePlanAnalysis(plan, draft, now)
-  const routeLegs = useRouteLegs(planning, now)
+  const journeyLegs = useJourneyLegs(planning, now)
   // The popup opens only from a pin click on the map: { stopId, anchor } or null.
   const [popup, setPopup] = useState(null)
   const [revealRequest, setRevealRequest] = useState(null)
@@ -135,7 +135,7 @@ function App() {
     <div className="app" data-navigating={navigating || undefined}>
       <MapView
         stops={planning.shown.stops}
-        legs={navigating ? noLegs : routeLegs}
+        legs={navigating ? noLegs : journeyLegs}
         stopStates={planning.stopStates}
         selectedStopId={selectedStopId}
         onSelectStop={selectFromMap}
