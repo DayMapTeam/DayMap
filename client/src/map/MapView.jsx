@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { numberStops } from '../app/stopNumbers.js'
 import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
 import { arcApex, arcPath, arcStyle } from './journeyArc.js'
-import { markerColors, markerTemplate, stopMarkerSvg } from './stopMarker.js'
+import { markerColors, markerTemplate, stopMarkerLayouts, stopMarkerSvg } from './stopMarker.js'
 import { chipFont, travelChipSvg } from './travelChip.js'
 import { navigationArrowSvg, userMarkerSvg } from './userMarker.js'
 import './MapView.css'
@@ -268,18 +268,25 @@ export default function MapView({
   useEffect(() => {
     if (!runtime) return
     const numbers = numberStops(stops)
+    const layouts = stopMarkerLayouts(stops, steep)
+    const selectedGroup = layouts.get(selectedStopId)?.groupId
     for (const stop of stops) {
       const entry = markersRef.current.get(stop.id)
       if (!entry) continue
+      const layout = layouts.get(stop.id)
       const selected = stop.id === selectedStopId
       const svg = stopMarkerSvg({
         number: numbers.get(stop.id),
         type: stop.timing.kind,
         state: { ...stopStates[stop.id], selected, past: isFinished(stop, now) },
         steep,
+        stack: layout,
       }, runtime.colors)
+      entry.marker.position = layout.position
+      // Floating place labels would cover the next numbered circle in a stack.
+      entry.marker.label = layout.count > 1 ? null : stop.title
       entry.marker.replaceChildren(markerTemplate(svg))
-      entry.marker.zIndex = selected ? 10 : 0
+      entry.marker.zIndex = (layout.groupId === selectedGroup ? 10 : 0) + layout.layer
       entry.marker.title = `${numbers.get(stop.id)}. ${stop.title}${selected ? ' (selected)' : ''}${stopStates[stop.id]?.note ? ` · ${stopStates[stop.id].note}` : ''}`
     }
   }, [runtime, stops, selectedStopId, now, steep, stopStates])
