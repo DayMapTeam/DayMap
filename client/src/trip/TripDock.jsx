@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { formatClock } from '../components/formatTime.js'
 import { directionsUrl } from './tripRules.js'
 import '../components/buttons.css'
@@ -152,7 +153,7 @@ function SpeakerIcon({ muted }) {
 }
 
 /** Bottom of the screen while navigating: time left, arrival, and controls. */
-function NavBar({ trip, navigation, voice, now, timezone, reading, following, hasPosition, onRecenter }) {
+function NavBar({ trip, navigation, voice, now, timezone, reading, following, hasPosition, onRecenter, walkthrough, onResetWalkthrough }) {
   const { target } = trip
   const { route, progress } = navigation
   const remainingSeconds = progress?.remainingSeconds ?? route?.seconds ?? null
@@ -165,6 +166,7 @@ function NavBar({ trip, navigation, voice, now, timezone, reading, following, ha
   return (
     <section className="nav-bar glass" aria-label={`Navigating to ${target.title}`}>
       <div className="nav-bar-info">
+        {walkthrough.session && <p className="walkthrough-label">Simulated walk</p>}
         {remainingSeconds !== null ? (
           <>
             <p className={`nav-bar-time${late > 0 ? ' nav-late' : ''}`}>{Math.max(1, Math.round(remainingSeconds / 60))} min</p>
@@ -183,20 +185,97 @@ function NavBar({ trip, navigation, voice, now, timezone, reading, following, ha
           </button>
         )}
         {hasPosition && !following && <button type="button" className="nav-pill" onClick={onRecenter}>Re-centre</button>}
-        <button type="button" className="nav-pill" onClick={trip.arrive}>I’m here</button>
-        <a className="nav-pill" href={mapsUrl} target="_blank" rel="noreferrer">
+        {!walkthrough.session && <button type="button" className="nav-pill" onClick={trip.arrive}>I’m here</button>}
+        {!walkthrough.session && <a className="nav-pill" href={mapsUrl} target="_blank" rel="noreferrer">
           Google Maps<span className="visually-hidden"> (opens Google Maps navigation)</span>
-        </a>
-        <button type="button" className="nav-exit" aria-label={trip.state.startedBy === 'auto' ? 'Cancel trip' : 'Exit navigation'} onClick={trip.end}>×</button>
+        </a>}
+        <button type="button" className="nav-exit" aria-label={walkthrough.session ? 'End simulated walk' : trip.state.startedBy === 'auto' ? 'Cancel trip' : 'Exit navigation'} onClick={walkthrough.session ? onResetWalkthrough : trip.end}>×</button>
       </div>
     </section>
   )
 }
 
+function WalkthroughControls({ walkthrough, onReset, blocked, editingRun, runSheetOpen, runDraftPending, onEditRun, onAddRun, onSetRunStart, onResumeRun }) {
+  const [open, setOpen] = useState(false)
+  const { pair, pairs, session, status, error, mode, dayIssue } = walkthrough
+  if (!open && !session && status !== 'loading' && status !== 'finished') {
+    return <button type="button" className="walkthrough-open glass" onClick={() => setOpen(true)}>Test run</button>
+  }
+  return (
+    <section className="walkthrough-panel glass" aria-label="Test run controls">
+      <div className="walkthrough-heading">
+        <strong>Test run</strong>
+        {!session && status !== 'loading' && <button type="button" className="button-text" onClick={() => { setOpen(false); walkthrough.dismissFinished() }}>Close</button>}
+      </div>
+      {session ? (
+        <>
+          <p className="walkthrough-route">{session.fromTitle} → {session.toTitle}</p>
+          {session.kind === 'day' && <p className="walkthrough-progress">
+            Stop {Math.max(1, walkthrough.itinerary.findIndex(({ id }) => id === session.toId))} of {Math.max(1, walkthrough.itinerary.length - 1)}
+          </p>}
+          <p className="walkthrough-status" role="status">
+            {status === 'loading' ? 'Finding the next walking route…' : editingRun ? 'Paused while you edit your day' :
+              session.finishTicks >= 2 ? `At ${session.toTitle}` : session.playing ? 'Following the walking route' : 'Paused'}
+          </p>
+          {error && <p className="walkthrough-error" role="alert">{error}</p>}
+          <div className="walkthrough-actions">
+            {editingRun ? <button type="button" className="nav-pill" disabled={runSheetOpen || runDraftPending || blocked} onClick={onResumeRun}>Return to run</button>
+              : <button type="button" className="nav-pill" disabled={status === 'loading'} onClick={session.playing ? walkthrough.pause : walkthrough.resume}>
+                {session.playing ? 'Pause' : session.finishTicks >= 2 ? 'Continue' : 'Resume'}
+              </button>}
+            <label className="walkthrough-speed">Speed
+              <select value={session.speed} onChange={(event) => walkthrough.setSpeed(Number(event.target.value))}>
+                <option value="10">10×</option><option value="30">30×</option><option value="60">60×</option><option value="120">120×</option>
+              </select>
+            </label>
+            <button type="button" className="nav-pill" onClick={onReset}>End run</button>
+          </div>
+          {session.kind === 'day' && <div className="walkthrough-actions">
+            <button type="button" className="nav-pill" onClick={onAddRun}>+ Add stop</button>
+            <button type="button" className="nav-pill" onClick={onEditRun}>Edit day</button>
+          </div>}
+          {editingRun && <p className="walkthrough-help">Accept your planner changes, then return to the run. The next route will use your updated day.</p>}
+          {editingRun && runDraftPending && <p className="walkthrough-error">Accept or discard the pending plan changes first.</p>}
+        </>
+      ) : status === 'finished' ? (
+        <>
+          <p className="walkthrough-status" role="status">Run complete. You’re back at your planner.</p>
+          <button type="button" className="nav-pill walkthrough-start" onClick={() => { walkthrough.dismissFinished(); setOpen(true) }}>Run again</button>
+        </>
+      ) : (
+        <>
+          <p className="walkthrough-help">Replay walking routes at 10–120× speed. Your GPS and saved day stay separate from the simulation.</p>
+          <div className="walkthrough-mode" role="group" aria-label="Run scope">
+            <button type="button" aria-pressed={mode === 'day'} onClick={() => walkthrough.setMode('day')}>Whole day</button>
+            <button type="button" aria-pressed={mode === 'pair'} onClick={() => walkthrough.setMode('pair')}>One journey</button>
+          </div>
+          {mode === 'day' ? <>
+            <p className="walkthrough-help">Start at Day start, visit your events in order, then Day end if set.</p>
+            {dayIssue && <p className="walkthrough-error">{dayIssue}</p>}
+            {dayIssue && <button type="button" className="nav-pill" onClick={dayIssue.startsWith('Set a located Day start') ? onSetRunStart : onEditRun}>
+              {dayIssue.startsWith('Set a located Day start') ? 'Set Day start' : 'Open planner'}
+            </button>}
+          </> : <>
+            <label className="walkthrough-pair">From → to
+              <select value={pair?.id ?? ''} onChange={(event) => walkthrough.setSelectedPairId(event.target.value)} disabled={!pairs.length || status === 'loading'}>
+                {pairs.map(({ id, from, to }) => <option key={id} value={id}>{from.title} → {to.title}</option>)}
+              </select>
+            </label>
+            {!pairs.length && <p className="walkthrough-error">Add two events with different map locations to test a journey.</p>}
+          </>}
+          {error && <p className="walkthrough-error" role="alert">{error}</p>}
+          <button type="button" className="nav-pill walkthrough-start" disabled={(mode === 'day' ? Boolean(dayIssue) : !pair) || status === 'loading' || blocked} onClick={walkthrough.start}>
+            {status === 'loading' ? 'Finding walking route…' : 'Start test run'}
+          </button>
+        </>
+      )}
+    </section>
+  )
+}
+
 /**
- * Bottom left of the map: just Go, which heads to the next stop in the
- * planner. During a trip, live turn-by-turn guidance. Trips also start by
- * themselves when you leave where you are.
+ * Bottom left of the map: Go and a browser-only route replay. During a trip,
+ * live turn-by-turn guidance. Trips also start when you leave where you are.
  *
  * @param {object} props
  * @param {ReturnType<import('./useTrip.js').useTrip>} props.trip
@@ -211,16 +290,21 @@ function NavBar({ trip, navigation, voice, now, timezone, reading, following, ha
  * @param {() => void} props.onRecenter
  * @param {import('react').ReactNode} props.recoveryControl Compact departure/recovery disclosure.
  */
-export default function TripDock({ trip, navigation, voice, now, timezone, reading, onGo, following, hasPosition, onRecenter, recoveryControl }) {
+export default function TripDock({ trip, navigation, voice, now, timezone, reading, onGo, following, hasPosition, onRecenter,
+  walkthrough, onResetWalkthrough, editingRun, runSheetOpen, runDraftPending, onEditRun, onAddRun, onSetRunStart,
+  onResumeRun, recoveryControl }) {
   const { target, next } = trip
+  const controls = <WalkthroughControls walkthrough={walkthrough} onReset={onResetWalkthrough} blocked={false}
+    {...{ editingRun, runSheetOpen, runDraftPending, onEditRun, onAddRun, onSetRunStart, onResumeRun }} />
   if (target) {
     return (
       <>
-        <NavBanner navigation={navigation} timezone={timezone} destination={target.title} />
+        {!editingRun && <NavBanner navigation={navigation} timezone={timezone} destination={target.title} />}
         <div className="trip-dock trip-dock-navigating">
           <TripToast trip={trip} />
+          {walkthrough.session && controls}
           {recoveryControl}
-          <NavBar {...{ trip, navigation, voice, now, timezone, reading, following, hasPosition, onRecenter }} />
+          {!editingRun && <NavBar {...{ trip, navigation, voice, now, timezone, reading, following, hasPosition, onRecenter, walkthrough, onResetWalkthrough }} />}
         </div>
       </>
     )
@@ -229,11 +313,12 @@ export default function TripDock({ trip, navigation, voice, now, timezone, readi
     <div className="trip-dock">
       <TripToast trip={trip} />
       {recoveryControl}
-      {next && (
+      {next && !walkthrough.session && walkthrough.status !== 'loading' && (
         <button type="button" className="trip-go" aria-label={`Go to ${next.title}`} title={`Go to ${next.title}`} onClick={() => onGo(next.id)}>
           Go
         </button>
       )}
+      {controls}
     </div>
   )
 }

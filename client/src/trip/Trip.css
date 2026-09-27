@@ -35,6 +35,98 @@
   transform: scale(var(--press-scale));
 }
 
+.walkthrough-open {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--label);
+  font-weight: 700;
+}
+
+.walkthrough-panel {
+  align-self: flex-start;
+  width: min(340px, 100%);
+  padding: var(--space-3);
+  border-radius: var(--radius-panel);
+  color: var(--label);
+  box-shadow: var(--shadow-glass);
+}
+
+.walkthrough-heading,
+.walkthrough-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.walkthrough-heading strong { font-size: 16px; }
+.walkthrough-help,
+.walkthrough-route,
+.walkthrough-status,
+.walkthrough-error {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.walkthrough-route { font-weight: 700; }
+.walkthrough-progress { margin-top: 2px; font-size: 12px; color: var(--label-2); }
+.walkthrough-error { color: var(--red-ink); }
+.walkthrough-label { color: var(--blue); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+
+.walkthrough-pair,
+.walkthrough-speed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--space-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.walkthrough-pair select,
+.walkthrough-speed select {
+  max-width: 100%;
+  min-height: 38px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-pill);
+  color: var(--label);
+  background: var(--fill);
+}
+
+.walkthrough-actions { justify-content: flex-start; flex-wrap: wrap; margin-top: var(--space-2); }
+.walkthrough-speed { margin-top: 0; }
+.walkthrough-start { margin-top: var(--space-3); }
+
+.walkthrough-mode {
+  display: flex;
+  gap: 4px;
+  margin-top: var(--space-3);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--fill);
+}
+
+.walkthrough-mode button {
+  flex: 1;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--label-2);
+  font-weight: 700;
+}
+
+.walkthrough-mode button[aria-pressed="true"] {
+  background: var(--blue);
+  color: var(--on-accent);
+}
+
 @keyframes trip-in {
   from {
     opacity: 0;

@@ -6,6 +6,8 @@ import { arcApex, arcPath, arcStyle } from './journeyArc.js'
 import { markerColors, markerTemplate, stopMarkerLayouts, stopMarkerSvg } from './stopMarker.js'
 import { chipFont, travelChipSvg } from './travelChip.js'
 import { navigationArrowSvg, userMarkerSvg } from './userMarker.js'
+import { bearingDegrees, distanceMeters, offsetPoint } from '../trip/tripRules.js'
+import { pointAlongRoute } from '../trip/walkthrough.js'
 import './MapView.css'
 
 // A pointer press older than this is not the one that clicked the pin.
@@ -19,11 +21,18 @@ const CAMERA_EVENTS = ['gmp-centerchange', 'gmp-rangechange', 'gmp-headingchange
 const FOLLOW_RANGE = 320
 const FOLLOW_TILT = 62
 const FOLLOW_FLY_MS = 1000
+const SIM_CAMERA_INTERVAL_MS = 32
+const SIM_CAMERA_EASE_MS = 260
 // A drag shorter than this is a click, not a camera move.
 const DRAG_PX = 6
 const CAMERA_KEYS = /^(Arrow|Page|Home$|End$|[-+=_]$)/
 
 const flyMillis = (millis) => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : millis)
+
+function blendAngle(from, to, fraction) {
+  const turn = ((to - from + 540) % 360) - 180
+  return (from + turn * fraction + 360) % 360
+}
 
 function isValidLocation(location) {
   return Boolean(location) && Number.isFinite(location.lat) && Number.isFinite(location.lng)
@@ -95,10 +104,12 @@ function journeyElements(runtime, leg) {
  *   line between its stops with a travel chip.
  * - route: the trip's route ({ steps: [{ kind, path, ride }] }) drawn on the ground, or null.
  * - routeSplit: { travelled, remaining } from splitRoute, to grey out what's behind you.
+ * - simulationSession: browser-only route replay, drawn between planner clock ticks.
  */
 export default function MapView({
   stops, legs = [], selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, onSelectPreview, stopStates = {},
   userPosition = null, tripActive = false, follow = null, onUserCameraMove, route = null, routeSplit = null,
+  simulationSession = null, simulationFollowing = false,
 }) {
   const containerRef = useRef(null)
   const markersRef = useRef(new Map())
@@ -319,6 +330,8 @@ export default function MapView({
 
   // "You are here". One marker, moved in place as readings arrive.
   const userMarkerRef = useRef(null)
+  const simulationRef = useRef(null)
+  const simulationActive = simulationSession !== null
   const simulated = Boolean(userPosition?.simulated)
   useEffect(() => {
     if (!runtime) return
@@ -343,9 +356,86 @@ export default function MapView({
       marker.remove()
       return
     }
-    marker.position = { lat: userPosition.lat, lng: userPosition.lng }
+    if (!simulationActive) marker.position = { lat: userPosition.lat, lng: userPosition.lng }
     if (!marker.isConnected) runtime.map.append(marker)
-  }, [runtime, userPosition, simulated, tripActive])
+  }, [runtime, userPosition, simulated, tripActive, simulationActive])
+
+  // The planner and directions can update every 250 ms, but the map needs a
+  // visual position each frame. Keep that animation inside the map so React
+  // does not rebuild the whole planner at display refresh rate.
+  useEffect(() => {
+    if (!simulationSession) {
+      simulationRef.current = null
+      return
+    }
+    const previous = simulationRef.current
+    simulationRef.current = {
+      id: simulationSession.id,
+      route: simulationSession.route,
+      duration: simulationSession.durationSeconds,
+      elapsed: simulationSession.elapsedSeconds,
+      speed: simulationSession.speed,
+      playing: simulationSession.playing,
+      to: simulationSession.to,
+      following: simulationFollowing,
+      anchoredAt: simulationSession.sampledAt,
+      lastCameraAt: previous?.id === simulationSession.id ? previous.lastCameraAt : 0,
+    }
+  }, [simulationSession, simulationFollowing])
+
+  useEffect(() => {
+    if (!runtime || !simulationActive) return undefined
+    const { map } = runtime
+    map.stopCameraAnimation?.()
+    let frame
+    let lastAt = performance.now()
+    let lastMarker = null
+    let lastFraction = null
+    let lastMarkerSessionId = null
+    function draw(at) {
+      const motion = simulationRef.current
+      if (motion) {
+        const elapsed = motion.playing
+          ? Math.min(motion.duration, motion.elapsed + Math.max(0, at - motion.anchoredAt) * motion.speed / 1000)
+          : motion.elapsed
+        const fraction = motion.duration > 0 ? elapsed / motion.duration : 1
+        const point = pointAlongRoute(motion.route, fraction) ?? motion.to
+        const marker = userMarkerRef.current
+        if (point && marker && (marker !== lastMarker || fraction !== lastFraction || motion.id !== lastMarkerSessionId)) {
+          marker.position = { lat: point.lat, lng: point.lng }
+          if (!marker.isConnected) map.append(marker)
+          lastMarker = marker
+          lastFraction = fraction
+          lastMarkerSessionId = motion.id
+        }
+        if (point && motion.following && at - motion.lastCameraAt >= SIM_CAMERA_INTERVAL_MS) {
+          const lead = pointAlongRoute(motion.route, Math.min(1, fraction + 0.015)) ?? motion.to
+          const tail = pointAlongRoute(motion.route, Math.max(0, fraction - 0.015)) ?? point
+          const desiredHeading = fraction > 0.985 ? bearingDegrees(tail, point) : bearingDegrees(point, lead)
+          const desiredCenter = offsetPoint(point, desiredHeading, 90)
+          const alpha = 1 - Math.exp(-Math.min(100, at - lastAt) / SIM_CAMERA_EASE_MS)
+          const center = map.center
+          const headingGap = Math.abs(((desiredHeading - map.heading + 540) % 360) - 180)
+          if (distanceMeters(center, desiredCenter) > 0.25 || headingGap > 0.25 ||
+            Math.abs(map.range - FOLLOW_RANGE) > 0.5 || Math.abs(map.tilt - FOLLOW_TILT) > 0.1) {
+            map.center = {
+              lat: center.lat + (desiredCenter.lat - center.lat) * alpha,
+              lng: center.lng + (desiredCenter.lng - center.lng) * alpha,
+              altitude: 0,
+            }
+            map.heading = blendAngle(map.heading, desiredHeading, alpha)
+            map.range += (FOLLOW_RANGE - map.range) * alpha
+            map.tilt += (FOLLOW_TILT - map.tilt) * alpha
+          }
+          motion.lastCameraAt = at
+          lastAt = at
+        }
+      }
+      frame = requestAnimationFrame(draw)
+    }
+    frame = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(frame)
+  }, [runtime, simulationActive])
 
   // Save the camera when a trip starts and fly back to it when the trip ends.
   useEffect(() => {
@@ -429,7 +519,7 @@ export default function MapView({
 
   // Follow the person during a trip, heading-up.
   useEffect(() => {
-    if (!runtime || !follow || !isValidLocation(follow.center)) return
+    if (!runtime || simulationActive || !follow || !isValidLocation(follow.center)) return
     runtime.map.flyCameraTo({
       endCamera: {
         center: { lat: follow.center.lat, lng: follow.center.lng, altitude: 0 },
@@ -437,7 +527,7 @@ export default function MapView({
       },
       durationMillis: flyMillis(FOLLOW_FLY_MS),
     })
-  }, [runtime, follow])
+  }, [runtime, follow, simulationActive])
 
   // Camera changes belong to explicit place selection, not planner updates or tilt redraws.
   useEffect(() => {

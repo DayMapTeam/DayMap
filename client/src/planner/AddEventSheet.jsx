@@ -126,13 +126,14 @@ function WhereStep({ plan, query, onQueryChange, onPlace, onText }) {
  * @param {(result: { stopId: string | null, message: string }) => void} props.onCommitted
  * @param {() => void} props.onCancel
  */
-export default function AddEventSheet({ now, planning, returnFocusSelector, onCommitted, onCancel, initialPlace = null }) {
+export default function AddEventSheet({ now, planning, returnFocusSelector, onCommitted, onCancel,
+  initialPlace = null, initialRole = 'event', initialDayRole = 'both' }) {
   const titleId = useId()
   const sheetRef = useRef(null)
   const [searching, setSearching] = useState(initialPlace === null)
   const [query, setQuery] = useState(initialPlace?.label ?? '')
   const [pickingLocation, setPickingLocation] = useState(false)
-  const draft = useAddEventDraft({ now, planning, initialPlace })
+  const draft = useAddEventDraft({ now, planning, initialPlace, initialRole, initialDayRole })
   const { plan, option } = draft
   const verdict = draft.role === 'event' ? describeVerdict(draft.fit, option, plan, 'fixed') : null
 
@@ -168,6 +169,17 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
       aria-modal="true"
       aria-labelledby={titleId}
       onKeyDown={(event) => {
+        if (event.key === 'Tab') {
+          const controls = [...sheetRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+            .filter((element) => element.getClientRects().length > 0)
+          const first = controls[0]
+          const last = controls.at(-1)
+          if (first && last && (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
+            event.preventDefault()
+            const focusTarget = event.shiftKey ? last : first
+            focusTarget.focus()
+          }
+        }
         if (event.key === 'Escape') {
           event.stopPropagation()
           if (pickingLocation) setPickingLocation(false)

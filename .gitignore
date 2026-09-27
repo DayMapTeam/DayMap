@@ -1,3 +1,8 @@
 # Local agent instructions; each teammate maintains their own.
 AGENTS.md
 agent.md
+
+# Local credentials and workspace settings.
+.env
+.env.*
+!.env.example

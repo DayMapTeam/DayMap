@@ -29,9 +29,9 @@ test('stop numbers have no gap after a delete or for stops without a pin', () =>
 test('fixed and flexible pins show their number in the type colour', () => {
   const fixed = stopMarkerSvg({ number: 1, type: 'fixed' }, colors)
   const flexible = stopMarkerSvg({ number: 2, type: 'flexible' }, colors)
-  assert.match(fixed, /r="18" fill="#1c1c1e"/)
+  assert.match(fixed, /r="15" fill="#1c1c1e"/)
   assert.match(fixed, />1<\/text>/)
-  assert.match(flexible, /r="18" fill="#0a84ff"/)
+  assert.match(flexible, /r="15" fill="#0a84ff"/)
   assert.match(flexible, />2<\/text>/)
 })
 
@@ -52,7 +52,7 @@ test('a steep camera shortens the stem', () => {
 
 test('selected shrinks the head and adds halos; past fades the whole pin', () => {
   const svg = stopMarkerSvg({ number: 3, type: 'flexible', state: { selected: true, past: true } }, colors)
-  assert.match(svg, /r="15.3" fill="#0a84ff"/)
+  assert.match(svg, /r="12.8" fill="#0a84ff"/)
   assert.match(svg, /r="22" fill="rgba\(10, 132, 255, 0.35\)"/)
   assert.match(svg, /r="11" fill="rgba\(10, 132, 255, 0.25\)"/)
   assert.match(svg, /<g opacity="0.7">/)
@@ -83,7 +83,7 @@ test('consecutive visits stack above the original pin; returning after another p
   assert.equal(layouts.get('b').connectorHeight, 7)
   assert.equal(layouts.get('return').connectorHeight, 27)
   assert.equal(layouts.get('last').connectorHeight, 7)
-  assert.deepEqual(['a', 'b', 'return', 'last'].map((id) => layouts.get(id).offset), [0, 47, 114, 161])
+  assert.deepEqual(['a', 'b', 'return', 'last'].map((id) => layouts.get(id).offset), [0, 41, 102, 143])
   assert.equal(layouts.get('away').offset, 0)
   assert.ok(layouts.get('a').layer > layouts.get('b').layer)
   assert.deepEqual(layouts.get('return').position, { lat: place.lat, lng: place.lng })
@@ -115,11 +115,11 @@ test('reordering or removing an intervening visit recalculates connectors, inclu
 test('stacked artwork adds only an upper head and connector, retaining each event state', () => {
   const stack = stopMarkerLayouts([stop('a'), stop('b')]).get('b')
   const svg = stopMarkerSvg({ number: 2, type: 'flexible', stack, state: { selected: true, past: true, clash: true } }, colors)
-  assert.match(svg, /width="44" height="141"/)
+  assert.match(svg, /width="44" height="135"/)
   assert.match(svg, /height="7"/)
   assert.match(svg, />2<\/text>/)
   assert.doesNotMatch(svg, /r="5"/)
-  assert.match(svg, /r="15.3"/)
+  assert.match(svg, /r="12.8"/)
   assert.match(svg, /opacity="0.7"/)
   assert.match(svg, /stroke="#ff3b30"/)
 })

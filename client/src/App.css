@@ -18,7 +18,7 @@
 /* Navigation mode: the map and guidance take the screen; the planner steps aside until the trip ends. */
 .app[data-navigating] .app-header,
 .app[data-navigating] .app-controls-top-left,
-.app[data-navigating] .planner,
+.app[data-navigating] .planner:not([data-takeover='true']),
 .app[data-navigating] .planner-reopen {
   display: none;
 }

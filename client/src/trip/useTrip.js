@@ -49,6 +49,7 @@ export function useTrip({ plan, now, reading }) {
   const go = useCallback((stopId) => dispatch({ type: 'go', stopId, plan: latest.current.plan, reading: latest.current.reading }), [])
   const end = useCallback(() => dispatch({ type: 'end' }), [])
   const arrive = useCallback(() => dispatch({ type: 'arrive' }), [])
+  const reset = useCallback(() => dispatch({ type: 'reset' }), [])
 
   return {
     state,
@@ -56,6 +57,6 @@ export function useTrip({ plan, now, reading }) {
     target,
     atStop: state.atStopId === null ? null : stops.get(state.atStopId) ?? null,
     noticeStop: state.notice === null ? null : stops.get(state.notice.stopId) ?? null,
-    go, end, arrive,
+    go, end, arrive, reset,
   }
 }
