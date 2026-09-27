@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { sortStopsForDisplay } from '../../../shared/planning/timeline.js'
 import { numberStops } from '../app/stopNumbers.js'
 import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
 import { arcApex, arcPath, arcStyle } from './journeyArc.js'
@@ -265,7 +266,8 @@ export default function MapView({
   useEffect(() => {
     if (!runtime) return
     const numbers = numberStops(stops)
-    const layouts = stopMarkerLayouts(stops, steep)
+    // Stack in the planner's time order, the same order as the numbers.
+    const layouts = stopMarkerLayouts(sortStopsForDisplay(stops), steep)
     const selectedGroup = layouts.get(selectedStopId)?.groupId
     for (const stop of stops) {
       const entry = markersRef.current.get(stop.id)
