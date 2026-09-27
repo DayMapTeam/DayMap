@@ -10,7 +10,8 @@ export function transitKey(from, to, departAt) {
 /**
  * Public-transport services per journey for this session: each journey and
  * departure is requested once, and the planner and the journey popup share
- * the answer. Nothing is stored beyond the page.
+ * the answer, including which service the user picked. Nothing is stored
+ * beyond the page.
  *
  * @param {(request: { from: object, to: object, departAt: string }) => Promise<object[]>} provider
  */
@@ -32,6 +33,13 @@ export function createTransitStore(provider) {
         (options) => publish(key, { status: 'ready', options }),
         () => publish(key, { status: 'error', options: [] }),
       )
+    },
+    /** The service the user picked for this journey and departure (`chosenId`). */
+    choose(from, to, departAt, optionId) {
+      const key = transitKey(from, to, departAt)
+      const entry = key && snapshot.get(key)
+      if (entry?.status !== 'ready' || !entry.options.some((option) => option.id === optionId)) return
+      publish(key, { ...entry, chosenId: optionId })
     },
     lookup(from, to, departAt, results = snapshot) {
       const key = transitKey(from, to, departAt)

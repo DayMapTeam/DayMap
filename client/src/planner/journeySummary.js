@@ -6,11 +6,14 @@ const CHANGE_WORTH_MS = 10 * 60000
 const rides = (option) => option.steps.filter((step) => step.kind === 'ride').length
 
 /**
- * The service a journey summary shows: among those arriving within 10 minutes
- * of the earliest, the one with the fewest changes (then the earliest).
+ * The service a journey summary shows: the one the user picked, otherwise,
+ * among those arriving within 10 minutes of the earliest, the one with the
+ * fewest changes (then the earliest).
  */
 export function pickService(services) {
   if (services?.status !== 'ready' || !services.options.length) return null
+  const chosen = services.chosenId != null && services.options.find((option) => option.id === services.chosenId)
+  if (chosen) return chosen
   const earliest = Math.min(...services.options.map((option) => Date.parse(option.arriveAt)))
   return services.options
     .filter((option) => Date.parse(option.arriveAt) - earliest <= CHANGE_WORTH_MS)
