@@ -8,7 +8,7 @@ const WATCH_OPTIONS = { enableHighAccuracy: true, maximumAge: 5000, timeout: 200
  * they are never saved to the plan, the server, storage or logs.
  *
  * status: 'requesting' | 'on' | 'denied' | 'unavailable' | 'unsupported'
- * position: { lat, lng, accuracy } or null
+ * position: { lat, lng, accuracy, observedAt } or null (observedAt is epoch milliseconds)
  */
 export function useLocation() {
   const supported = typeof navigator !== 'undefined' && 'geolocation' in navigator
@@ -19,9 +19,9 @@ export function useLocation() {
   useEffect(() => {
     if (!supported) return undefined
     const id = navigator.geolocation.watchPosition(
-      ({ coords }) => {
+      ({ coords, timestamp }) => {
         setStatus('on')
-        setPosition({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy })
+        setPosition({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy, observedAt: timestamp })
       },
       (error) => {
         if (error.code === error.PERMISSION_DENIED) {

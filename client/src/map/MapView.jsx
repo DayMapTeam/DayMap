@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { numberStops } from '../app/stopNumbers.js'
 import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
 import { arcApex, arcPath, arcStyle } from './journeyArc.js'
-import { markerColors, markerTemplate, stopMarkerSvg } from './stopMarker.js'
+import { markerColors, markerTemplate, stopMarkerLayouts, stopMarkerSvg } from './stopMarker.js'
 import { chipFont, travelChipSvg } from './travelChip.js'
 import { navigationArrowSvg, userMarkerSvg } from './userMarker.js'
 import { bearingDegrees, distanceMeters, offsetPoint } from '../trip/tripRules.js'
@@ -77,7 +77,6 @@ function journeyElements(runtime, leg) {
     collisionBehavior: 'OPTIONAL_AND_HIDES_LOWER_PRIORITY',
     drawsWhenOccluded: true,
     zIndex: CHIP_Z[leg.state] ?? CHIP_Z.later,
-    label: leg.label,
   })
   chip.append(markerTemplate(travelChipSvg({ label: leg.label, faded: leg.state === 'done' }, colors,
     measureText(leg.label, chipFont(colors)))))
@@ -234,7 +233,6 @@ export default function MapView({
       const existing = markers.get(stop.id)
       if (existing) {
         existing.marker.position = { lat: stop.location.lat, lng: stop.location.lng }
-        existing.marker.label = stop.title
         continue
       }
       const marker = new runtime.Marker({
@@ -242,7 +240,6 @@ export default function MapView({
         altitudeMode: 'CLAMP_TO_GROUND',
         collisionBehavior: 'REQUIRED',
         drawsWhenOccluded: true,
-        label: stop.title,
       })
       const handleClick = (event) => {
         const container = containerRef.current
@@ -279,18 +276,23 @@ export default function MapView({
   useEffect(() => {
     if (!runtime) return
     const numbers = numberStops(stops)
+    const layouts = stopMarkerLayouts(stops, steep)
+    const selectedGroup = layouts.get(selectedStopId)?.groupId
     for (const stop of stops) {
       const entry = markersRef.current.get(stop.id)
       if (!entry) continue
+      const layout = layouts.get(stop.id)
       const selected = stop.id === selectedStopId
       const svg = stopMarkerSvg({
         number: numbers.get(stop.id),
         type: stop.timing.kind,
         state: { ...stopStates[stop.id], selected, past: isFinished(stop, now) },
         steep,
+        stack: layout,
       }, runtime.colors)
+      entry.marker.position = layout.position
       entry.marker.replaceChildren(markerTemplate(svg))
-      entry.marker.zIndex = selected ? 10 : 0
+      entry.marker.zIndex = (layout.groupId === selectedGroup ? 10 : 0) + layout.layer
       entry.marker.title = `${numbers.get(stop.id)}. ${stop.title}${selected ? ' (selected)' : ''}${stopStates[stop.id]?.note ? ` · ${stopStates[stop.id].note}` : ''}`
     }
   }, [runtime, stops, selectedStopId, now, steep, stopStates])

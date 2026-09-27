@@ -5,11 +5,43 @@
 // colours are read from the tokens once (markerColors) and passed in.
 
 const WIDTH = 44
-const HEAD = { cx: 22, cy: 26, r: 18 }
+const HEAD = { cx: 22, cy: 26, r: 15 }
 const STEM_TOP = 46
 const STEM_HEIGHT = { normal: 40, steep: 28 } // shorter above 45° tilt
 const DOT_RADIUS = 5
 const SELECTED_SCALE = 0.85
+
+/** Layout only: stack repeated places in plan order without moving their map position. */
+export function stopMarkerLayouts(stops, steep = false) {
+  const groups = []
+  let previousGroup = null
+  const stemHeight = steep ? STEM_HEIGHT.steep : STEM_HEIGHT.normal
+  for (const stop of stops) {
+    const location = stop.location
+    if (!location || !Number.isFinite(location.lat) || Math.abs(location.lat) > 90
+      || !Number.isFinite(location.lng) || Math.abs(location.lng) > 180) continue
+    let group = groups.find(({ locations }) => locations.some((other) => (
+      (location.placeId && location.placeId === other.placeId)
+      || (location.lat === other.lat && location.lng === other.lng)
+    )))
+    if (!group) {
+      group = { id: stop.id, position: { lat: location.lat, lng: location.lng }, locations: [], entries: [] }
+      groups.push(group)
+    }
+    const previous = group.entries.at(-1)
+    const connectorHeight = previous ? Math.round(stemHeight * (previousGroup === group ? 1 / 6 : 2 / 3)) : stemHeight
+    // Head diameter plus its outline clearance, then the visible connector.
+    const offset = previous ? previous.offset + 2 * HEAD.r + 4 + connectorHeight : 0
+    group.locations.push(location)
+    group.entries.push({ id: stop.id, offset, connectorHeight })
+    previousGroup = group
+  }
+  return new Map(groups.flatMap((group) => group.entries.map((entry, index) => [entry.id, {
+    ...entry, position: group.position, groupId: group.id, count: group.entries.length,
+    // Lower pins cover the transparent tail of higher pins, keeping every head clickable.
+    layer: group.entries.length - index,
+  }])))
+}
 
 // Token name → key used by stopMarkerSvg.
 const COLOR_TOKENS = {
@@ -60,13 +92,15 @@ function headContent({ type, number }, colors, radius) {
  * @param {'fixed' | 'flexible' | 'all-day' | 'search' | 'ghost'} input.type
  * @param {{ selected?: boolean, clash?: boolean, past?: boolean, previewShifted?: boolean }} [input.state]
  * @param {boolean} [input.steep] Camera tilted above 45°: shorter stem.
+ * @param {{ offset: number, connectorHeight: number }} [input.stack] Shared-place stack layout.
  * @param {Record<string, string>} colors From markerColors().
  */
-export function stopMarkerSvg({ number, type, state = {}, steep = false }, colors) {
+export function stopMarkerSvg({ number, type, state = {}, steep = false, stack }, colors) {
   const { cx, cy } = HEAD
   const stemHeight = steep ? STEM_HEIGHT.steep : STEM_HEIGHT.normal
   const dotY = STEM_TOP + stemHeight + 1
-  const height = dotY + DOT_RADIUS + 2
+  const stacked = stack?.offset > 0
+  const height = dotY + DOT_RADIUS + 2 + (stack?.offset ?? 0)
   const radius = state.selected ? Math.round(HEAD.r * SELECTED_SCALE * 10) / 10 : HEAD.r
   const outline = type === 'search' || type === 'ghost'
   const typeColor = { fixed: colors.fixed, flexible: colors.flexible, 'all-day': colors.allDay }[type] ?? colors.accent
@@ -80,11 +114,11 @@ export function stopMarkerSvg({ number, type, state = {}, steep = false }, color
     `<filter id="dm-head-shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="${colors.shadow}"/></filter>`,
     `<filter id="dm-stem-shadow" x="-200%" y="-50%" width="500%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="1" flood-color="${colors.shadow}"/></filter>`,
     '</defs>',
-    `<g${state.past ? ' opacity="0.45"' : ''}>`,
-    state.selected ? `<circle cx="${cx}" cy="${dotY}" r="${DOT_RADIUS + 6}" fill="${colors.dotHalo}"/>` : '',
+    `<g${state.past ? ' opacity="0.7"' : ''}>`,
+    state.selected && !stacked ? `<circle cx="${cx}" cy="${dotY}" r="${DOT_RADIUS + 6}" fill="${colors.dotHalo}"/>` : '',
     `<g filter="url(#dm-stem-shadow)">`,
-    `<rect x="${cx - 1}" y="${STEM_TOP}" width="2" height="${stemHeight}" fill="${colors.ring}"/>`,
-    `<circle cx="${cx}" cy="${dotY}" r="${DOT_RADIUS}" fill="${colors.ring}" stroke="${state.previewShifted ? colors.shifted : typeColor}" stroke-width="3"/>`,
+    `<rect x="${cx - 1}" y="${STEM_TOP}" width="2" height="${stacked ? stack.connectorHeight : stemHeight}" fill="${colors.ring}"/>`,
+    !stacked ? `<circle cx="${cx}" cy="${dotY}" r="${DOT_RADIUS}" fill="${colors.ring}" stroke="${state.previewShifted ? colors.shifted : typeColor}" stroke-width="3"/>` : '',
     '</g>',
     state.selected ? `<circle cx="${cx}" cy="${cy}" r="22" fill="${colors.halo}"/>` : '',
     state.clash ? `<circle cx="${cx}" cy="${cy}" r="${radius + 3}" fill="none" stroke="${colors.clash}" stroke-width="3"/>` : '',

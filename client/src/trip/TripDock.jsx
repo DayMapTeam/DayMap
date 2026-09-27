@@ -288,9 +288,11 @@ function WalkthroughControls({ walkthrough, onReset, blocked, editingRun, runShe
  * @param {boolean} props.following Whether the camera follows you.
  * @param {boolean} props.hasPosition Whether your location is known.
  * @param {() => void} props.onRecenter
+ * @param {import('react').ReactNode} props.recoveryControl Compact departure/recovery disclosure.
  */
 export default function TripDock({ trip, navigation, voice, now, timezone, reading, onGo, following, hasPosition, onRecenter,
-  walkthrough, onResetWalkthrough, editingRun, runSheetOpen, runDraftPending, onEditRun, onAddRun, onSetRunStart, onResumeRun }) {
+  walkthrough, onResetWalkthrough, editingRun, runSheetOpen, runDraftPending, onEditRun, onAddRun, onSetRunStart,
+  onResumeRun, recoveryControl }) {
   const { target, next } = trip
   const controls = <WalkthroughControls walkthrough={walkthrough} onReset={onResetWalkthrough} blocked={false}
     {...{ editingRun, runSheetOpen, runDraftPending, onEditRun, onAddRun, onSetRunStart, onResumeRun }} />
@@ -301,6 +303,7 @@ export default function TripDock({ trip, navigation, voice, now, timezone, readi
         <div className="trip-dock trip-dock-navigating">
           <TripToast trip={trip} />
           {walkthrough.session && controls}
+          {recoveryControl}
           {!editingRun && <NavBar {...{ trip, navigation, voice, now, timezone, reading, following, hasPosition, onRecenter, walkthrough, onResetWalkthrough }} />}
         </div>
       </>
@@ -309,6 +312,7 @@ export default function TripDock({ trip, navigation, voice, now, timezone, readi
   return (
     <div className="trip-dock">
       <TripToast trip={trip} />
+      {recoveryControl}
       {next && !walkthrough.session && walkthrough.status !== 'loading' && (
         <button type="button" className="trip-go" aria-label={`Go to ${next.title}`} title={`Go to ${next.title}`} onClick={() => onGo(next.id)}>
           Go

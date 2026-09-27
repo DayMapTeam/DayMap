@@ -28,7 +28,7 @@ export function useNavigation({ target, plannedMode, reading, fallbackOrigin, ro
     const { reading: here, fallbackOrigin: stop, plannedMode: planned } = latest.current
     const from = here ?? stop
     dispatch({ type: 'target', target, from, mode: target ? navigationMode(target, planned, from) : null, at: Date.now() })
-  }, [target])
+  }, [target, plannedMode])
 
   useEffect(() => {
     if (reading) dispatch({ type: 'reading', reading, at: Date.now() })

@@ -39,7 +39,7 @@ test('a trip starts loading a route from where you are, or waits for a position'
   const target = { id: 'lecture', location: end }
   const loading = navigationReducer(initialNavigation, { type: 'target', target, from: start, mode: 'walk', at: 0 })
   assert.equal(loading.status, 'loading')
-  assert.deepEqual(loading.request, { from: start, to: end, mode: 'walk', fallbacks: ['drive'] })
+  assert.deepEqual(loading.request, { from: start, to: end, mode: 'walk' })
   const ready = navigationReducer(loading, { type: 'routed', requestId: loading.requestId, route, at: 1000 })
   assert.equal(ready.status, 'ready')
   assert.equal(navigationReducer(ready, { type: 'routed', requestId: 99, route: null, at: 0 }), ready, 'late answers are ignored')
@@ -126,14 +126,26 @@ test('announcements: the start, before the turn, the turn, and arrival — each 
   assert.equal(say(460), 'Morning lecture is ahead.')
 })
 
-test('if there is no route this way, driving then walking are tried', () => {
+test('route failure never switches transport without consent', () => {
   const target = { id: 'far', location: end }
   let state = navigationReducer(initialNavigation, { type: 'target', target, from: start, mode: 'transit', at: 0 })
   state = navigationReducer(state, { type: 'failed', requestId: state.requestId })
-  assert.equal(state.request.mode, 'drive')
-  assert.equal(state.status, 'loading')
-  state = navigationReducer(state, { type: 'failed', requestId: state.requestId })
-  assert.equal(state.request.mode, 'walk')
-  state = navigationReducer(state, { type: 'failed', requestId: state.requestId })
+  assert.equal(state.request.mode, 'transit')
   assert.equal(state.status, 'error')
+})
+
+test('accepting a different mode for the same destination replaces the route; stale replies cannot undo it', () => {
+  const target = { id: 'lecture', location: end }
+  let state = navigationReducer(initialNavigation, { type: 'target', target, from: start, mode: 'walk', at: 0 })
+  const oldId = state.requestId
+  state = navigationReducer(state, { type: 'routed', requestId: oldId, route, at: 1 })
+  state = navigationReducer(state, { type: 'target', target, from: corner, mode: 'transit', at: 2 })
+  assert.equal(state.status, 'loading')
+  assert.equal(state.route, null)
+  assert.equal(state.request.mode, 'transit')
+  assert.deepEqual(state.request.from, corner)
+  assert.equal(navigationReducer(state, { type: 'routed', requestId: oldId, route, at: 3 }), state)
+  const moved = navigationReducer(state, { type: 'target', target: { ...target, location: start }, from: corner, mode: 'transit', at: 4 })
+  assert.equal(moved.request.to, start)
+  assert.equal(moved.requestId, state.requestId + 1)
 })
