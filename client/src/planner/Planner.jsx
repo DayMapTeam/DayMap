@@ -129,10 +129,10 @@ export default function Planner({ now, revealRequest, planning, emptyState }) {
           <button
             type="button"
             className="planner-add"
-            aria-label="Add event"
+            aria-label="Add to your day"
             aria-keyshortcuts="N"
             disabled={!canAdd}
-            title={canAdd ? 'Add event (N)' : 'Accept or keep your pending changes first'}
+            title={canAdd ? 'Add to your day (N)' : 'Accept or keep your pending changes first'}
             onClick={openSheet}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
@@ -142,8 +142,8 @@ export default function Planner({ now, revealRequest, planning, emptyState }) {
         }
         overlay={pendingDeleteId !== null && (
           <ConfirmDialog
-            title="Delete event"
-            message="Are you sure you want to delete this event?"
+            title="Delete item"
+            message="Are you sure you want to delete this item?"
             confirmLabel="Confirm"
             returnFocusSelector={`[data-delete-stop="${CSS.escape(pendingDeleteId)}"] || .planner-add`}
             onConfirm={confirmDelete}

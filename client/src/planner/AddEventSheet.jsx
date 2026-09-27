@@ -3,15 +3,16 @@ import '../components/buttons.css'
 import { describeVerdict, splitPlaceLabel } from './addEventCopy.js'
 import { TimeRangeInputs } from './AddEventFields.jsx'
 import FitVerdict from './FitVerdict.jsx'
+import PlacePicker from './PlacePicker.jsx'
+import { matchingDayPlaces } from './addPlaces.js'
 import { useAddEventDraft } from './useAddEventDraft.js'
 import { placeStatusMessage, usePlaceSuggestions } from './usePlaceSuggestions.js'
 import { useReturnFocus } from './useReturnFocus.js'
 
 const ROLES = [
-  { value: 'event', title: 'An event', note: 'Choose when it starts and ends.' },
-  { value: 'both', title: 'My day starts and ends here', note: 'Like home. No times needed.' },
-  { value: 'start', title: 'My day starts here', note: 'Where you are in the morning.' },
-  { value: 'end', title: 'My day ends here', note: 'Home, or a hotel for the night.' },
+  { value: 'event', title: 'Activity' },
+  { value: 'note', title: 'Note' },
+  { value: 'day-place', title: 'Day start/end' },
 ]
 
 function ChevronIcon() {
@@ -32,17 +33,20 @@ function PinIcon() {
 }
 
 // Step 1: find a place, or use the typed text without one.
-function WhereStep({ query, onQueryChange, onPlace, onText }) {
+function WhereStep({ plan, query, onQueryChange, onPlace, onText }) {
   const inputId = useId()
   const labelId = useId()
   const { state, search, select } = usePlaceSuggestions(onPlace)
   const typed = query.trim()
+  const knownPlaces = matchingDayPlaces(plan, query)
+
+  useEffect(() => { search(query) }, [query, search])
   const results = state.status === 'results' ? state.results : []
   const message = placeStatusMessage(state.status)
 
   return (
     <>
-      <label className="visually-hidden" htmlFor={inputId}>Search places or type a name</label>
+      <label className="visually-hidden" htmlFor={inputId}>Place, activity or note</label>
       <div className="add-search add-search-large">
         <svg className="add-search-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
           <circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" strokeWidth="1.6" />
@@ -52,21 +56,32 @@ function WhereStep({ query, onQueryChange, onPlace, onText }) {
           id={inputId}
           className="add-search-input sheet-autofocus"
           type="text"
-          placeholder="Search places or type a name"
+          placeholder="Place, activity or note"
           autoComplete="off"
           value={query}
           onChange={(event) => {
             onQueryChange(event.target.value)
-            search(event.target.value)
           }}
         />
       </div>
       {typed === '' ? (
-        <p className="add-hint">Search for a place in Adelaide, or type something to do, like “Call Mum”.</p>
+        <p className="add-hint">Try “Home”, “Read a book”, or a reminder. You can add a location later.</p>
       ) : (
         <>
           <p id={labelId} className="add-section-label">Results</p>
           <ul className="inset-group sheet-rows" aria-labelledby={labelId}>
+            {knownPlaces.map((place) => (
+              <li key={`${place.label}|${place.lat}|${place.lng}`}>
+                <button type="button" className="sheet-row" onClick={() => onPlace(place)}>
+                  <span className="sheet-row-thumb" aria-hidden="true"><PinIcon /></span>
+                  <span className="sheet-row-text">
+                    <span className="sheet-row-name">{place.label}</span>
+                    <span className="sheet-row-sub">Already in your day</span>
+                  </span>
+                  <ChevronIcon />
+                </button>
+              </li>
+            ))}
             {results.map((result) => {
               const { name, rest } = splitPlaceLabel(result.label)
               return (
@@ -87,7 +102,7 @@ function WhereStep({ query, onQueryChange, onPlace, onText }) {
                 <span className="sheet-row-thumb" data-plus aria-hidden="true">+</span>
                 <span className="sheet-row-text">
                   <span className="sheet-row-name">Use “{typed}”</span>
-                  <span className="sheet-row-sub">No place. Travel stays unknown.</span>
+                  <span className="sheet-row-sub">Choose a type next. Location is optional.</span>
                 </span>
                 <ChevronIcon />
               </button>
@@ -102,8 +117,7 @@ function WhereStep({ query, onQueryChange, onPlace, onText }) {
 
 /**
  * Add to the day on one screen: find a place (or type a name), then say what
- * it is — an event with From and To times, or where the day starts and/or
- * ends (home, a hotel), which needs no times. Add is the explicit accept.
+ * it is: an activity, a note, or an explicit day endpoint. Add is the accept.
  *
  * @param {object} props
  * @param {Date} props.now
@@ -117,9 +131,10 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
   const sheetRef = useRef(null)
   const [searching, setSearching] = useState(true)
   const [query, setQuery] = useState('')
+  const [pickingLocation, setPickingLocation] = useState(false)
   const draft = useAddEventDraft({ now, planning })
   const { plan, option } = draft
-  const verdict = describeVerdict(draft.fit, option, plan, 'fixed')
+  const verdict = draft.role === 'event' ? describeVerdict(draft.fit, option, plan, 'fixed') : null
 
   useReturnFocus(returnFocusSelector)
 
@@ -155,14 +170,15 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.stopPropagation()
-          onCancel()
+          if (pickingLocation) setPickingLocation(false)
+          else onCancel()
         }
       }}
     >
       <div className="sheet-header">
         <div className="sheet-nav">
           {!searching ? (
-            <button type="button" className="sheet-back" onClick={() => setSearching(true)}>
+            <button type="button" className="sheet-back" onClick={() => { setPickingLocation(false); setSearching(true) }}>
               <span aria-hidden="true">‹ </span>Search
             </button>
           ) : <span />}
@@ -173,7 +189,7 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
 
       <div className="sheet-body">
         {searching ? (
-          <WhereStep query={query} onQueryChange={setQuery} onPlace={pickPlace} onText={chooseText} />
+          <WhereStep plan={plan} query={query} onQueryChange={setQuery} onPlace={pickPlace} onText={chooseText} />
         ) : (
           <>
             <div className="sheet-place">
@@ -186,38 +202,41 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
                   id={`${titleId}-name`}
                   className="sheet-place-name"
                   type="text"
+                  maxLength={120}
                   value={draft.title}
                   onChange={(event) => draft.setTitle(event.target.value)}
                 />
                 <span className="sheet-row-sub">
-                  {draft.location === null ? 'No place. Travel stays unknown.' : draft.location.label}
+                  {draft.location === null ? (draft.role === 'note' ? 'No location needed' : 'Location not set') : draft.location.label}
                 </span>
               </span>
-              <button type="button" className="button-text" onClick={() => setSearching(true)}>Change</button>
+              <button type="button" className="button-text" onClick={() => setPickingLocation(true)}>
+                {draft.location ? 'Change place' : 'Add place'}
+              </button>
             </div>
 
+            {pickingLocation && (
+              <PlacePicker
+                initialQuery={draft.location ? '' : draft.title}
+                knownPlaces={matchingDayPlaces(plan, '', Infinity)}
+                noPlaceLabel="Remove place"
+                onPick={(place) => { draft.attachPlace(place); setPickingLocation(false) }}
+                onNoPlace={draft.location ? () => { draft.attachPlace(null); setPickingLocation(false) } : null}
+                onCancel={() => setPickingLocation(false)}
+              />
+            )}
+
             <fieldset className="add-field role-options">
-              <legend className="add-section-label">What is it?</legend>
-              {ROLES.map((role) => {
-                const disabled = role.value !== 'event' && draft.location === null
-                return (
-                  <label key={role.value} className="role-option" data-checked={draft.role === role.value || undefined} data-disabled={disabled || undefined}>
-                    <input
-                      className="visually-hidden"
-                      type="radio"
-                      name={`${titleId}-role`}
-                      checked={draft.role === role.value}
-                      disabled={disabled}
-                      onChange={() => draft.changeRole(role.value)}
-                    />
-                    <span className="role-option-radio" aria-hidden="true" />
-                    <span className="role-option-text">
-                      <span className="role-option-title">{role.title}</span>
-                      <span className="role-option-note">{disabled ? 'Needs a place from search.' : role.note}</span>
-                    </span>
+              <legend className="add-section-label">Add as</legend>
+              <div className="add-kind-options">
+                {ROLES.map((role) => (
+                  <label key={role.value} className="segmented-option">
+                    <input className="visually-hidden" type="radio" name={`${titleId}-role`}
+                      checked={draft.role === role.value} onChange={() => draft.changeRole(role.value)} />
+                    <span className="segmented-label">{role.title}</span>
                   </label>
-                )
-              })}
+                ))}
+              </div>
             </fieldset>
 
             {draft.role === 'event' ? (
@@ -231,21 +250,33 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
                 />
                 <FitVerdict verdict={draft.checkingTravel ? { tone: 'neutral', text: 'Checking travel time…' } : verdict} />
               </div>
+            ) : draft.role === 'note' ? (
+              <p className="add-hint">A note for today. No set time, and it won’t change your schedule.</p>
             ) : (
-              <p className="add-hint">
-                {draft.role === 'start' && 'The planner starts here and shows when to leave for your first stop.'}
-                {draft.role === 'end' && 'The planner ends here. After your last stop, Go takes you here.'}
-                {draft.role === 'both' && 'The planner starts and ends here. After your last stop, Go takes you back.'}
-              </p>
+              <div className="add-field">
+                <label className="add-section-label" htmlFor={`${titleId}-day-role`}>Use this place for</label>
+                <select id={`${titleId}-day-role`} className="time-range-input" value={draft.dayRole}
+                  onChange={(event) => draft.setDayRole(event.target.value)}>
+                  <option value="both">Start and end of day</option>
+                  <option value="start">Start of day</option>
+                  <option value="end">End of day</option>
+                </select>
+                <p className="add-hint">Use Activity for a visit home or reading afterwards. These places sit before and after all your activities.</p>
+                {!draft.location && <p className="add-hint" role="status">Add a place to confirm the address. We won’t guess where “{draft.title || 'this'}” is.</p>}
+                {draft.dayRole !== 'end' && plan.startPlace && <p className="add-hint">Replaces day start: {plan.startPlace.label}.</p>}
+                {draft.dayRole !== 'start' && plan.endPlace && <p className="add-hint">Replaces day end: {plan.endPlace.label}.</p>}
+              </div>
             )}
+            {!draft.title.trim() && <p className="add-hint" role="status">Enter a name or note.</p>}
+            {draft.title.trim().length > 120 && <p className="add-hint" role="status">Keep the name or note to 120 characters.</p>}
           </>
         )}
       </div>
 
       {!searching && (
         <div className="sheet-footer">
-          <button type="button" className="button-filled sheet-primary" disabled={!draft.canCommit} onClick={add}>
-            Add to day
+          <button type="button" className="button-filled sheet-primary" disabled={!draft.canCommit || pickingLocation} onClick={add}>
+            {draft.role === 'day-place' ? 'Save day place' : draft.role === 'note' ? 'Add note' : 'Add to day'}
           </button>
         </div>
       )}

@@ -1,6 +1,9 @@
 // Rules for user edits to a stop. Shared by the reducer (which rejects invalid
 // edits) and the planner form (which explains them).
 
+/** Manual all-day items are notes, using the existing persisted stop shape. */
+export const isDayNote = (stop) => stop.source === 'manual' && stop.timing.kind === 'all-day'
+
 /**
  * @typedef {object} StopEdit
  * @property {string} title
@@ -16,8 +19,9 @@
  * @returns {null | 'not-editable' | 'missing-title' | 'end-before-start' | 'outside-window'}
  */
 export function validateStopEdit(stop, edit) {
-  if (stop.timing.kind !== 'flexible') return 'not-editable'
+  if (stop.timing.kind !== 'flexible' && !isDayNote(stop)) return 'not-editable'
   if (edit.title.trim() === '') return 'missing-title'
+  if (isDayNote(stop)) return edit.scheduledStartAt === null && edit.scheduledEndAt === null ? null : 'not-editable'
   const start = Date.parse(edit.scheduledStartAt)
   const end = Date.parse(edit.scheduledEndAt)
   if (!(end > start)) return 'end-before-start'

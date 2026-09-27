@@ -7,9 +7,11 @@ import SuggestionDetails from './SuggestionDetails.jsx'
 function describeChange({ before, after }, timezone) {
   const parts = []
   if (before.title !== after.title) parts.push(`renamed from ${before.title}`)
-  const beforeRange = formatTimeRange(before.timing.scheduledStartAt, before.timing.scheduledEndAt, timezone)
-  const afterRange = formatTimeRange(after.timing.scheduledStartAt, after.timing.scheduledEndAt, timezone)
-  if (beforeRange !== afterRange) parts.push(`${beforeRange} → ${afterRange}`)
+  if (before.timing.scheduledStartAt !== after.timing.scheduledStartAt || before.timing.scheduledEndAt !== after.timing.scheduledEndAt) {
+    const beforeRange = formatTimeRange(before.timing.scheduledStartAt, before.timing.scheduledEndAt, timezone)
+    const afterRange = formatTimeRange(after.timing.scheduledStartAt, after.timing.scheduledEndAt, timezone)
+    parts.push(`${beforeRange} → ${afterRange}`)
+  }
   return `${after.title}: ${parts.join(', ')}`
 }
 

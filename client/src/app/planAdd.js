@@ -23,7 +23,7 @@ const MAX_TITLE = 120
  * @property {string} title
  * @property {{ label: string, placeId: string | null, lat: number, lng: number } | null} location
  *   null adds it without a place; it then shows "Location needed" like any unresolved stop.
- * @property {'flexible' | 'fixed' | 'timed'} kind 'timed': at the given times, and flexible afterwards.
+ * @property {'flexible' | 'fixed' | 'timed' | 'all-day'} kind 'all-day': a note without scheduled times.
  * @property {number} [durationMinutes] Flexible only.
  * @property {string | null} [startAt] Fixed only, UTC timestamp.
  * @property {string | null} [endAt] Fixed only, UTC timestamp.
@@ -137,6 +137,7 @@ export function validateNewStop(newStop) {
   const title = newStop.title.trim()
   if (title === '') return 'missing-title'
   if (title.length > MAX_TITLE) return 'title-too-long'
+  if (newStop.kind === 'all-day') return null
   let minutes = newStop.durationMinutes
   if (newStop.kind === 'fixed' || newStop.kind === 'timed') {
     if (!newStop.startAt || !newStop.endAt) return 'missing-time'
@@ -322,6 +323,21 @@ export function fitNewStop(plan, newStop, { afterStopId = null, now, ctx = null 
   const journey = journeyTimes(ctx)
   const error = validateNewStop(newStop)
   if (error !== null) return { error, options: [] }
+
+  // Notes use the existing all-day shape: no invented time, travel or shifts.
+  if (newStop.kind === 'all-day') {
+    const stop = makeStop(newStop, 0, 0)
+    stop.timing = { kind: 'all-day', durationMinutes: null, fixedStartAt: null, fixedEndAt: null,
+      earliestStartAt: null, latestEndAt: null, scheduledStartAt: null, scheduledEndAt: null }
+    const next = { ...plan, stops: [...plan.stops, stop] }
+    if (stop.location === null) {
+      next.questions = [...(plan.questions ?? []), { id: `location:${stop.id}`, stopId: stop.id,
+        field: 'location', prompt: `Where is “${stop.title}”?`, status: 'deferred' }]
+    }
+    return { error: null, options: [{ ok: true, plan: next, afterStopId: null, startAt: null, endAt: null,
+      reason: null, spareMinutes: null, nextStopId: null, shiftedStopIds: [], changes: [{ stopId: stop.id, type: 'new' }],
+      journeys: [], lateArrivalMinutes: null, recommended: true }] }
+  }
 
   const timed = timedStops(plan)
   let options

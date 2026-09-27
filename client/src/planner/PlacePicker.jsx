@@ -16,16 +16,19 @@ const STATUS = {
  *
  * @param {object} props
  * @param {string} [props.initialQuery] Starts searching straight away (for example the Calendar's location text).
+ * @param {object[]} [props.knownPlaces] Confirmed places the person can explicitly reuse.
+ * @param {string} [props.noPlaceLabel] Label for the optional clear-location action.
  * @param {(place: { label: string, placeId: string | null, lat: number, lng: number }) => void} props.onPick
  * @param {(() => void) | null} props.onNoPlace Records that the event needs no place; null hides the option.
  * @param {() => void} props.onCancel
  */
-export default function PlacePicker({ initialQuery = '', onPick, onNoPlace, onCancel }) {
+export default function PlacePicker({ initialQuery = '', knownPlaces = [], noPlaceLabel = 'No place needed', onPick, onNoPlace, onCancel }) {
   const id = useId()
   const inputRef = useRef(null)
   const [query, setQuery] = useState(initialQuery)
   const { state, search, select } = usePlaceSuggestions(onPick)
   const results = state.status === 'results' ? state.results : []
+  const known = knownPlaces.filter((place) => place.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -61,8 +64,18 @@ export default function PlacePicker({ initialQuery = '', onPick, onNoPlace, onCa
           }}
         />
       </div>
-      {results.length > 0 && (
+      {(results.length > 0 || known.length > 0) && (
         <ul className="inset-group sheet-rows" aria-label="Places">
+          {known.map((place) => (
+            <li key={`${place.label}|${place.lat}|${place.lng}`}>
+              <button type="button" className="sheet-row" onClick={() => onPick(place)}>
+                <span className="sheet-row-text">
+                  <span className="sheet-row-name">{place.label}</span>
+                  <span className="sheet-row-sub">Already in your day</span>
+                </span>
+              </button>
+            </li>
+          ))}
           {results.map((result) => {
             const { name, rest } = splitPlaceLabel(result.label)
             return (
@@ -82,7 +95,7 @@ export default function PlacePicker({ initialQuery = '', onPick, onNoPlace, onCa
       <div className="event-form-actions">
         {onNoPlace && (
           <button type="button" className="button-text place-picker-none" onClick={onNoPlace}>
-            No place needed
+            {noPlaceLabel}
           </button>
         )}
         <button type="button" className="button-text" onClick={onCancel}>Cancel</button>

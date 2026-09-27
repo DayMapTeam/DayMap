@@ -1,5 +1,5 @@
 import { chooseOption } from './planAdd.js'
-import { listStopChanges, validateStopEdit, withDayPlace, withStopKind, withTravelMode } from './planEdits.js'
+import { isDayNote, listStopChanges, validateStopEdit, withDayPlace, withStopKind, withTravelMode } from './planEdits.js'
 import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
 import { planFingerprint } from '../../../shared/planning/fingerprint.js'
@@ -65,7 +65,7 @@ function editStopDraft(state, { stopId, edit }) {
   target.title = edit.title.trim()
   target.timing.scheduledStartAt = edit.scheduledStartAt
   target.timing.scheduledEndAt = edit.scheduledEndAt
-  target.timing.durationMinutes = (Date.parse(edit.scheduledEndAt) - Date.parse(edit.scheduledStartAt)) / 60000
+  target.timing.durationMinutes = isDayNote(target) ? null : (Date.parse(edit.scheduledEndAt) - Date.parse(edit.scheduledStartAt)) / 60000
   if (timingChanged) {
     plan.legs = plan.legs.map((leg) =>
       leg.fromStopId === stopId || leg.toStopId === stopId ? { ...leg, status: 'stale' } : leg,
@@ -110,6 +110,7 @@ function withoutStop(plan, stopId) {
     ...plan,
     stops: plan.stops.filter((stop) => stop.id !== stopId),
     legs: plan.legs.filter((leg) => leg.fromStopId !== stopId && leg.toStopId !== stopId),
+    questions: (plan.questions ?? []).filter((question) => question.stopId !== stopId),
   }
 }
 
@@ -120,7 +121,7 @@ function withoutStop(plan, stopId) {
  */
 function removeStop(state, { stopId }) {
   const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
-  if (!stop || stop.timing.kind !== 'flexible') return state
+  if (!stop || (stop.timing.kind !== 'flexible' && !isDayNote(stop))) return state
   if (state.draft?.suggestion) return removeStop(revertSuggestion(state), { stopId })
 
   const version = state.plan.version + 1
