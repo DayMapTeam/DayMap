@@ -9,9 +9,21 @@ const colors = {
   shadow: 'rgba(0, 0, 0, 0.35)', font: "'Instrument Sans', sans-serif",
 }
 
-test('stop numbers follow the plan order', () => {
-  const numbers = numberStops([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
-  assert.deepEqual([...numbers], [['a', 1], ['b', 2], ['c', 3]])
+const at = { lat: -34.92, lng: 138.6 }
+const timed = (id, start, location = at) => ({
+  id, location,
+  timing: { kind: 'flexible', scheduledStartAt: `2026-09-27T${start}:00Z`, scheduledEndAt: `2026-09-27T${start}:30Z` },
+})
+
+test('stop numbers follow the planner time order, not creation order', () => {
+  const numbers = numberStops([timed('late', '05'), timed('early', '01'), timed('middle', '03')])
+  assert.deepEqual([...numbers], [['early', 1], ['middle', 2], ['late', 3]])
+})
+
+test('stop numbers have no gap after a delete or for stops without a pin', () => {
+  const stops = [timed('a', '01'), timed('b', '02'), timed('unlocated', '03', null), timed('d', '04')]
+  assert.deepEqual([...numberStops(stops)], [['a', 1], ['b', 2], ['d', 3]])
+  assert.deepEqual([...numberStops(stops.filter((stop) => stop.id !== 'b'))], [['a', 1], ['d', 2]])
 })
 
 test('fixed and flexible pins show their number in the type colour', () => {

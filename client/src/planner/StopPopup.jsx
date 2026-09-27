@@ -38,6 +38,7 @@ export default function StopPopup({ stopId, anchor, onClose, onViewInPlanner, on
   if (!stop) return null
 
   const { timing } = stop
+  const number = numberStops(shown.stops).get(stop.id)
   const time = timing.scheduledStartAt !== null && timing.scheduledEndAt !== null
     ? formatTimeRange(timing.scheduledStartAt, timing.scheduledEndAt, shown.timezone)
     : 'Time not set'
@@ -46,7 +47,7 @@ export default function StopPopup({ stopId, anchor, onClose, onViewInPlanner, on
     <PlacePopup
       anchor={anchor}
       title={stop.title}
-      badge={{ number: numberStops(shown.stops).get(stop.id), kind: timing.kind }}
+      badge={number === undefined ? null : { number, kind: timing.kind }}
       photoUrl={details?.photoUrl ?? null}
       onClose={onClose}
     >

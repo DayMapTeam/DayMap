@@ -1,10 +1,16 @@
+import { sortStopsForDisplay } from '../../../shared/planning/timeline.js'
+
+const hasPin = (location) => Boolean(location) && Number.isFinite(location.lat) && Number.isFinite(location.lng)
+
 /**
- * Display numbers for stops: their position in the plan, starting at 1. The
- * map pins and the popup both read this, so they always match the planner's
- * order. Unlocated stops keep their number so pins match planner positions.
+ * Display numbers for the pinned stops: 1, 2, 3… in the planner's time order,
+ * so deleting or retiming a stop never leaves a gap or an out-of-order pin.
+ * Stops without a location have no pin, so they don't take a number. The map
+ * pins and the popup both read this, so they always match.
  *
  * @returns {Map<string, number>} stop ID → number
  */
 export function numberStops(stops) {
-  return new Map(stops.map((stop, index) => [stop.id, index + 1]))
+  const pinned = sortStopsForDisplay(stops).filter((stop) => hasPin(stop.location))
+  return new Map(pinned.map((stop, index) => [stop.id, index + 1]))
 }
