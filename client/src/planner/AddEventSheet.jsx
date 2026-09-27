@@ -169,7 +169,8 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
       aria-modal="true"
       aria-labelledby={titleId}
       onKeyDown={(event) => {
-        if (event.key === 'Tab') {
+        // Trap focus only while the form floats over the map (see PlannerPanel.css).
+        if (event.key === 'Tab' && sheetRef.current.closest('.app[data-navigating]')) {
           const controls = [...sheetRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')]
             .filter((element) => element.getClientRects().length > 0)
           const first = controls[0]
