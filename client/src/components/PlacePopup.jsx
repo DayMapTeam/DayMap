@@ -1,4 +1,5 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import EventArtwork from './EventArtwork.jsx'
 import { placePopup } from './popupPosition.js'
 import './PlacePopup.css'
 
@@ -23,9 +24,11 @@ function mapBounds(container) {
  * where it was on close. `onClose` should be stable (useCallback) so focus is
  * not reset each render. `badge` ({ number, kind }) repeats the pin's number.
  */
-export default function PlacePopup({ anchor, title, badge = null, photoUrl, onClose, children }) {
+export default function PlacePopup({ anchor, title, badge = null, photoUrl, artworkType = 'place', onClose, children }) {
   const titleId = useId()
   const popupRef = useRef(null)
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState(null)
+  const showPhoto = photoUrl && failedPhotoUrl !== photoUrl
 
   // Position with direct style writes before paint; React does not own these styles.
   useLayoutEffect(() => {
@@ -63,7 +66,7 @@ export default function PlacePopup({ anchor, title, badge = null, photoUrl, onCl
   return (
     <div ref={popupRef} className="place-popup glass" role="dialog" aria-labelledby={titleId} tabIndex={-1}>
       <div className="place-popup-photo">
-        {photoUrl ? <img src={photoUrl} alt="" /> : <span className="place-popup-photo-empty">No photo yet</span>}
+        {showPhoto ? <img src={photoUrl} alt="" onError={() => setFailedPhotoUrl(photoUrl)} /> : <EventArtwork type={artworkType} />}
         <button type="button" className="place-popup-close" aria-label="Close" onClick={onClose}>
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
             <path d="m1.5 1.5 7 7m0-7-7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

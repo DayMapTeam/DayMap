@@ -3,6 +3,7 @@ import { usePlan } from '../app/planContext.js'
 import { numberStops } from '../app/stopNumbers.js'
 import { formatTimeRange } from '../components/formatTime.js'
 import PlacePopup from '../components/PlacePopup.jsx'
+import { eventArtworkType } from '../components/eventArtwork.js'
 import { getPlaceDetails } from '../services/placesService.js'
 import { KIND_LABELS } from './stopLabels.js'
 import '../components/buttons.css'
@@ -49,6 +50,7 @@ export default function StopPopup({ stopId, anchor, onClose, onViewInPlanner, on
       title={stop.title}
       badge={number === undefined ? null : { number, kind: timing.kind }}
       photoUrl={details?.photoUrl ?? null}
+      artworkType={eventArtworkType(stop.title, stop.location?.label)}
       onClose={onClose}
     >
       {details && (

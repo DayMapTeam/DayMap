@@ -1,0 +1,12 @@
+.event-artwork { width: 100%; height: 100%; display: block; --art-background: #dcece9; --art-accent: #9fc9bd; --art-shadow: #668b88; }
+.event-artwork[data-type='groceries'] { --art-background: #f8ead7; --art-accent: #e7caa2; --art-shadow: #9f805e; }
+.event-artwork[data-type='coffee'] { --art-background: #e8d2bf; --art-accent: #c9997c; --art-shadow: #806552; }
+.event-artwork[data-type='food'] { --art-background: #f1dfca; --art-accent: #e9ab89; --art-shadow: #ac8668; }
+.event-artwork[data-type='study'] { --art-background: #e4dff2; --art-accent: #bcb2d9; --art-shadow: #8b82a7; }
+.event-artwork[data-type='fitness'] { --art-background: #ccded9; --art-accent: #8ebcae; --art-shadow: #618d83; }
+.event-artwork[data-type='health'] { --art-background: #f3dce0; --art-accent: #e8acb3; --art-shadow: #b9828b; }
+.event-artwork[data-type='nature'] { --art-background: #dcead8; --art-accent: #abd2a0; --art-shadow: #729a72; }
+.event-artwork[data-type='shopping'] { --art-background: #f2dce5; --art-accent: #dfaec7; --art-shadow: #ad8193; }
+.event-artwork[data-type='home'] { --art-background: #e7e8dd; --art-accent: #c2d7d1; --art-shadow: #8e9c91; }
+.event-artwork[data-type='work'] { --art-background: #dce5eb; --art-accent: #a9c4d0; --art-shadow: #7e9ba8; }
+.event-artwork[data-type='travel'] { --art-background: #dce9e9; --art-accent: #a8cccc; --art-shadow: #7b9b9a; }
