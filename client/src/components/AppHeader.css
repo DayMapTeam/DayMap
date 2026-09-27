@@ -13,29 +13,6 @@
   box-shadow: none;
 }
 
-.app-header-logo {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.app-header-mark {
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid var(--label);
-  border-radius: 50%;
-}
-
-.app-header-mark::after {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--blue);
-}
-
 .app-header-wordmark {
   font-size: 19px;
   font-weight: 700;

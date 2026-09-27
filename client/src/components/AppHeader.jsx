@@ -16,10 +16,7 @@ import './AppHeader.css'
 export default function AppHeader({ date, timezone, dataMode, now, isDemoTime, children }) {
   return (
     <header className="app-header glass">
-      <div className="app-header-logo">
-        <span className="app-header-mark" aria-hidden="true" />
-        <span className="app-header-wordmark">DayMap</span>
-      </div>
+      <span className="app-header-wordmark">DayMap</span>
       {dataMode === 'demo' && <span className="app-header-demo">Demo data</span>}
       <div className="app-header-spacer" />
       <time className="app-header-date" dateTime={date}>
