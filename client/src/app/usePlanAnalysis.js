@@ -98,6 +98,8 @@ export function usePlanAnalysis(plan, draft, now) {
   const requestTransit = useCallback((from, to) => {
     if (provider === 'google') transit.request(from.location, to.location, departureFor(from))
   }, [provider, transit, departureFor])
+  const chooseTransit = useCallback((from, to, optionId) => transit.choose(from.location, to.location, departureFor(from), optionId),
+    [transit, departureFor])
   useEffect(() => {
     for (const leg of analysis.legs) {
       if (leg.status !== 'ready' || leg.mode !== 'transit') continue
@@ -124,5 +126,5 @@ export function usePlanAnalysis(plan, draft, now) {
     provider, loadingRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'pending'),
     failedRoutes: provider === 'google' && [...results.values()].some((r) => r.status === 'unavailable'),
     retryRoutes: routes.retryFailures, checkAlternatives, checkGapRoutes, requestJourneys,
-    departureFor, journeyEstimates, requestAllModes, transitServicesFor, requestTransit }
+    departureFor, journeyEstimates, requestAllModes, transitServicesFor, requestTransit, chooseTransit }
 }

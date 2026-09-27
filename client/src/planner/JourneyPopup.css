@@ -2,19 +2,24 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
   padding: var(--overlay-inset);
   background: var(--scrim);
 }
 
+/*
+ * One size whatever is chosen, so the popup never jumps: the header and the
+ * actions stay put and the body between them scrolls. Shorter on short screens.
+ */
 .journey-popup {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   width: min(440px, 100%);
   max-height: calc(100dvh - 2 * var(--overlay-inset));
-  overflow-y: auto;
+  overflow: hidden;
   padding: var(--space-5);
   background: var(--glass-strong);
   border-radius: var(--radius-panel);
@@ -59,6 +64,24 @@
   background: var(--fill);
   border: 0;
   border-radius: 50%;
+}
+
+.journey-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--space-4);
+  min-height: 0;
+  /* Room for card shadows and focus rings, which the scroll box would clip. */
+  margin: -4px;
+  padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.journey-head,
+.journey-actions {
+  flex-shrink: 0;
 }
 
 .journey-modes {
@@ -148,24 +171,62 @@
 }
 
 .journey-service {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
   background: var(--solid);
+  border: 1.5px solid transparent;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
+}
+
+.journey-service[data-checked] {
+  border-color: var(--blue);
+  background: var(--blue-tint);
 }
 
 .journey-service-head {
   display: grid;
   gap: 2px;
-  width: 100%;
+  min-width: 0;
   padding: var(--space-3);
   text-align: left;
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+
+/* The whole card greys on hover, chevron included, like an event row. */
+.journey-service:not([data-checked]):hover {
+  background: var(--fill);
+}
+
+.journey-service-head:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.journey-service-toggle {
+  display: grid;
+  place-items: center;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  padding: 0;
+  color: var(--label-3);
   background: transparent;
   border: 0;
   border-radius: var(--radius-card);
 }
 
-.journey-service-head:hover {
-  background: var(--fill);
+.journey-service-chevron {
+  transition: transform var(--duration-panel) var(--ease-spring);
+}
+
+.journey-service-toggle[aria-expanded='true'] .journey-service-chevron {
+  transform: rotate(90deg);
+}
+
+.journey-service .journey-steps {
+  grid-column: 1 / -1;
 }
 
 .journey-service-lines {
