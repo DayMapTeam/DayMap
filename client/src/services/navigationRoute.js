@@ -50,6 +50,7 @@ export function createNavigationRouteProvider(loadLibrary) {
       travelMode: TRAVEL_MODES[mode] ?? 'WALKING',
       fields: ['durationMillis', 'distanceMeters', 'path', 'legs'],
       ...(mode === 'transit' ? { departureTime: new Date(departAt ?? Date.now()) } : {}),
+      ...(mode === 'drive' ? { routingPreference: 'TRAFFIC_AWARE' } : {}),
     })
     const route = routes?.[0] ? normalizeRoute(routes[0], mode) : null
     if (!route || route.path.length < 2) throw Object.assign(new Error('No route found'), { code: 'no-route' })

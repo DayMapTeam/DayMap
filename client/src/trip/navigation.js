@@ -127,11 +127,10 @@ export function navigationReducer(state, action) {
   switch (action.type) {
     case 'target': {
       if (!action.target) return initialNavigation
-      if (action.target.id === state.targetId) return state
-      // If Google has no route this way from here, try driving, then walking.
-      const fallbacks = ['drive', 'walk'].filter((mode) => mode !== action.mode)
+      if (action.target.id === state.targetId && action.mode === state.request?.mode
+        && action.target.location.lat === state.request?.to.lat && action.target.location.lng === state.request?.to.lng) return state
       const base = { ...initialNavigation, requestId: state.requestId, targetId: action.target.id,
-        request: { from: null, to: action.target.location, mode: action.mode, fallbacks } }
+        request: { from: null, to: action.target.location, mode: action.mode } }
       return requestFrom(base, action.from, action.at)
     }
     case 'routed':
@@ -139,10 +138,6 @@ export function navigationReducer(state, action) {
       return { ...state, status: 'ready', route: action.route, routedAt: action.at, offCount: 0 }
     case 'failed': {
       if (action.requestId !== state.requestId) return state
-      const [next, ...rest] = state.request?.fallbacks ?? []
-      if (next && !state.route) {
-        return { ...state, requestId: state.requestId + 1, request: { ...state.request, mode: next, fallbacks: rest } }
-      }
       return { ...state, status: state.route ? 'ready' : 'error' }
     }
     case 'reading': {
