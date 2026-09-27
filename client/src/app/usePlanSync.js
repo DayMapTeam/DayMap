@@ -1,21 +1,21 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { demoPlan } from '../../../shared/fixtures/demoPlan.js'
 import { useNow } from '../components/useNow.js'
 import { api } from '../services/supabase.js'
 import { usePlan } from './planContext.js'
 import {
-  browserTimezone, carryOverPlaces, createPlanSaver, emptyLivePlan, localDate, previousDate, readDemoPlan, sessionStore, writeDemoPlan,
+  browserTimezone, carryOverPlaces, createPlanSaver, emptyLivePlan, localDate, previousDate, sessionStore,
 } from './planPersistence.js'
+import { isDemoRequested, localPlanId, readLocalPlan, writeLocalPlan } from './localPlan.js'
 
 const noSubscription = () => () => {}
 
 /**
  * Keeps the accepted plan in the database while someone is signed in, and the
- * demo day in this browser session while they are not. Drafts are never
+ * local day (or explicitly requested demo) in this browser session while they are not. Drafts are never
  * saved; only the accepted plan is.
  *
  * Returns `{ state, error, day, retry, loadLatest, keepMine, adopt }` where state is
- * 'demo' | 'loading' | 'load-error' | 'saved' | 'saving' | 'error' | 'conflict'.
+ * 'local' | 'demo' | 'loading' | 'load-error' | 'saved' | 'saving' | 'error' | 'conflict'.
  *
  * At midnight the next day is loaded (after any trip in progress, `hold`).
  * A new day starts where the day before ended.
@@ -39,8 +39,12 @@ export function usePlanSync(userId, { hold = false } = {}) {
 
   useEffect(() => {
     if (!userId) {
-      // Signed out (or the session expired): back to the demo day.
-      if (planRef.current.dataMode === 'live') loadPlan(readDemoPlan(sessionStore(), demoPlan))
+      // Restore only this tab's own day on sign-out, never an account's data.
+      const current = planRef.current
+      const demo = isDemoRequested()
+      if (demo ? current.dataMode !== 'demo' : current.id !== localPlanId(planDay, timezone)) {
+        loadPlan(readLocalPlan(sessionStore(), { demo, date: planDay, timezone }))
+      }
       return undefined
     }
     const controller = new AbortController()
@@ -76,7 +80,7 @@ export function usePlanSync(userId, { hold = false } = {}) {
 
   useEffect(() => {
     if (saver && plan.id === loaded.planId) saver.sync(plan)
-    else if (!userId && plan.dataMode === 'demo') writeDemoPlan(sessionStore(), plan)
+    else if (!userId) writeLocalPlan(sessionStore(), plan)
   }, [plan, saver, loaded, userId])
 
   // Coming back online retries a failed save.
@@ -88,7 +92,7 @@ export function usePlanSync(userId, { hold = false } = {}) {
   }, [saver])
 
   let status
-  if (!userId) status = { state: 'demo', error: null }
+  if (!userId) status = { state: plan.dataMode === 'demo' ? 'demo' : 'local', error: null }
   else if (loaded?.userId !== userId) status = { state: 'loading', error: null }
   else if (loaded.error) status = { state: 'load-error', error: loaded.error }
   else status = saverStatus

@@ -240,7 +240,7 @@ The map sits behind a single adapter:
 
 ### Demo and live modes
 
-- Demo mode must keep working without login or Calendar credentials. Issue #5 imports `shared/fixtures/demoPlan.js` directly so the frontend runs before the backend exists. Once DM-04 is implemented, the demo service will read the same fixture through `GET /api/demo-plan`, which makes no external API calls.
+- Normal signed-out startup is an empty local day, stored separately from account and demo plans in this tab. Only events in the shown plan get numbered event pins and journey arcs; Google’s built-in place labels are hidden. A selected search result has one temporary dashed preview pin and an Add to planner action (also available in its pin popup). This opens the existing event sheet with the place prefilled and editable From–To times. Only Add to day creates the event; Cancel leaves the plan unchanged, clearing search removes the preview, and a successful add replaces it with the selected event pin. Demo mode is explicitly opened from the account menu (`?demo=1`) and must keep working without login or Calendar credentials. Issue #5 imports `shared/fixtures/demoPlan.js` directly so the frontend runs before the backend exists. Once DM-04 is implemented, the demo service will read the same fixture through `GET /api/demo-plan`, which makes no external API calls.
 - Simulated data, including sample route geometry and disruptions, is clearly labelled in the UI (`dataMode: 'demo'`).
 
 ## 5. Shared data contract
