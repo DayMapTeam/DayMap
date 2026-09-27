@@ -6,6 +6,9 @@ import { zonedTimeToTimestamp } from '../components/zonedTime.js'
 import { planDayBounds } from '../../../shared/planning/dayBounds.js'
 import { localDate } from './planPersistence.js'
 
+/** Manual all-day items are notes, using the existing persisted stop shape. */
+export const isDayNote = (stop) => stop.source === 'manual' && stop.timing.kind === 'all-day'
+
 /**
  * @typedef {object} StopEdit
  * @property {string} title
@@ -41,8 +44,9 @@ export function canEditStop(stop) {
  * @returns {null | 'not-editable' | 'missing-title' | 'end-before-start' | 'too-long' | 'outside-window'}
  */
 export function validateStopEdit(stop, edit) {
-  if (!canEditStop(stop)) return 'not-editable'
+  if (!canEditStop(stop) && !isDayNote(stop)) return 'not-editable'
   if (edit.title.trim() === '') return 'missing-title'
+  if (isDayNote(stop)) return edit.scheduledStartAt === null && edit.scheduledEndAt === null ? null : 'not-editable'
   const start = Date.parse(edit.scheduledStartAt)
   const end = Date.parse(edit.scheduledEndAt)
   if (!(end > start)) return 'end-before-start'

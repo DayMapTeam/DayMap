@@ -1,6 +1,6 @@
 import { chooseOption } from './planAdd.js'
 import {
-  listStopChanges, validateStopEdit, withDayPlace, withLocalTimeMarks, withStopKind, withTravelMode,
+  isDayNote, listStopChanges, validateStopEdit, withDayPlace, withLocalTimeMarks, withStopKind, withTravelMode,
 } from './planEdits.js'
 import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
@@ -85,7 +85,7 @@ function editStopDraft(state, { stopId, edit }) {
   target.title = edit.title.trim()
   target.timing.scheduledStartAt = edit.scheduledStartAt
   target.timing.scheduledEndAt = edit.scheduledEndAt
-  target.timing.durationMinutes = (Date.parse(edit.scheduledEndAt) - Date.parse(edit.scheduledStartAt)) / 60000
+  target.timing.durationMinutes = isDayNote(target) ? null : (Date.parse(edit.scheduledEndAt) - Date.parse(edit.scheduledStartAt)) / 60000
   if (target.timing.kind === 'fixed') {
     target.timing.fixedStartAt = edit.scheduledStartAt
     target.timing.fixedEndAt = edit.scheduledEndAt
@@ -170,6 +170,7 @@ function withRemovedEvent(plan, stop) {
 function removeStop(state, { stopId }) {
   const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
   if (!stop) return state
+  if (stop.timing.kind === 'all-day' && !isDayNote(stop)) return state
   if (state.draft?.suggestion) return removeStop(revertSuggestion(state), { stopId })
 
   const version = state.plan.version + 1

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { timesFromInputs, validateStopEdit } from '../app/planEdits.js'
+import { isDayNote, timesFromInputs, validateStopEdit } from '../app/planEdits.js'
 import { formatClock, toTimeInputValue } from '../components/formatTime.js'
 import '../components/buttons.css'
 
@@ -44,9 +44,10 @@ const ERROR_FIELDS = {
  */
 export default function EventEditForm({ stop, date, timezone, onSave, onCancel, onDelete }) {
   const id = useId()
+  const note = isDayNote(stop)
   const [title, setTitle] = useState(stop.title)
-  const [start, setStart] = useState(toTimeInputValue(stop.timing.scheduledStartAt, timezone))
-  const [end, setEnd] = useState(toTimeInputValue(stop.timing.scheduledEndAt, timezone))
+  const [start, setStart] = useState(note ? '' : toTimeInputValue(stop.timing.scheduledStartAt, timezone))
+  const [end, setEnd] = useState(note ? '' : toTimeInputValue(stop.timing.scheduledEndAt, timezone))
   const [error, setError] = useState(null)
   const stopTimes = `${stop.timing.scheduledStartAt}|${stop.timing.scheduledEndAt}`
   const [shownTimes, setShownTimes] = useState(stopTimes)
@@ -61,12 +62,14 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel, 
 
   function handleSubmit(event) {
     event.preventDefault()
-    if (!start || !end) {
+    if (!note && (!start || !end)) {
       setError('missing-time')
       return
     }
     // Unchanged fields keep their exact times, so events that cross midnight stay intact.
-    const edit = { title: title.trim(), ...timesFromInputs(stop, { start, end }, { date, timezone }) }
+    const edit = note
+      ? { title: title.trim(), scheduledStartAt: null, scheduledEndAt: null }
+      : { title: title.trim(), ...timesFromInputs(stop, { start, end }, { date, timezone }) }
     const code = validateStopEdit(stop, edit)
     if (code !== null) {
       setError(code)
@@ -81,7 +84,7 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel, 
     <form className="event-form" onSubmit={handleSubmit} noValidate>
       <div className="event-form-group">
         <label className="event-form-field" htmlFor={`${id}-title`}>
-          <span className="event-form-label">Event</span>
+          <span className="event-form-label">{note ? 'Note' : 'Event'}</span>
           <input
             id={`${id}-title`}
             className="event-form-input"
@@ -96,30 +99,34 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel, 
           <span className="event-form-label">Place</span>
           <span className="event-form-value">{stop.location?.label ?? 'Not set'}</span>
         </div>
-        <label className="event-form-field" htmlFor={`${id}-start`}>
-          <span className="event-form-label">Starts</span>
-          <input
-            id={`${id}-start`}
-            className="event-form-input"
-            type="time"
-            value={start}
-            onChange={(event) => setStart(event.target.value)}
-            aria-invalid={invalid('start')}
-            aria-describedby={invalid('start') && errorId}
-          />
-        </label>
-        <label className="event-form-field" htmlFor={`${id}-end`}>
-          <span className="event-form-label">Ends</span>
-          <input
-            id={`${id}-end`}
-            className="event-form-input"
-            type="time"
-            value={end}
-            onChange={(event) => setEnd(event.target.value)}
-            aria-invalid={invalid('end')}
-            aria-describedby={invalid('end') && errorId}
-          />
-        </label>
+        {!note && (
+          <>
+            <label className="event-form-field" htmlFor={`${id}-start`}>
+              <span className="event-form-label">Starts</span>
+              <input
+                id={`${id}-start`}
+                className="event-form-input"
+                type="time"
+                value={start}
+                onChange={(event) => setStart(event.target.value)}
+                aria-invalid={invalid('start')}
+                aria-describedby={invalid('start') && errorId}
+              />
+            </label>
+            <label className="event-form-field" htmlFor={`${id}-end`}>
+              <span className="event-form-label">Ends</span>
+              <input
+                id={`${id}-end`}
+                className="event-form-input"
+                type="time"
+                value={end}
+                onChange={(event) => setEnd(event.target.value)}
+                aria-invalid={invalid('end')}
+                aria-describedby={invalid('end') && errorId}
+              />
+            </label>
+          </>
+        )}
       </div>
       {earliestStartAt !== null && latestEndAt !== null && (
         <p className="event-form-hint">

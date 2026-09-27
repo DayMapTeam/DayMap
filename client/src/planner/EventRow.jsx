@@ -5,6 +5,7 @@ import EventEditForm from './EventEditForm.jsx'
 import LengthStepper from './LengthStepper.jsx'
 import PlacePicker from './PlacePicker.jsx'
 import { KIND_LABELS } from './stopLabels.js'
+import { isDayNote } from '../app/planEdits.js'
 
 const KIND_NOTES = {
   fixed: 'Starred — DayMap will never move this or suggest changes to it.',
@@ -85,14 +86,14 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
   const duration = timing.kind === 'all-day' ? null : formatDuration(timing.durationMinutes)
   const editedInDayMap = stop.source === 'google-calendar' && (stop.localEdits?.length ?? 0) > 0
   const sourceNote = calendarNote(stop)
-  const editable = canEditStop(stop)
+  const editable = canEditStop(stop) || isDayNote(stop)
   // The star is for stops DayMap could still move: not all-day, finished or unscheduled.
   const showStar = editable && !past
   const fixed = timing.kind === 'fixed'
   const kindLocked = onSetKind === null
   const details = [
     past ? 'Finished' : null,
-    KIND_LABELS[timing.kind],
+    isDayNote(stop) ? 'Note' : KIND_LABELS[timing.kind],
     placeText,
     duration,
     editedInDayMap ? 'Edited in DayMap' : null,
@@ -154,7 +155,7 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
           {conflict && <span className="event-row-conflict">Schedule conflict</span>}
         </span>
         <span className="event-row-time">
-          {hasTimes ? formatTimeRange(timing.scheduledStartAt, timing.scheduledEndAt, timezone) : 'Time not set'}
+          {hasTimes ? formatTimeRange(timing.scheduledStartAt, timing.scheduledEndAt, timezone) : timing.kind === 'all-day' ? 'All day' : 'Time not set'}
         </span>
         <svg className="event-row-chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
           <path d="M4 2.5 7.5 6 4 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -187,8 +188,8 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
           {sourceNote && <p className="event-details-info">{sourceNote}</p>}
           {editable ? (
             <>
-              {overlap && <p className="event-overlap-note">{overlap}</p>}
-              <LengthStepper stop={stop} onResize={(edit) => onResize(stop.id, edit)} />
+              {!isDayNote(stop) && overlap && <p className="event-overlap-note">{overlap}</p>}
+              {!isDayNote(stop) && <LengthStepper stop={stop} onResize={(edit) => onResize(stop.id, edit)} />}
               <EventEditForm
                 stop={stop}
                 date={date}

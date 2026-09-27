@@ -165,10 +165,10 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
           <button
             type="button"
             className="planner-add"
-            aria-label="Add event"
+            aria-label="Add to your day"
             aria-keyshortcuts="N"
             disabled={!canAdd}
-            title={canAdd ? 'Add event (N)' : 'Accept or keep your pending changes first'}
+            title={canAdd ? 'Add to your day (N)' : 'Accept or keep your pending changes first'}
             onClick={openSheet}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
