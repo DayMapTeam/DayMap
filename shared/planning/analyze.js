@@ -17,10 +17,45 @@ function samePlace(from, to) {
   return Boolean(from.location?.placeId && from.location.placeId === to.location?.placeId)
 }
 
+const LATE_STEP_MS = 5 * 60 * SECOND
+const LATE_ATTEMPTS = 3
+
+/**
+ * The latest five-minute departure that still arrives in time, with buffer,
+ * for a journey the person leaves for just in time. Time-dependent travel
+ * (public transport) is looked up again at that departure, and a slower
+ * service moves the departure earlier, a few times at most. Null when no
+ * later departure is verified yet (the missing estimate joins `pending`) or
+ * none fits: the journey then leaves when `from` ends.
+ */
+function lateDeparture(from, to, { mode, departMs, startMs, bufferSeconds, estimate, ctx, pending }) {
+  const timed = mode === 'transit' || estimate.timeDependent
+  let travelSeconds = estimate.travelSeconds
+  for (let attempt = 0; attempt < LATE_ATTEMPTS; attempt++) {
+    const leave = Math.floor((startMs - (travelSeconds + bufferSeconds) * SECOND) / LATE_STEP_MS) * LATE_STEP_MS
+    if (leave <= departMs) return null
+    const departAt = stamp(leave)
+    const found = timed ? ctx.travel?.(from, to, { mode, departAt }) : estimate
+    if (!found || found.status === 'pending' || found.status === 'stale') {
+      pending.push({ fromStopId: from.id, toStopId: to.id, mode, departAt })
+      return null
+    }
+    if (found.status !== 'ready' || !Number.isFinite(found.travelSeconds) || found.travelSeconds < 0
+      || (timed && Date.parse(found.departAt) !== leave)) return null
+    if ((startMs - leave) / SECOND - found.travelSeconds - bufferSeconds >= 0) {
+      return { departMs: leave, travelSeconds: found.travelSeconds }
+    }
+    travelSeconds = found.travelSeconds
+  }
+  return null
+}
+
 /**
  * Pure schedule analysis. `travel` is a synchronous lookup, NEVER a fetch.
  * ctx: now (Date or epoch ms), modeFor(from,to), travel(from,to,{mode,departAt}),
  * buffers (minutes per mode), freeTimeMin (minutes; defaults to 15).
+ * A stop with `leaveTiming: 'late'` is left for just in time: its free time
+ * comes before the journey, at the origin (`placement: 'before-travel'`).
  * Lookup: {status:'ready', travelSeconds, provider, timeDependent?, departAt?}
  * or {status:'pending'|'stale'|'unavailable', reason?}. Undefined means pending.
  * Time-dependent estimates must match the exact departure, not a cache bucket.
@@ -108,13 +143,18 @@ export function analyzePlan(plan, ctx) {
     }
 
     const gapSeconds = (startMs - departMs) / SECOND
-    const travelSeconds = estimate.travelSeconds
     const bufferSeconds = bufferMinutes * MINUTE
-    const spareSeconds = gapSeconds - travelSeconds - bufferSeconds
+    const early = estimate.travelSeconds
+    // Leaving just in time moves the free time to the origin, before travel.
+    const late = !identicalPlace && to.leaveTiming === 'late' && gapSeconds - early - bufferSeconds > 0
+      ? lateDeparture(from, to, { mode, departMs, startMs, bufferSeconds, estimate, ctx, pending }) : null
+    const legDepartMs = late?.departMs ?? departMs
+    const travelSeconds = late?.travelSeconds ?? early
+    const spareSeconds = (startMs - legDepartMs) / SECOND - travelSeconds - bufferSeconds
     Object.assign(leg, {
       status: 'ready', provider: estimate.provider ?? 'supplied',
-      travelSeconds, bufferSeconds, spareSeconds,
-      arriveAt: stamp(departMs + travelSeconds * SECOND),
+      departAt: stamp(legDepartMs), travelSeconds, bufferSeconds, spareSeconds,
+      arriveAt: stamp(legDepartMs + travelSeconds * SECOND),
     })
     if (spareSeconds < 0) {
       const lateSeconds = Math.max(0, travelSeconds - gapSeconds)
@@ -126,11 +166,22 @@ export function analyzePlan(plan, ctx) {
         needsDecision: from.timing.kind === 'fixed' && to.timing.kind === 'fixed',
         factsKey: JSON.stringify({ departAt, startAt: stamp(startMs), mode, travelSeconds, bufferSeconds, provider: leg.provider }),
       })
+    } else if (late) {
+      const minutes = (late.departMs - departMs) / SECOND / MINUTE
+      // Sized by the time the day has spare, so it stays shown (and movable back).
+      if (gapSeconds - early - bufferSeconds >= freeTimeMin * MINUTE) {
+        freeTime.push({
+          id: `free:${key}`, fromStopId: from.id, toStopId: to.id,
+          // A concrete free interval at the origin, before leaving just in time.
+          locationStopId: from.id, placement: 'before-travel',
+          startAt: stamp(departMs), endAt: stamp(late.departMs), minutes, provider: leg.provider,
+        })
+      }
     } else if (spareSeconds >= freeTimeMin * MINUTE && spareSeconds > 0) {
       freeTime.push({
         id: `free:${key}`, fromStopId: from.id, toStopId: to.id,
         // A concrete free interval at the destination after travelling there.
-        locationStopId: to.id,
+        locationStopId: to.id, placement: 'after-travel',
         startAt: stamp(departMs + (travelSeconds + bufferSeconds) * SECOND),
         endAt: stamp(startMs), minutes: spareSeconds / MINUTE, provider: leg.provider,
       })
