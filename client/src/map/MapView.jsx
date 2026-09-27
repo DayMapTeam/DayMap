@@ -97,7 +97,7 @@ function journeyElements(runtime, leg) {
  * - routeSplit: { travelled, remaining } from splitRoute, to grey out what's behind you.
  */
 export default function MapView({
-  stops, legs = [], selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, stopStates = {},
+  stops, legs = [], selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, onSelectPreview, stopStates = {},
   userPosition = null, tripActive = false, follow = null, onUserCameraMove, route = null, routeSplit = null,
 }) {
   const containerRef = useRef(null)
@@ -111,8 +111,8 @@ export default function MapView({
   const [error, setError] = useState('')
 
   useEffect(() => {
-    callbacksRef.current = { onSelectStop, onClearSelection, onCameraMove, onUserCameraMove }
-  }, [onSelectStop, onClearSelection, onCameraMove, onUserCameraMove])
+    callbacksRef.current = { onSelectStop, onSelectPreview, onClearSelection, onCameraMove, onUserCameraMove }
+  }, [onSelectStop, onSelectPreview, onClearSelection, onCameraMove, onUserCameraMove])
 
   // Remember where the pointer went down. Capture phase, so the map cannot stop it first.
   useEffect(() => {
@@ -178,7 +178,8 @@ export default function MapView({
           range: 2500,
           tilt: 60,
           heading: 0,
-          mode: 'HYBRID',
+          // Keep Google's unrelated place labels out of the event map.
+          mode: 'SATELLITE',
         })
 
         map.style.width = '100%'
@@ -283,23 +284,33 @@ export default function MapView({
     }
   }, [runtime, stops, selectedStopId, now, steep, stopStates])
 
+  // One temporary search pin, using the same artwork as the event markers.
+  // It never becomes part of the plan until the add sheet is confirmed.
   useEffect(() => {
-    if (!runtime || !previewPlace) return
-
+    if (!runtime || !isValidLocation(previewPlace)) return
     const { lat, lng, label } = previewPlace
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
     const marker = new runtime.Marker({
-      position: { lat, lng },
-      altitudeMode: 'CLAMP_TO_GROUND',
-      collisionBehavior: 'REQUIRED',
-      drawsWhenOccluded: true,
-      label: `${label} (preview)`,
-      title: `${label} (preview, not in your day)`,
-      zIndex: 20,
+      position: { lat, lng }, altitudeMode: 'CLAMP_TO_GROUND',
+      collisionBehavior: 'REQUIRED', drawsWhenOccluded: true,
+      label: `${label} (preview)`, title: `${label} (preview, not in your day)`, zIndex: 20,
     })
     marker.append(markerTemplate(stopMarkerSvg({ type: 'search', steep }, runtime.colors)))
+    const handleClick = (event) => {
+      const container = containerRef.current
+      const pointer = lastPointerRef.current
+      const recent = pointer !== null && event.timeStamp - pointer.at < POINTER_CLICK_WINDOW_MS
+      const anchor = recent ? { x: pointer.x, y: pointer.y }
+        : { x: container.clientWidth / 2, y: container.clientHeight / 2 }
+      lastPointerRef.current = null
+      lastPinClickRef.current = performance.now()
+      callbacksRef.current.onSelectPreview?.({ anchor })
+    }
+    marker.addEventListener('gmp-click', handleClick)
     runtime.map.append(marker)
-    return () => marker.remove()
+    return () => {
+      marker.removeEventListener('gmp-click', handleClick)
+      marker.remove()
+    }
   }, [runtime, previewPlace, steep])
 
   // "You are here". One marker, moved in place as readings arrive.

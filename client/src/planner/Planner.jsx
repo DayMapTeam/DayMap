@@ -34,7 +34,7 @@ function isTyping(target) {
  * @param {import('react').ReactNode} [props.emptyState] Shown when the day has no stops.
  * @param {ReturnType<import('../app/useCalendar.js').useCalendar> | null} [props.calendar] Connected Calendar, for bringing back removed events; null when signed out.
  */
-export default function Planner({ now, revealRequest, planning, emptyState, calendar = null }) {
+export default function Planner({ now, revealRequest, planning, emptyState, calendar = null, addPlaceRequest = null, onPlaceAdded }) {
   const { plan, draft, undoAdd, removeStop, undoRemove, lastRemove = null } = usePlan()
   const [filter, setFilter] = useState('')
   const [open, setOpen] = usePlannerOpen()
@@ -43,6 +43,8 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   const [reveal, setReveal] = useState(null)
   // Changes each time the add sheet opens, so it starts empty: a number, or null when closed.
   const [sheetKey, setSheetKey] = useState(null)
+  const [sheetPlace, setSheetPlace] = useState(null)
+  const [handledAddPlace, setHandledAddPlace] = useState(null)
   // { stopId, message, key, showNew }
   const [recentAdd, setRecentAdd] = useState(null)
   // The stop waiting for "Are you sure?": { stopId, returnFocus }, or null.
@@ -54,6 +56,17 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   // The stop went away some other way (undo, import): there is nothing left to ask about.
   if (pendingDelete !== null && pendingStop === null) setPendingDelete(null)
   const canAdd = draft === null && pendingDelete === null
+
+  // Each explicit search Add request starts a fresh sheet with that exact place.
+  if (addPlaceRequest !== handledAddPlace) {
+    setHandledAddPlace(addPlaceRequest)
+    if (addPlaceRequest && canAdd) {
+      setOpen(true)
+      setOpenStopId(null)
+      setSheetPlace(addPlaceRequest.place)
+      setSheetKey(addPlaceRequest.key)
+    }
+  }
 
   // Open the panel and the row in the same render as the request, so EventList
   // can scroll to a row that is already visible. The filter is cleared in case
@@ -78,11 +91,12 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
       event.preventDefault()
       setOpen(true)
       setOpenStopId(null)
+      if (sheetKey === null) setSheetPlace(null)
       setSheetKey((previous) => previous ?? Date.now())
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [canAdd, setOpen])
+  }, [canAdd, setOpen, sheetKey])
 
   const recentKey = recentAdd?.key ?? null
   useEffect(() => {
@@ -109,12 +123,14 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
   function openSheet() {
     setOpen(true)
     setOpenStopId(null)
+    setSheetPlace(null)
     setSheetKey(Date.now())
   }
 
   function committed({ stopId, message }) {
     setSheetKey(null)
     setFilter('')
+    if (sheetPlace) onPlaceAdded?.()
     // Where the day starts or ends is shown at the ends of the planner; there is no row to reveal.
     if (stopId === null) return
     setRecentAdd((previous) => ({ stopId, message, key: (previous?.key ?? 0) + 1, showNew: true }))
@@ -192,7 +208,8 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
             key={sheetKey}
             now={now}
             planning={planning}
-            returnFocusSelector=".planner-add"
+            initialPlace={sheetPlace}
+            returnFocusSelector={sheetPlace ? '.place-search-add || #place-search-input' : '.planner-add'}
             onCommitted={committed}
             onCancel={() => setSheetKey(null)}
           />

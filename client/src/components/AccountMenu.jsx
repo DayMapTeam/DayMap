@@ -94,7 +94,7 @@ function SignInForm({ account }) {
  *
  * @param {object} props
  * @param {ReturnType<import('../app/useAccount.js').useAccount>} props.account
- * @param {() => void} props.onResetDemo Restores the demo day's original stops.
+ * @param {(() => void) | null} props.onResetDemo Restores the demo, only when viewing it.
  * @param {import('react').ReactNode} [props.children]
  */
 export default function AccountMenu({ account, onResetDemo, children }) {
@@ -149,9 +149,7 @@ export default function AccountMenu({ account, onResetDemo, children }) {
       <>
         <h2 className="account-title">Sign-in isn’t set up</h2>
         <p className="account-text">
-          This copy of DayMap has no Supabase settings, so it shows the demo day. Add
-          {' '}<code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to
-          {' '}<code>client/.env.local</code> and restart to save real days.
+          You can plan events in this tab. Account saving and Google Calendar aren’t available in this copy of DayMap yet.
         </p>
       </>
     )
@@ -174,9 +172,16 @@ export default function AccountMenu({ account, onResetDemo, children }) {
         <div id={panelId} className="account-panel glass" role="dialog" aria-label="Account">
           {body}
           {!user && !account.checking && (
-            <button type="button" className="button-text account-reset" onClick={() => { onResetDemo(); setOpen(false) }}>
-              Reset demo day
-            </button>
+            <>
+              {onResetDemo && (
+                <button type="button" className="button-text account-reset" onClick={() => { onResetDemo(); setOpen(false) }}>
+                  Reset demo day
+                </button>
+              )}
+              <a className="button-text account-reset" href={onResetDemo ? window.location.pathname : '?demo=1'}>
+                {onResetDemo ? 'Back to my day' : 'Explore sample day'}
+              </a>
+            </>
           )}
         </div>
       )}
