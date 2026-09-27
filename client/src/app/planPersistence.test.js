@@ -183,3 +183,14 @@ test('the demo session copy is read back only when it is the same demo day', () 
   assert.equal(readDemoPlan(blocked, demoPlan), demoPlan)
   assert.doesNotThrow(() => writeDemoPlan(blocked, edited))
 })
+
+test('a new day starts where the day before ended', async () => {
+  const { carryOverPlaces, previousDate } = await import('./planPersistence.js')
+  assert.equal(previousDate('2026-10-01'), '2026-09-30')
+  assert.equal(previousDate('2027-01-01'), '2026-12-31')
+  const home = { label: 'Home', placeId: null, lat: -34.95, lng: 138.6 }
+  const hotel = { label: 'Hotel', placeId: null, lat: -34.98, lng: 138.51 }
+  assert.deepEqual(carryOverPlaces({ startPlace: home, endPlace: hotel }), { startPlace: hotel, endPlace: null })
+  assert.deepEqual(carryOverPlaces({ startPlace: home, endPlace: home }), { startPlace: home, endPlace: home })
+  assert.deepEqual(carryOverPlaces(null), { startPlace: null, endPlace: null })
+})

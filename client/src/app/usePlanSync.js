@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { demoPlan } from '../../../shared/fixtures/demoPlan.js'
+import { useNow } from '../components/useNow.js'
 import { api } from '../services/supabase.js'
 import { usePlan } from './planContext.js'
 import {
-  browserTimezone, createPlanSaver, emptyLivePlan, localDate, readDemoPlan, sessionStore, writeDemoPlan,
+  browserTimezone, carryOverPlaces, createPlanSaver, emptyLivePlan, localDate, previousDate, readDemoPlan, sessionStore, writeDemoPlan,
 } from './planPersistence.js'
 
 const noSubscription = () => () => {}
@@ -16,10 +17,18 @@ const noSubscription = () => () => {}
  * Returns `{ state, error, day, retry, loadLatest, keepMine, adopt }` where state is
  * 'demo' | 'loading' | 'load-error' | 'saved' | 'saving' | 'error' | 'conflict'.
  *
+ * At midnight the next day is loaded (after any trip in progress, `hold`).
+ * A new day starts where the day before ended.
+ *
  * @param {string | null} userId The signed-in DayMap user, or null.
+ * @param {{ hold?: boolean }} [options] While true, stay on the current day.
  */
-export function usePlanSync(userId) {
+export function usePlanSync(userId, { hold = false } = {}) {
   const { plan, loadPlan } = usePlan()
+  const timezone = browserTimezone()
+  const today = localDate(useNow(), timezone)
+  const [planDay, setPlanDay] = useState(today)
+  if (!hold && planDay !== today) setPlanDay(today)
   const planRef = useRef(plan)
   useEffect(() => {
     planRef.current = plan
@@ -35,11 +44,19 @@ export function usePlanSync(userId) {
       return undefined
     }
     const controller = new AbortController()
-    const timezone = browserTimezone()
-    const date = localDate(new Date(), timezone)
+    const date = planDay
     let saver = null
-    api.getDayPlan(date, timezone, { signal: controller.signal }).then((saved) => {
-      const initial = saved ?? emptyLivePlan({ id: crypto.randomUUID(), date, timezone })
+    const load = async () => {
+      const saved = await api.getDayPlan(date, timezone, { signal: controller.signal })
+      if (saved) return { saved, initial: saved }
+      // Nothing saved yet: start where yesterday ended.
+      const yesterday = await api.getDayPlan(previousDate(date), timezone, { signal: controller.signal }).catch((error) => {
+        if (error?.name === 'AbortError') throw error
+        return null
+      })
+      return { saved: null, initial: { ...emptyLivePlan({ id: crypto.randomUUID(), date, timezone }), ...carryOverPlaces(yesterday) } }
+    }
+    load().then(({ saved, initial }) => {
       saver = createPlanSaver({ save: (next, version) => api.savePlan(next, version), plan: initial, version: saved?.version ?? 0 })
       loadPlan(initial)
       setLoaded({ userId, saver, planId: initial.id, date, timezone })
@@ -51,7 +68,7 @@ export function usePlanSync(userId) {
       saver?.dispose()
       setLoaded(null)
     }
-  }, [userId, attempt, loadPlan])
+  }, [userId, attempt, loadPlan, planDay, timezone])
 
   const saver = loaded?.userId === userId ? loaded.saver ?? null : null
   const subscribe = useCallback((listener) => saver?.subscribe(listener) ?? noSubscription(), [saver])

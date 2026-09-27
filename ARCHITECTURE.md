@@ -165,7 +165,7 @@ stateDiagram-v2
 
 ### Saved days (issue #32)
 
-Signed in, `usePlanSync` loads today's plan in the browser's timezone from `GET /api/plans` (or starts an empty live day) and saves each new *accepted* plan with `PUT /api/plans/:id`. Saves run one at a time against the version the server last returned; the local `plan.version` is only a local edit counter. A 409 stops saving until the person picks **Load latest** or **Keep mine**. Place IDs and legs are stripped before saving (§12), and unlocated stops get a location question. Signed out, the demo day is kept in sessionStorage only.
+Signed in, `usePlanSync` loads today's plan in the browser's timezone from `GET /api/plans` (or starts an empty live day) and saves each new *accepted* plan with `PUT /api/plans/:id`. Saves run one at a time against the version the server last returned; the local `plan.version` is only a local edit counter. A 409 stops saving until the person picks **Load latest** or **Keep mine**. Place IDs and legs are stripped before saving (§12), and unlocated stops get a location question. Signed out, the demo day is kept in sessionStorage only. At midnight (browser timezone) the next day loads — after any trip in progress — and Calendar imports it (issue #56). A day with nothing saved starts where the day before ended: yesterday's end place becomes today's start place, and a day that started and ended at the same place (home) does so again.
 
 ### Browser place search (issue #16)
 

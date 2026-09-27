@@ -30,7 +30,9 @@ function App() {
   const { plan, draft, selectedStopId, selectStop, clearSelection, loadPlan } = usePlan()
   const account = useAccount()
   const userId = account.user?.id ?? null
-  const sync = usePlanSync(userId)
+  // Hold the day while navigating, so midnight never swaps the plan mid-trip.
+  const [tripRunning, setTripRunning] = useState(false)
+  const sync = usePlanSync(userId, { hold: tripRunning })
   const calendar = useCalendar({ userId, sync, plan, draft })
   const resetDemo = useCallback(() => {
     writeDemoPlan(sessionStore(), null)
@@ -59,6 +61,7 @@ function App() {
   })
   // Navigation mode: like Google Maps on a phone, the map takes the whole screen.
   const navigating = tripTargetId !== null
+  if (navigating !== tripRunning) setTripRunning(navigating)
   const voice = useVoiceGuidance({
     route: navigation.route,
     progress: navigation.progress,

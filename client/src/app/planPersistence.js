@@ -13,6 +13,23 @@ export function localDate(now, timeZone) {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
 }
 
+/** The "YYYY-MM-DD" before another. */
+export function previousDate(date) {
+  return new Date(Date.parse(`${date}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
+}
+
+/**
+ * Where a new day starts, from the day before: where it ended (home, or the
+ * hotel you stayed at). If it started and ended at the same place, the new
+ * day ends there too.
+ */
+export function carryOverPlaces(previous) {
+  const end = previous?.endPlace ?? null
+  const start = previous?.startPlace ?? null
+  const same = end && start && end.lat === start.lat && end.lng === start.lng
+  return { startPlace: end, endPlace: same ? end : null }
+}
+
 /** A day with nothing planned yet. It is only saved once something is added. */
 export function emptyLivePlan({ id, date, timezone }) {
   return { id, date, timezone, version: 0, dataMode: 'live', stops: [], legs: [], conflicts: [], questions: [] }
