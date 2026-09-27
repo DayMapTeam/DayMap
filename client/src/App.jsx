@@ -20,8 +20,6 @@ import EmptyDay from './planner/EmptyDay.jsx'
 import Planner from './planner/Planner.jsx'
 import StopPopup from './planner/StopPopup.jsx'
 import TripDock from './trip/TripDock.jsx'
-import RecoveryControl from './trip/RecoveryControl.jsx'
-import { useRecovery } from './trip/useRecovery.js'
 import { bearingDegrees, offsetPoint, tripStops } from './trip/tripRules.js'
 import { useLocation } from './trip/useLocation.js'
 import { splitRoute } from './trip/navigation.js'
@@ -37,7 +35,7 @@ import './App.css'
 const noLegs = []
 
 function App() {
-  const { plan, draft, selectedStopId, selectStop, clearSelection, loadPlan, setStopTravelMode, editStopDraft } = usePlan()
+  const { plan, draft, selectedStopId, selectStop, clearSelection, loadPlan } = usePlan()
   const account = useAccount()
   const userId = account.user?.id ?? null
   const walkthrough = useWalkthrough(plan)
@@ -125,7 +123,6 @@ function App() {
     fallbackOrigin: trip.atStop?.location ?? previousStop?.location ?? null,
     routeOverride: walkthrough.routeOverride,
   })
-  const recovery = useRecovery({ plan, trip, navigation, location, now, draft })
   // Navigation mode: like Google Maps on a phone, the map takes the whole screen.
   const navigating = tripTargetId !== null
   if (navigating !== tripRunning) setTripRunning(navigating)
@@ -274,9 +271,6 @@ function App() {
         onAddRun={() => openRunPlanner('add')}
         onSetRunStart={() => openRunPlanner('day-start')}
         onResumeRun={resumeRun}
-        recoveryControl={!walkSession && <RecoveryControl recovery={recovery} plan={plan} navigating={navigating} draft={draft}
-          onChoose={(stopId, mode) => { setStopTravelMode(stopId, mode); startTrip(stopId) }}
-          onReview={(stopId, edit) => { editStopDraft(stopId, edit); trip.end(); viewInPlanner(stopId) }} />}
       />
       <Planner
         now={now}
