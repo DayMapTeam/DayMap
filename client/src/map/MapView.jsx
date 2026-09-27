@@ -68,7 +68,6 @@ function journeyElements(runtime, leg) {
     collisionBehavior: 'OPTIONAL_AND_HIDES_LOWER_PRIORITY',
     drawsWhenOccluded: true,
     zIndex: CHIP_Z[leg.state] ?? CHIP_Z.later,
-    label: leg.label,
   })
   chip.append(markerTemplate(travelChipSvg({ label: leg.label, faded: leg.state === 'done' }, colors,
     measureText(leg.label, chipFont(colors)))))
@@ -223,7 +222,6 @@ export default function MapView({
       const existing = markers.get(stop.id)
       if (existing) {
         existing.marker.position = { lat: stop.location.lat, lng: stop.location.lng }
-        existing.marker.label = stop.title
         continue
       }
       const marker = new runtime.Marker({
@@ -231,7 +229,6 @@ export default function MapView({
         altitudeMode: 'CLAMP_TO_GROUND',
         collisionBehavior: 'REQUIRED',
         drawsWhenOccluded: true,
-        label: stop.title,
       })
       const handleClick = (event) => {
         const container = containerRef.current
@@ -283,8 +280,6 @@ export default function MapView({
         stack: layout,
       }, runtime.colors)
       entry.marker.position = layout.position
-      // Floating place labels would cover the next numbered circle in a stack.
-      entry.marker.label = layout.count > 1 ? null : stop.title
       entry.marker.replaceChildren(markerTemplate(svg))
       entry.marker.zIndex = (layout.groupId === selectedGroup ? 10 : 0) + layout.layer
       entry.marker.title = `${numbers.get(stop.id)}. ${stop.title}${selected ? ' (selected)' : ''}${stopStates[stop.id]?.note ? ` · ${stopStates[stop.id].note}` : ''}`
