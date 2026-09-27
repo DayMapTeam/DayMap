@@ -5,10 +5,11 @@ import './buttons.css'
 import './RemovedCalendarEvents.css'
 
 /**
- * "2 removed Calendar events hidden", opening to the list with a Bring back
+ * "2 removed Calendar events", opening to the list with a Bring back
  * button for each and Bring back all. Calendar events the person removed stay
  * out of later imports until brought back here, which imports the day again
- * with them included, as they are in Google Calendar. Shows only while
+ * with them included, as they are in Google Calendar, with what the person
+ * had changed in DayMap. Shows only while
  * Calendar is connected and something is hidden.
  *
  * @param {object} props
@@ -61,7 +62,7 @@ export default function RemovedCalendarEvents({ calendar, returnFocusSelector })
       <summary ref={summaryRef} className="removed-events-summary">{removedEventsSummary(count)}</summary>
       <div className="removed-events-body">
         <p className="removed-events-text">
-          Bringing an event back adds it again as it is in Google Calendar now. Your Google Calendar isn’t changed.
+          Bringing an event back adds it again as it is in Google Calendar now, with the changes you made in DayMap. Your Google Calendar isn’t changed.
         </p>
         {reason && <p id={`${id}-reason`} className="removed-events-reason">{reason}</p>}
         <ul ref={listRef} className="removed-events-list">

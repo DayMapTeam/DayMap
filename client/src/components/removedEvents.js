@@ -5,9 +5,9 @@ export function removedEventKey({ sourceCalendarId, sourceEventId }) {
   return `${sourceCalendarId}\u0000${sourceEventId}`
 }
 
-/** "1 removed Calendar event hidden", "3 removed Calendar events hidden". */
+/** "1 removed Calendar event", "3 removed Calendar events". */
 export function removedEventsSummary(count) {
-  return `${count} removed Calendar ${count === 1 ? 'event' : 'events'} hidden`
+  return `${count} removed Calendar ${count === 1 ? 'event' : 'events'}`
 }
 
 /**

@@ -145,7 +145,9 @@ function withoutStop(plan, stopId) {
   }
 }
 
-// Calendar events the person removed; re-import leaves them out.
+// Calendar events the person removed; re-import leaves them out. What the
+// person set in DayMap (place, travel mode, edited title or times, made
+// flexible) is kept, so bringing the event back restores it too.
 const MAX_REMOVED_EVENTS = 500
 
 function withRemovedEvent(plan, stop) {
@@ -154,7 +156,14 @@ function withRemovedEvent(plan, stop) {
   const known = removed.some((event) =>
     event.sourceCalendarId === stop.sourceCalendarId && event.sourceEventId === stop.sourceEventId)
   if (known) return plan
-  const event = { sourceCalendarId: stop.sourceCalendarId, sourceEventId: stop.sourceEventId, title: stop.title }
+  const localEdits = stop.localEdits ?? []
+  // Re-import keeps DayMap's times only when they were edited or the event was made flexible.
+  const ownTiming = localEdits.includes('time') || stop.timing.kind === 'flexible'
+  const event = { sourceCalendarId: stop.sourceCalendarId, sourceEventId: stop.sourceEventId, title: stop.title,
+    ...(stop.location ? { location: stop.location } : {}),
+    ...(stop.travelMode ? { travelMode: stop.travelMode } : {}),
+    ...(localEdits.length ? { localEdits: [...localEdits] } : {}),
+    ...(ownTiming ? { timing: stop.timing } : {}) }
   return { ...plan, removedEvents: [...removed, event].slice(-MAX_REMOVED_EVENTS) }
 }
 
@@ -170,7 +179,6 @@ function withRemovedEvent(plan, stop) {
 function removeStop(state, { stopId }) {
   const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
   if (!stop) return state
-  if (stop.timing.kind === 'all-day' && !isDayNote(stop)) return state
   if (state.draft?.suggestion) return removeStop(revertSuggestion(state), { stopId })
 
   const version = state.plan.version + 1
