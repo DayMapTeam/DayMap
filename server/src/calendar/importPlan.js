@@ -24,6 +24,7 @@ function mergeCalendarStop(stop, next) {
   const localEdits = stop.localEdits ?? []
   const merged = { ...next, id: stop.id, location: stop.location, status: stop.status,
     ...(stop.travelMode ? { travelMode: stop.travelMode } : {}),
+    ...(stop.leaveTiming ? { leaveTiming: stop.leaveTiming } : {}),
     ...(localEdits.length ? { localEdits } : {}) }
   // A Calendar event the person made flexible is DayMap's to schedule; only its title follows Calendar.
   if (stop.timing.kind === 'flexible' && next.timing.kind === 'fixed') merged.timing = stop.timing

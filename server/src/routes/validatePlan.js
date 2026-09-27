@@ -61,8 +61,9 @@ export function validateSave(id, body) {
   }
   const ids = new Set()
   for (const stop of plan.stops) {
-    keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode', 'localEdits'])
+    keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode', 'leaveTiming', 'localEdits'])
     checkTravelMode(stop.travelMode)
+    checkLeaveTiming(stop.leaveTiming)
     check(text(stop.id) && (plan.dataMode === 'demo' || uuid.test(stop.id)) && !ids.has(stop.id), 'Stop IDs must be unique; live IDs must be UUIDs.')
     ids.add(stop.id)
     check(text(stop.title) && ['manual', 'google-calendar'].includes(stop.source)
@@ -103,6 +104,11 @@ export function validateSave(id, body) {
 // How the person chose to travel to a stop; absent or null means automatic.
 function checkTravelMode(travelMode) {
   check(travelMode === undefined || travelMode === null || ['walk', 'transit', 'drive'].includes(travelMode), 'Invalid travelMode.')
+}
+
+// When to leave for a stop: 'late' is just in time; absent, null or 'early' leaves when the stop before ends.
+function checkLeaveTiming(leaveTiming) {
+  check(leaveTiming === undefined || leaveTiming === null || ['early', 'late'].includes(leaveTiming), 'Invalid leaveTiming.')
 }
 
 // What the person changed on a Calendar event, kept on re-import: absent, or distinct 'title' / 'time'.

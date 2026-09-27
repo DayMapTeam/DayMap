@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { demoPlan } from '../../../shared/fixtures/demoPlan.js'
-import { withStopKind } from './planEdits.js'
+import { moveBounds, movedStopEdit, withStopKind } from './planEdits.js'
 import { createPlanState, planReducer } from './planReducer.js'
 
 const [lecture, library] = demoPlan.stops
@@ -55,6 +55,32 @@ test('a chosen way of travelling applies to the plan and a draft, and null means
   const auto = planReducer(next, { type: 'set-stop-travel-mode', stopId: library.id, mode: null })
   assert.equal(auto.plan.stops[1].travelMode, null)
   assert.equal(planReducer(state, { type: 'set-stop-travel-mode', stopId: library.id, mode: 'boat' }), state, 'unknown modes mean automatic')
+})
+
+test('when to leave applies to the plan and a draft; anything else means early', () => {
+  const state = createPlanState(demoPlan)
+  const late = planReducer(state, { type: 'set-stop-leave-timing', stopId: library.id, timing: 'late' })
+  assert.equal(late.plan.stops[1].leaveTiming, 'late')
+  assert.equal(late.plan.version, state.plan.version + 1)
+  assert.equal(planReducer(late, { type: 'set-stop-leave-timing', stopId: library.id, timing: 'late' }), late)
+  const early = planReducer(late, { type: 'set-stop-leave-timing', stopId: library.id, timing: 'soon' })
+  assert.equal(early.plan.stops[1].leaveTiming, 'early')
+  assert.equal(planReducer(state, { type: 'set-stop-leave-timing', stopId: library.id, timing: 'early' }), state)
+})
+
+test('moving a stop keeps its length and stays inside a flexible window', () => {
+  const at = (iso) => Date.parse(iso)
+  // Library study, 60 min, may run 10:00–12:00 local (00:30–02:30Z).
+  assert.deepEqual(moveBounds(library, demoPlan), { earliest: at('2026-09-26T00:30:00Z'), latest: at('2026-09-26T01:30:00Z') })
+  assert.deepEqual(movedStopEdit(library, at('2026-09-26T01:15:00Z'), demoPlan), {
+    title: library.title, scheduledStartAt: '2026-09-26T01:15:00.000Z', scheduledEndAt: '2026-09-26T02:15:00.000Z',
+  })
+  assert.equal(movedStopEdit(library, at('2026-09-26T01:35:00Z'), demoPlan), null, 'past the window')
+  assert.equal(movedStopEdit(library, at(library.timing.scheduledStartAt), demoPlan), null, 'unchanged')
+  // A fixed stop has no window, only the plan's day.
+  const { earliest } = moveBounds(lecture, demoPlan)
+  assert.equal(earliest, at('2026-09-25T14:30:00Z'))
+  assert.equal(moveBounds({ ...library, status: 'completed' }, demoPlan), null)
 })
 
 test('where the day starts and ends is set, saved and cleared like any accepted change', async () => {

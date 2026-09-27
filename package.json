@@ -1,0 +1,16 @@
+{
+  "name": "daymap",
+  "private": true,
+  "type": "module",
+  "description": "Local setup and run scripts. The app itself is in client/ and server/.",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "node scripts/dev.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "stop": "node scripts/stop.mjs",
+    "test": "node --test \"scripts/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22.9.0"
+  }
+}

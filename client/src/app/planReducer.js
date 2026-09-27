@@ -1,6 +1,6 @@
 import { chooseOption } from './planAdd.js'
 import {
-  isDayNote, listStopChanges, validateStopEdit, withDayPlace, withLocalTimeMarks, withStopKind, withTravelMode,
+  isDayNote, listStopChanges, validateStopEdit, withDayPlace, withLocalTimeMarks, withStopKind, withTravelMode, withLeaveTiming,
 } from './planEdits.js'
 import { setStopLocation } from './planLocations.js'
 import { applyProposal } from '../../../shared/planning/proposals.js'
@@ -289,14 +289,15 @@ function setKind(state, { stopId, kind }) {
 }
 
 /**
- * Choose how to travel to a stop (null: automatic). The choice is the explicit
- * accept, so it changes the accepted plan and a pending draft alike.
+ * A choice about the journey to a stop (how to travel, when to leave). The
+ * choice is the explicit accept, so it changes the accepted plan and a
+ * pending draft alike. `change` returns the new stop, or null for no change.
  */
-function setTravelMode(state, { stopId, mode }) {
-  if (state.draft?.suggestion) return setTravelMode(revertSuggestion(state), { stopId, mode })
+function setJourneyChoice(state, stopId, change) {
+  if (state.draft?.suggestion) return setJourneyChoice(revertSuggestion(state), stopId, change)
   const apply = (plan) => {
     const stop = plan.stops.find((candidate) => candidate.id === stopId)
-    const next = stop && withTravelMode(stop, mode)
+    const next = stop && change(stop)
     return next ? { ...plan, stops: plan.stops.map((candidate) => (candidate.id === stopId ? next : candidate)) } : plan
   }
   const plan = apply(state.plan)
@@ -375,7 +376,9 @@ export function planReducer(state, action) {
     case 'set-day-place':
       return setDayPlace(state, action)
     case 'set-stop-travel-mode':
-      return setTravelMode(state, action)
+      return setJourneyChoice(state, action.stopId, (stop) => withTravelMode(stop, action.mode))
+    case 'set-stop-leave-timing':
+      return setJourneyChoice(state, action.stopId, (stop) => withLeaveTiming(stop, action.timing))
     case 'set-stop-kind':
       return setKind(state, action)
     case 'set-stop-location':

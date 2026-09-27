@@ -34,7 +34,7 @@ function matchesFilter(stop, needle) {
  */
 export default function EventList({ now, filter, openStopId, onOpenStopChange, revealRequest, newStopId, onRequestDelete, planning, onGapPreview, emptyState = null }) {
   const { analysis, bookends } = planning
-  const { plan, draft, selectedStopId, selectStop, editStopDraft, setStopLocation, setStopKind, setDayPlace } = usePlan()
+  const { plan, draft, selectedStopId, selectStop, editStopDraft, setStopLocation, setStopKind, setDayPlace, setStopLeaveTiming } = usePlan()
   const listRef = useRef(null)
   const reviewAfterSave = useRef(false)
   const lastPreview = useRef(null)
@@ -149,19 +149,25 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
       </>}
       <ol className="event-list" aria-label="Stops">
         {stops.map((stop, index) => {
-          const gap = index > 0 && !filtering && planning.displayGaps.find((g) => g.fromStopId === stops[index - 1].id && g.toStopId === stop.id)
+          const previous = stops[index - 1]
+          const gap = index > 0 && !filtering && planning.displayGaps.find((g) => g.fromStopId === previous.id && g.toStopId === stop.id)
+          const leg = index > 0 && !filtering ? legBetween(previous, stop) : null
+          const freeTime = gap && <FreeTimeGap gap={gap} planning={planning} from={previous} to={stop}
+            open={activeGap?.id === gap.id && activeGap.fingerprint === planning.fingerprint}
+            onOpen={() => setActiveGap({ id: gap.id, fingerprint: planning.fingerprint })}
+            onClose={() => setActiveGap(null)}
+            onPreview={() => { setActiveGap(null); onOpenStopChange(null); onGapPreview() }}
+            // Free time before the journey means leaving just in time.
+            onPlace={leg?.provider === 'same-place' ? null : (placement) => setStopLeaveTiming(stop.id, placement === 'before-travel' ? 'late' : 'early')} />
           return <li key={stop.id}>
+            {gap?.placement === 'before-travel' && freeTime}
             {/* While filtering, neighbours in the list may not be neighbours in the day. */}
             {index > 0 && !filtering && <TravelConnector
-              leg={legBetween(stops[index - 1], stop)}
-              summary={summaryBetween(stops[index - 1], stop)}
-              onOpen={stops[index - 1].location && stop.location && stops[index - 1].timing.kind !== 'all-day' && stop.timing.kind !== 'all-day'
-                ? () => setJourney({ fromId: stops[index - 1].id, toId: stop.id }) : null} />}
-            {gap && <FreeTimeGap gap={gap} planning={planning}
-              open={activeGap?.id === gap.id && activeGap.fingerprint === planning.fingerprint}
-              onOpen={() => setActiveGap({ id: gap.id, fingerprint: planning.fingerprint })}
-              onClose={() => setActiveGap(null)}
-              onPreview={() => { setActiveGap(null); onOpenStopChange(null); onGapPreview() }} />}
+              leg={leg}
+              summary={summaryBetween(previous, stop)}
+              onOpen={previous.location && stop.location && previous.timing.kind !== 'all-day' && stop.timing.kind !== 'all-day'
+                ? () => setJourney({ fromId: previous.id, toId: stop.id }) : null} />}
+            {gap?.placement !== 'before-travel' && freeTime}
             {gapProposal?.changes[0].stopId === stop.id ? <GapPreview planning={planning} /> : <EventRow
               stop={stop}
               conflict={analysis.conflicts.some((c) => c.stopIds.includes(stop.id))}
@@ -176,6 +182,7 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
               onToggle={toggle}
               onSave={save}
               onResize={editStopDraft}
+              onMove={editStopDraft}
               onDelete={onRequestDelete}
               placeState={placeStatus(shown, stop)}
               calendarPlace={calendarLocationText(locationQuestionFor(shown, stop.id))}

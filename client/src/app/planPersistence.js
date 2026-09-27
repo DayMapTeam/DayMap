@@ -1,4 +1,4 @@
-const STOP_FIELDS = ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'status', 'travelMode']
+const STOP_FIELDS = ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'status', 'travelMode', 'leaveTiming']
 const TIMING_FIELDS = ['kind', 'durationMinutes', 'fixedStartAt', 'fixedEndAt',
   'earliestStartAt', 'latestEndAt', 'scheduledStartAt', 'scheduledEndAt']
 const DEMO_KEY = 'daymap:demo-plan'

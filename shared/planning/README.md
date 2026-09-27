@@ -64,7 +64,13 @@ travel fits but the buffer does not. Exact fits do not create warnings.
 Unresolved legs keep durations and spare time null, never zero.
 
 Free-time entries describe a concrete interval **at the destination after travel
-and buffer**, with its `locationStopId`. They require at least 15 minutes by
+and buffer** (`placement: 'after-travel'`), with its `locationStopId`. A stop with
+`leaveTiming: 'late'` is left for just in time instead: the journey departs at
+the latest five-minute mark that still arrives with its buffer, and the free time
+is at the origin before it (`placement: 'before-travel'`). Public transport is
+looked up again at that later departure (a few times at most, if services are
+slower); until it is known, or when nothing later fits, the journey leaves early.
+Conflicts are always judged from the earliest departure. They require at least 15 minutes by
 default. A proposed activity elsewhere must still account for both new journeys.
 Confirmed equal non-empty place IDs require no journey or buffer; nearby
 coordinates alone do not establish this. Estimates retain their provider label,
