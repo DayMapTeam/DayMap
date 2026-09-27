@@ -264,10 +264,21 @@ test('fixed stops can be deleted, taking their questions and conflicts with them
   assert.deepEqual(removed.lastRemove, { stopId: lecture.id, title: lecture.title, previousPlan: plan, version: plan.version + 1, draftStop: null })
 })
 
-test('a removed Calendar stop is remembered once, so re-import leaves it out', () => {
+test('a removed Calendar stop is remembered once, with its place, so re-import leaves it out', () => {
   const removed = planReducer(createPlanState(calendarPlan), { type: 'remove-stop', stopId: lecture.id })
-  const event = { sourceCalendarId: 'primary', sourceEventId: 'lecture-1', title: lecture.title }
+  const event = { sourceCalendarId: 'primary', sourceEventId: 'lecture-1', title: lecture.title, location: lecture.location }
+  assert.ok(lecture.location, 'the fixture has a confirmed place')
   assert.deepEqual(removed.plan.removedEvents, [event])
+  // What the person changed in DayMap is remembered with it.
+  const editedLecture = { ...calendarLecture, title: 'My lecture', travelMode: 'drive', localEdits: ['title', 'time'] }
+  const editedPlan = { ...calendarPlan, stops: [editedLecture, ...calendarPlan.stops.slice(1)] }
+  assert.deepEqual(planReducer(createPlanState(editedPlan), { type: 'remove-stop', stopId: lecture.id }).plan.removedEvents,
+    [{ ...event, title: 'My lecture', travelMode: 'drive', localEdits: ['title', 'time'], timing: lecture.timing }])
+  // Calendar's own times are not kept: bringing it back follows Calendar.
+  assert.equal('timing' in removed.plan.removedEvents[0], false)
+  // Without a confirmed place, there is none to remember.
+  const unlocated = { ...calendarPlan, stops: [{ ...calendarLecture, location: null }, ...calendarPlan.stops.slice(1)] }
+  assert.equal('location' in planReducer(createPlanState(unlocated), { type: 'remove-stop', stopId: lecture.id }).plan.removedEvents[0], false)
   // Removing the same event again (after undo) does not duplicate it.
   const again = planReducer({ ...removed, plan: { ...calendarPlan, removedEvents: [event], version: 9 } },
     { type: 'remove-stop', stopId: lecture.id })

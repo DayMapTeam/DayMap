@@ -66,9 +66,7 @@
   /* Elevation */
   --shadow-glass: 0 12px 32px rgba(0, 0, 0, 0.18);
   --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.15);
-  --shadow-thumb: 0 1px 3px rgba(0, 0, 0, 0.15);
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-marker: 0 4px 12px rgba(0, 0, 0, 0.35);
 
   /* Map pins (read by map/stopMarker.js, which draws them as SVG images) */
   --marker-halo: rgba(10, 132, 255, 0.35);
@@ -85,7 +83,6 @@
   --duration-press: 180ms;
   --duration-popup: 250ms; /* popup fade */
   --duration-popup-fly: 400ms;
-  --duration-camera: 700ms;
   --press-scale: 0.97;
 
   /* Spacing */
@@ -111,7 +108,6 @@
     --duration-press: 0ms;
     --duration-popup: 0ms;
     --duration-popup-fly: 0ms;
-    --duration-camera: 0ms;
     --press-scale: 1;
   }
 }

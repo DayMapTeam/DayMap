@@ -27,7 +27,8 @@ The frontend signs in with Supabase Auth and saves the accepted plan through the
 ## Local Supabase (no shared project needed)
 
 `supabase/config.toml` runs the whole stack (Postgres, Auth, PostgREST) in Docker.
-With Docker running and Node 22:
+`npm run setup` in the repository root does everything in this section for you.
+By hand, with Docker running and Node 22:
 
 ```sh
 npx supabase start -x realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor

@@ -138,6 +138,46 @@ export function resizedStopEdit(stop, deltaMinutes, plan) {
 }
 
 /**
+ * The earliest and latest start a stop can be moved to, keeping its length:
+ * within the plan's day (unless it already reaches past it) and within a
+ * flexible stop's window. Null for a stop that can't be edited.
+ *
+ * @param {object} stop Stop in the §5 shape.
+ * @param {{ date: string, timezone: string }} plan
+ * @returns {{ earliest: number, latest: number } | null} Epoch milliseconds.
+ */
+export function moveBounds(stop, plan) {
+  if (!canEditStop(stop)) return null
+  const start = Date.parse(stop.timing.scheduledStartAt)
+  const length = Date.parse(stop.timing.scheduledEndAt) - start
+  const day = planDayBounds(plan.date, plan.timezone)
+  let earliest = Math.min(day.start, start)
+  let latest = Math.max(day.end, start + length) - length
+  const { kind, earliestStartAt, latestEndAt } = stop.timing
+  if (kind === 'flexible' && earliestStartAt !== null) earliest = Math.max(earliest, Date.parse(earliestStartAt))
+  if (kind === 'flexible' && latestEndAt !== null) latest = Math.min(latest, Date.parse(latestEndAt) - length)
+  return { earliest: Math.min(earliest, start), latest: Math.max(latest, start) }
+}
+
+/**
+ * The edit that moves a stop to start at `startMs`, keeping its title and
+ * length, or null when that start is outside moveBounds or unchanged.
+ *
+ * @param {object} stop Stop in the §5 shape.
+ * @param {number} startMs Epoch milliseconds.
+ * @param {{ date: string, timezone: string }} plan
+ * @returns {StopEdit | null}
+ */
+export function movedStopEdit(stop, startMs, plan) {
+  const bounds = moveBounds(stop, plan)
+  const start = Date.parse(stop.timing.scheduledStartAt)
+  if (bounds === null || !Number.isFinite(startMs) || startMs === start
+    || startMs < bounds.earliest || startMs > bounds.latest) return null
+  const length = Date.parse(stop.timing.scheduledEndAt) - start
+  return { title: stop.title, scheduledStartAt: new Date(startMs).toISOString(), scheduledEndAt: new Date(startMs + length).toISOString() }
+}
+
+/**
  * `after` with 'time' added to the `localEdits` of every Google Calendar stop
  * whose planned times differ from `before`, however they changed (an edit, an
  * accepted suggestion, a stop added in front). Re-import then keeps DayMap's
@@ -213,6 +253,19 @@ export function withTravelMode(stop, mode) {
   const next = TRAVEL_MODES.includes(mode) ? mode : null
   if ((stop.travelMode ?? null) === next) return null
   return { ...stop, travelMode: next }
+}
+
+const LEAVE_TIMINGS = ['early', 'late']
+
+/**
+ * The stop with when to leave for it: 'late' (just in time, free time before
+ * the journey) or 'early' (free time after it, at this stop). Returns null
+ * when nothing would change.
+ */
+export function withLeaveTiming(stop, timing) {
+  const next = LEAVE_TIMINGS.includes(timing) ? timing : 'early'
+  if ((stop.leaveTiming ?? 'early') === next) return null
+  return { ...stop, leaveTiming: next }
 }
 
 /**

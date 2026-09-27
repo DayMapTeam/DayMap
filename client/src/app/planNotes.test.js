@@ -42,13 +42,18 @@ test('note rename/accept and delete retain valid persisted data without orphan q
   assert.ok(!deleted.plan.stops.some((stop) => stop.id === note.id))
 })
 
-test('notes reject blank names and stale adds; imported all-day entries remain protected', () => {
+test('notes reject blank names and stale adds; imported all-day entries can still be deleted', () => {
   const state = createPlanState(demoPlan)
   assert.equal(add(state, { ...note, title: '  ' }), state)
   assert.equal(planReducer(state, { type: 'add-stop', newStop: note, baseVersion: -1, now }), state)
-  const imported = { ...note, source: 'google-calendar', timing: { kind: 'all-day' } }
+  const imported = { ...note, source: 'google-calendar', sourceCalendarId: 'primary', sourceEventId: 'holiday',
+    timing: { kind: 'all-day', scheduledStartAt: null, scheduledEndAt: null } }
   const calendar = createPlanState({ ...demoPlan, stops: [imported] })
-  assert.equal(planReducer(calendar, { type: 'remove-stop', stopId: note.id }), calendar)
+  const deleted = planReducer(calendar, { type: 'remove-stop', stopId: note.id })
+  assert.deepEqual(deleted.plan.stops, [])
+  assert.deepEqual(deleted.plan.removedEvents, [{ sourceCalendarId: 'primary', sourceEventId: 'holiday', title: note.title }])
+  const restored = planReducer(deleted, { type: 'undo-remove', stopId: note.id })
+  assert.deepEqual(restored.plan.stops.map((stop) => stop.id), [note.id])
 })
 
 test('Home followed by reading remains two activities without changing day endpoints', () => {

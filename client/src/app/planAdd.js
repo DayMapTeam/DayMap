@@ -10,9 +10,6 @@
 
 const MINUTE = 60000
 
-/** Visit lengths offered by the add flows, in minutes. */
-export const DURATION_CHOICES = [15, 20, 30, 45, 60]
-
 const MIN_DURATION = 5
 const MAX_DURATION = 480
 const MAX_TITLE = 120
