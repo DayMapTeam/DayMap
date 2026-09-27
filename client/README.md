@@ -1,6 +1,6 @@
 # DayMap frontend
 
-React + JavaScript + Vite. The page shows an Adelaide 3D map, a floating planner, and browser Places search. Signed out, the planner uses a fictional demo day with no backend. Signed in, it loads and saves the real day through the Express API (see **Sign-in and saved days**). Map rendering and place search require a restricted Google browser key.
+React + JavaScript + Vite. The page shows an Adelaide 3D map, a floating planner, and browser Places search. Signed out, the planner starts with an empty day and keeps accepted events in this tab. The fictional demo is opt-in via **Sign in → Explore sample day** (`?demo=1`). Signed in, it loads and saves the real day through the Express API (see **Sign-in and saved days**). Map rendering and place search require a restricted Google browser key.
 
 ## Run locally
 
@@ -36,8 +36,8 @@ What to expect:
 - Each accepted change (add, delete, accept draft) is saved against the server's version, one request at a time. The header shows **Saving…**, **Saved** or **Not saved**. Drafts are never saved.
 - If the day changed in another tab or device, saving stops and a banner offers **Load latest** or **Keep mine**. Neither happens without a click.
 - Place IDs and journeys are not saved (provider retention, ARCHITECTURE §12); coordinates are, and journeys are recalculated on load.
-- Signed out, demo-day edits survive a refresh in this tab (sessionStorage) and never reach the server. **Reset demo day** in the account menu restores the fixture.
-- Without the Supabase variables the account menu says sign-in isn't set up, and the demo still works.
+- Signed out, accepted events survive refresh in this tab (sessionStorage) and never reach the server. Each new date starts empty. The sample day has separate storage; **Back to my day** restores your local day. Signing in loads the account’s day; it does not merge local or sample events into the account. **Reset demo day** is available only in the sample day.
+- Without Supabase settings, local planning and the optional demo still work.
 
 ## Setting an event's place
 
@@ -48,8 +48,8 @@ Open an event in the planner and choose **Set place** (or **Change place**). For
 1. In the DayMap Google Cloud project, enable **Maps JavaScript API** and **Places API (New)**.
 2. Edit the browser key: keep **Websites** restrictions for `http://localhost:5173/*` and `http://127.0.0.1:5173/*`; allow both APIs under **API restrictions**. Billing must be enabled on the project.
 3. Set `VITE_GOOGLE_MAPS_API_KEY` in ignored `client/.env.local`, using `.env.example` as the template. Restart Vite after changing it. Never commit the real key.
-4. Search for `State Library` in the top-left field. Choose a suggestion by pointer or ArrowDown/Enter. A dashed search pin (not in your day) previews the location and the camera moves there.
-5. Choose another place: the previous preview is replaced. Clear search or press Escape: the preview disappears. It never changes the day's activities or selected itinerary stop.
+4. Search for `State Library` in the top-left field. Choose a suggestion by pointer or ArrowDown/Enter. The camera moves there and Hannah’s dashed preview pin marks the selected place. The search result offers **Add to planner**; clicking the pin opens the place popup with the same action.
+5. Choose **Add to planner** to open the existing add sheet with the name and exact place prefilled. Set **From / To**, then **Add to day** to confirm. Cancel keeps the plan unchanged. Choose another result to replace the preview; clear search or press Escape to remove it. Successful addition removes the preview and selects the new event pin.
 6. Confirm itinerary pin/card selection still works. Try a query with no matches and check that the status is clear.
 
 Search waits 300ms after typing and requires two characters. Results favour Adelaide and are restricted to Australia. Loading, no-results and provider errors appear below the field. Session tokens group autocomplete with the selected place details; only coordinates and formatted address are requested. No Places data is persisted. Live verification requires the Cloud setup above; unit tests cover debouncing, stale responses, clearing during details loading and disposal.
@@ -169,7 +169,7 @@ const shown = draft?.plan ?? plan
 return <MapView stops={shown.stops} selectedStopId={selectedStopId} onSelectStop={selectStop} />
 ```
 
-Every map pin is drawn by `stopMarkerSvg()` in `src/map/stopMarker.js`: a numbered head on a stem above a ground dot, where the ground dot is the stop's exact position. Numbers come from `numberStops()` in `src/app/stopNumbers.js` (plan order, starting at 1), which the popup badge also uses. Fixed stops are dark, flexible blue, all-day grey, and search previews dashed. Selected pins get a smaller head and a blue halo, finished stops fade, and the stem shortens above 45° tilt. Colours come from `src/theme/tokens.css`. Clash and preview-shifted states now come from the same analysis as the planner. Marker titles describe their state too. Existing markers update in place when drafts change.
+Every map pin is drawn by `stopMarkerSvg()` in `src/map/stopMarker.js`: a numbered head on a stem above a ground dot, where the ground dot is the stop's exact position. Numbers come from `numberStops()` in `src/app/stopNumbers.js` (plan order, starting at 1), which the popup badge also uses. Fixed stops are dark, flexible blue, and all-day grey. Search uses the dashed preview variant of the same marker. It stays separate from numbered event pins until Add to day is confirmed. Satellite mode keeps the photorealistic 3D imagery without the built-in place labels ([Google map modes](https://developers.google.com/maps/documentation/javascript/reference/3d-map#MapMode)). Selected pins get a smaller head and a blue halo, finished stops fade, and the stem shortens above 45° tilt. Colours come from `src/theme/tokens.css`. Clash and preview-shifted states now come from the same analysis as the planner. Marker titles describe their state too. Existing markers update in place when drafts change.
 
 Besides the documented props, `MapView` takes:
 
@@ -179,10 +179,10 @@ Besides the documented props, `MapView` takes:
 | `onClearSelection()` | The empty map was clicked. |
 | `onCameraMove()` | The camera moved. The popup is placed on screen and cannot follow it, so `App.jsx` closes it (the stop stays selected). |
 | `now` | Stops that ended before this are drawn faded. |
-| `previewPlace` | The place-search preview, drawn as a dashed search pin. |
+| `previewPlace` | The camera target and temporary dashed search marker; not an accepted event. |
 | `stopStates` | Per-stop `{ clash, previewShifted, note }` from shared analysis; updates pin appearance and title without moving the camera |
 
-`App.jsx` opens the popup only from a pin click, never from the planner or search.
+`App.jsx` opens event and search-place popups from their respective pin clicks. The selected search result also has an Add to planner action, without needing to click the pin. `Planner.addPlaceRequest` opens a fresh `AddEventSheet` with `initialPlace`; the sheet owns the editable times and normal confirmation. `onPlaceAdded` clears the temporary preview after confirmation.
 
 `usePlan()` throws a descriptive error outside the provider. Context/hook, reducer, and provider live in separate files to support React Fast Refresh. Edits follow ARCHITECTURE §4: they create a draft, and only `acceptDraft()` changes the accepted plan. Preview (conflicts and routes), persistence, loading data from `/api/demo-plan`, and server-held proposals are later work.
 
@@ -190,7 +190,7 @@ Besides the documented props, `MapView` takes:
 
 ### Conflict and suggestion flow
 
-For the deterministic walkthrough below, set `VITE_TRAVEL_PROVIDER=demo` and restart
+Open **Sign in → Explore sample day** before the demo walkthroughs below. For the deterministic walkthrough, set `VITE_TRAVEL_PROVIDER=demo` and restart
 Vite. This uses **labelled simulated walking estimates**, based on straight-line
 distance with a 1.3 detour factor, walking at 1.3 m/s, plus a 5-minute buffer.
 These are not Google routes. With the default Google provider, the same controls
@@ -217,7 +217,7 @@ use fetched walking durations instead, so suggested times may differ.
 Automated coverage: `node --test src/services/planningContext.test.js` from
 `client/` runs this fixture's edit/apply/revert/accept sequence without a Maps key.
 The existing add-event fit remains time-only; the day checks show any resulting
-travel issues after adding. Refresh still resets to the fixture.
+travel issues after adding. Refresh keeps accepted changes in the sample day for this tab.
 
 ### Compact gap preview
 
@@ -262,6 +262,6 @@ To try a successful move with the Google provider in the demo:
 9. Expand any event and press the red *Delete* on the left of Cancel and Save. A dialog over the planner explains what happens; *Cancel* (or Esc) changes nothing and returns focus to Delete, and *Delete* removes the stop. A toast offers *Undo* for 5 seconds. A removed Google Calendar event only leaves DayMap: importing again keeps it hidden, and *Bring back* at the bottom of the planner (or in the account menu's Calendar section) imports it again. Imported events you edit are marked *Edited in DayMap*, and importing again keeps your title and times.
 10. The round *+* button in the planner header (or the N key) opens the add sheet: *Where?* (a place, or *Use “…”* without one), *When?* (duration and the best times, or a set time), then *Check your day* listing what is new, moved or unchanged. Nothing changes until *Add to day*. The new row is marked *New* and selected, and a toast offers *Undo* for 5 seconds. Try *At a set time* 11:00–11:20am: it overlaps Library study and *Next* stays disabled. Without a Maps key, place search says it is unavailable and events can still be added without a place (shown as *Location needed*).
 11. Adding is disabled while an edit is waiting to be accepted. Fits use clock times only: travel is unknown until routes exist, and every message says so. The fit logic is local (`src/app/planAdd.js`) until the planning endpoint exists.
-12. Refresh: the fixture reloads with no selected stop and no draft. Selection and edits are not persisted yet.
+12. Refresh: accepted events reload with no selected stop and no draft. Use **Reset demo day** to restore the fictional fixture.
 
 The planner lives in `src/planner/`, shared UI helpers in `src/components/`, and design tokens in `src/theme/tokens.css`.

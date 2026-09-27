@@ -30,3 +30,19 @@ test('failures are reported, and bad input never requests', async () => {
   assert.equal(calls, 1)
   assert.equal(transitKey(a, b, null), null)
 })
+
+const ride = (name) => ({ kind: 'ride', vehicle: 'Bus', name })
+const service = (id, lines, arriveAt) => ({ id, arriveAt, steps: [{ kind: 'walk', minutes: 3 }, ...lines.map(ride)] })
+
+test('a picked service is remembered for the journey, and only if listed', async () => {
+  const store = createTransitStore(async () => [service('tram', ['T1'], '2026-09-26T04:20:00Z'), service('bus', ['M44'], '2026-09-26T04:35:00Z')])
+  store.choose(a, b, at, 'bus')
+  assert.equal(store.lookup(a, b, at).status, 'idle', 'nothing to pick before services arrive')
+  store.request(a, b, at)
+  await tick()
+  store.choose(a, b, at, 'train')
+  assert.equal(store.lookup(a, b, at).chosenId, undefined)
+  store.choose(a, b, at, 'bus')
+  assert.equal(store.lookup(a, b, at).chosenId, 'bus')
+  assert.equal(store.lookup(b, a, at).chosenId, undefined, 'the return journey is its own choice')
+})

@@ -91,3 +91,16 @@
 
 .place-search-results li:hover,
 .place-search-results li[aria-selected='true'] { background: var(--blue-tint); }
+
+.place-search-preview {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  font-size: 14px;
+}
+
+.place-search-preview-hint {
+  color: var(--label-2);
+  font-size: 12px;
+}

@@ -126,13 +126,13 @@ function WhereStep({ plan, query, onQueryChange, onPlace, onText }) {
  * @param {(result: { stopId: string | null, message: string }) => void} props.onCommitted
  * @param {() => void} props.onCancel
  */
-export default function AddEventSheet({ now, planning, returnFocusSelector, onCommitted, onCancel }) {
+export default function AddEventSheet({ now, planning, returnFocusSelector, onCommitted, onCancel, initialPlace = null }) {
   const titleId = useId()
   const sheetRef = useRef(null)
-  const [searching, setSearching] = useState(true)
-  const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(initialPlace === null)
+  const [query, setQuery] = useState(initialPlace?.label ?? '')
   const [pickingLocation, setPickingLocation] = useState(false)
-  const draft = useAddEventDraft({ now, planning })
+  const draft = useAddEventDraft({ now, planning, initialPlace })
   const { plan, option } = draft
   const verdict = draft.role === 'event' ? describeVerdict(draft.fit, option, plan, 'fixed') : null
 
@@ -251,7 +251,7 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
                 <FitVerdict verdict={draft.checkingTravel ? { tone: 'neutral', text: 'Checking travel time…' } : verdict} />
               </div>
             ) : draft.role === 'note' ? (
-              <p className="add-hint">A note for today. No set time, and it won’t change your schedule.</p>
+              <p className="add-hint">Saved in Day notes above your itinerary. No set time, and it won’t change your schedule or travel.</p>
             ) : (
               <div className="add-field">
                 <label className="add-section-label" htmlFor={`${titleId}-day-role`}>Use this place for</label>

@@ -52,3 +52,10 @@ test('the summary prefers fewer changes unless that arrives over 10 minutes late
   assert.equal(pickService({ status: 'pending', options: [] }), null)
   assert.equal(pickService({ status: 'ready', options: [] }), null)
 })
+
+test('the service the user picked wins, even if a quicker one exists', () => {
+  const tram = { id: 'tram', arriveAt: '2026-09-26T04:45:00Z', steps: [{ kind: 'ride' }] }
+  const slowBus = { id: 'bus', arriveAt: '2026-09-26T05:10:00Z', steps: [{ kind: 'ride' }] }
+  assert.equal(pickService({ status: 'ready', options: [tram, slowBus], chosenId: 'bus' }), slowBus)
+  assert.equal(pickService({ status: 'ready', options: [tram, slowBus], chosenId: 'gone' }), tram, 'a pick no longer listed is ignored')
+})

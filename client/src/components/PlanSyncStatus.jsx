@@ -9,6 +9,7 @@ import './PlanSyncStatus.css'
  */
 export function SyncChip({ sync }) {
   const text = {
+    local: 'This tab only',
     loading: 'Loading your day…',
     saving: 'Saving…',
     saved: 'Saved',

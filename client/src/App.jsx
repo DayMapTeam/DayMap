@@ -11,6 +11,8 @@ import AppHeader from './components/AppHeader.jsx'
 import CalendarSection from './components/CalendarSection.jsx'
 import { Notice, SyncBanner, SyncChip } from './components/PlanSyncStatus.jsx'
 import PlaceSearch from './components/PlaceSearch.jsx'
+import PlacePopup from './components/PlacePopup.jsx'
+import { splitPlaceLabel } from './planner/addEventCopy.js'
 import { usePlanClock } from './components/usePlanClock.js'
 import MapView from './map/MapView.jsx'
 import EmptyDay from './planner/EmptyDay.jsx'
@@ -43,11 +45,34 @@ function App() {
     if (plan.dataMode === 'demo') loadPlan(readDemoPlan(sessionStore(), demoPlan))
   }, [plan.dataMode, loadPlan])
   const [previewPlace, setPreviewPlace] = useState(null)
+  // The event popup opens from a pin click: { stopId, anchor } or null.
+  const [popup, setPopup] = useState(null)
+  const [searchPopup, setSearchPopup] = useState(null)
+  const [searchKey, setSearchKey] = useState(0)
+  const [addPlaceRequest, setAddPlaceRequest] = useState(null)
+  const previewSearch = useCallback((place) => {
+    setPreviewPlace(place)
+    setSearchPopup(null)
+  }, [])
+  const closeSearchPopup = useCallback(() => setSearchPopup(null), [])
+  const selectPreview = useCallback(({ anchor }) => {
+    setPopup(null)
+    setSearchPopup(anchor)
+  }, [])
+  const addSearchPlace = useCallback((place) => {
+    if (draft !== null) return
+    setSearchPopup(null)
+    setPopup(null)
+    setAddPlaceRequest({ place, key: crypto.randomUUID() })
+  }, [draft])
+  const searchPlaceAdded = useCallback(() => {
+    setPreviewPlace(null)
+    setSearchPopup(null)
+    setSearchKey((value) => value + 1)
+  }, [])
   const { now, isDemoTime } = usePlanClock(plan)
   const planning = usePlanAnalysis(plan, draft, now)
   const journeyLegs = useJourneyLegs(planning, now)
-  // The popup opens only from a pin click on the map: { stopId, anchor } or null.
-  const [popup, setPopup] = useState(null)
   const [revealRequest, setRevealRequest] = useState(null)
 
   // Trips use the accepted plan and the device's position, watched while DayMap is open.
@@ -110,10 +135,12 @@ function App() {
   // Esc, ×, clicking the open pin again, or clicking the empty map: close and deselect.
   const dismiss = useCallback(() => {
     setPopup(null)
+    setSearchPopup(null)
     clearSelection()
   }, [clearSelection])
 
   const selectFromMap = useCallback((stopId, { anchor }) => {
+    setSearchPopup(null)
     if (popup?.stopId === stopId) {
       dismiss()
       return
@@ -124,7 +151,7 @@ function App() {
 
   // The popup is placed on screen and cannot follow the camera, so it closes when
   // the camera moves. The stop stays selected.
-  const closePopup = useCallback(() => setPopup(null), [])
+  const closePopup = useCallback(() => { setPopup(null); setSearchPopup(null) }, [])
 
   // The popup stays open while the planner reveals the row.
   const viewInPlanner = useCallback((stopId) => {
@@ -146,6 +173,7 @@ function App() {
         onCameraMove={closePopup}
         now={now}
         previewPlace={previewPlace}
+        onSelectPreview={selectPreview}
         userPosition={shownPosition}
         tripActive={navigating}
         follow={follow}
@@ -161,7 +189,7 @@ function App() {
         isDemoTime={isDemoTime}
       >
         <SyncChip sync={sync} />
-        <AccountMenu account={account} onResetDemo={resetDemo}>
+        <AccountMenu account={account} onResetDemo={plan.dataMode === 'demo' ? resetDemo : null}>
           <CalendarSection calendar={calendar} />
         </AccountMenu>
       </AppHeader>
@@ -179,7 +207,7 @@ function App() {
         )}
       </div>
       <div className="app-controls-top-left">
-        <PlaceSearch onPlaceSelect={setPreviewPlace} />
+        <PlaceSearch key={searchKey} onPlaceSelect={previewSearch} onAddPlace={addSearchPlace} canAdd={draft === null} />
       </div>
       <TripDock
         trip={trip}
@@ -196,10 +224,20 @@ function App() {
       <Planner
         now={now}
         revealRequest={revealRequest}
+        addPlaceRequest={addPlaceRequest}
+        onPlaceAdded={searchPlaceAdded}
         planning={planning}
         emptyState={<EmptyDay calendar={userId ? calendar : null} />}
         calendar={userId ? calendar : null}
       />
+      {previewPlace && searchPopup && (
+        <PlacePopup anchor={searchPopup} title={splitPlaceLabel(previewPlace.label).name} onClose={closeSearchPopup}>
+          <p className="place-popup-sub">{previewPlace.label}</p>
+          <p className="place-popup-time">{draft === null ? 'Preview · choose a time to add this event.' : 'Accept or discard your pending changes first.'}</p>
+          <button type="button" className="button-filled place-popup-action" disabled={draft !== null}
+            onClick={() => addSearchPlace(previewPlace)}>Add to planner</button>
+        </PlacePopup>
+      )}
       {popup !== null && (
         <StopPopup
           key={popup.stopId}

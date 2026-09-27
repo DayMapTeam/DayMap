@@ -206,6 +206,8 @@ Each journey line reads like a Google Maps route summary (issue #46): the mode i
 
 **Adding (issues #52, #60)** starts with a place search or arbitrary text. The same compact choices are always available: **Activity** (default, From–To times), **Note** (no time), and **Day start/end** (reveals a start/end/both selector). Names never infer a day endpoint: visiting home and reading afterwards are ordinary activities. A separate optional place picker preserves the typed name and can reuse an explicitly selected location already in the day. Day endpoints require resolved coordinates; typed “Home” never invents an address. Existing endpoints are named before replacement.
 
+The planner displays manual notes in a separate collapsible **Day notes** section above the itinerary. Adding, restoring, or revealing a note opens the section and highlights its row; filtering searches notes too. Notes have edit/delete controls without time, fixed/flexible, or place controls, and are excluded from itinerary row adjacency so they cannot interrupt travel connectors.
+
 Notes reuse manual `all-day` stops with null duration and timestamps, so they never occupy a time slot, move appointments, or request journeys. Unlocated notes use the existing deferred location question (“no place needed”). They can be renamed through the draft/accept flow, deleted, undone after adding, and saved with the existing API shape. Imported all-day Calendar entries retain their existing edit restrictions. No new backend fields or endpoints are introduced.
 
 The planner shows *Day starts* above the first stop and *Day ends* after the last; these are explicit route endpoints, not an automatic consequence of adding Home.
@@ -238,7 +240,7 @@ The map sits behind a single adapter:
 
 ### Demo and live modes
 
-- Demo mode must keep working without login or Calendar credentials. Issue #5 imports `shared/fixtures/demoPlan.js` directly so the frontend runs before the backend exists. Once DM-04 is implemented, the demo service will read the same fixture through `GET /api/demo-plan`, which makes no external API calls.
+- Normal signed-out startup is an empty local day, stored separately from account and demo plans in this tab. Only events in the shown plan get numbered event pins and journey arcs; Google’s built-in place labels are hidden. A selected search result has one temporary dashed preview pin and an Add to planner action (also available in its pin popup). This opens the existing event sheet with the place prefilled and editable From–To times. Only Add to day creates the event; Cancel leaves the plan unchanged, clearing search removes the preview, and a successful add replaces it with the selected event pin. Demo mode is explicitly opened from the account menu (`?demo=1`) and must keep working without login or Calendar credentials. Issue #5 imports `shared/fixtures/demoPlan.js` directly so the frontend runs before the backend exists. Once DM-04 is implemented, the demo service will read the same fixture through `GET /api/demo-plan`, which makes no external API calls.
 - Simulated data, including sample route geometry and disruptions, is clearly labelled in the UI (`dataMode: 'demo'`).
 
 ## 5. Shared data contract

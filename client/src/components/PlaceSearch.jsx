@@ -4,7 +4,7 @@ import { createPlaceSearchController } from '../services/placeSearchController.j
 import './PlaceSearch.css'
 
 /** Search previews never modify the accepted plan or its selected stop. */
-export default function PlaceSearch({ onPlaceSelect }) {
+export default function PlaceSearch({ onPlaceSelect, onAddPlace, canAdd = true }) {
   const [query, setQuery] = useState('')
   const [state, setState] = useState({ status: 'idle', results: [] })
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -108,6 +108,18 @@ export default function PlaceSearch({ onPlaceSelect }) {
       <p id="place-search-note" className="place-search-note glass" role="status" hidden={!query}>
         {message}
       </p>
+      {state.status === 'selected' && onAddPlace && (
+        <div className="place-search-preview glass">
+          <p>{state.place.label}</p>
+          <button type="button" className="button-filled place-search-add" disabled={!canAdd}
+            onClick={() => onAddPlace(state.place)}>
+            Add to planner
+          </button>
+          <p className="place-search-preview-hint">
+            {canAdd ? 'Choose a time before adding this event.' : 'Accept or discard your pending changes first.'}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
