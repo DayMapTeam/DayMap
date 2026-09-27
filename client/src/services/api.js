@@ -68,9 +68,19 @@ export function createApiClient({ baseUrl = '', getToken, fetchImpl = (...args) 
     disconnectCalendar() {
       return request('/api/calendar/disconnect', { method: 'POST' })
     },
-    /** Merges one day's primary-calendar events into the saved plan: `{ plan, summary }`. */
-    importCalendarDay(date, timezone) {
-      return request('/api/calendar/import', { method: 'POST', body: { date, timezone } })
+    /**
+     * Merges one day's primary-calendar events into the saved plan:
+     * `{ plan, summary: { added, updated, removed, hidden } }`. Events the
+     * person removed stay out (`hidden`) unless `restoreRemoved` is true (all
+     * of them) or they are in `restoreEvents` ({ sourceCalendarId, sourceEventId }[]).
+     */
+    importCalendarDay(date, timezone, { restoreRemoved = false, restoreEvents } = {}) {
+      const body = { date, timezone }
+      if (restoreRemoved === true) body.restoreRemoved = true
+      if (Array.isArray(restoreEvents) && restoreEvents.length > 0) {
+        body.restoreEvents = restoreEvents.map(({ sourceCalendarId, sourceEventId }) => ({ sourceCalendarId, sourceEventId }))
+      }
+      return request('/api/calendar/import', { method: 'POST', body })
     },
   }
 }

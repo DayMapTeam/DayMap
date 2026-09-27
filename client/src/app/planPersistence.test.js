@@ -194,3 +194,16 @@ test('a new day starts where the day before ended', async () => {
   assert.deepEqual(carryOverPlaces({ startPlace: home, endPlace: home }), { startPlace: home, endPlace: home })
   assert.deepEqual(carryOverPlaces(null), { startPlace: null, endPlace: null })
 })
+
+test('saved plans keep Calendar edits and removed events, and omit them when empty', () => {
+  const calendarStop = liveStop({ source: 'google-calendar', sourceEventId: 'e1', sourceCalendarId: 'primary', localEdits: ['title', 'time'] })
+  const removedEvents = [{ sourceCalendarId: 'primary', sourceEventId: 'e2', title: 'Standup', extra: 'ui-only' }]
+  const saved = toSavedPlan({ ...withStops(base(), [calendarStop]), removedEvents })
+  assert.deepEqual(saved.stops[0].localEdits, ['title', 'time'])
+  assert.deepEqual(saved.removedEvents, [{ sourceCalendarId: 'primary', sourceEventId: 'e2', title: 'Standup' }])
+
+  const empty = toSavedPlan({ ...withStops(base(), [{ ...calendarStop, localEdits: [] }, liveStop({ id: 'x', localEdits: ['title'] })]), removedEvents: [] })
+  assert.equal('localEdits' in empty.stops[0], false)
+  assert.equal('localEdits' in empty.stops[1], false, 'only Calendar stops carry localEdits')
+  assert.equal('removedEvents' in empty, false)
+})

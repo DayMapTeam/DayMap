@@ -131,7 +131,8 @@ test('deletion invalidates the suggestion and retains unrelated user edits', () 
 test('invalid manual edits do not discard an active suggestion', () => {
   const applied = apply(initial())
   assert.equal(edit(applied, 'c', ''), applied)
-  assert.equal(edit(applied, 'a', 'Cannot edit fixed'), applied)
+  const backwards = { title: 'a', scheduledStartAt: at(90), scheduledEndAt: at(60) }
+  assert.equal(planReducer(applied, { type: 'edit-stop-draft', stopId: 'a', edit: backwards }), applied)
 })
 
 test('apply rejects tampering with duration, window, protected fields or stop identity', () => {
@@ -165,4 +166,20 @@ test('apply ignores supplied derived legs and rejects a newly unsafe proposed de
     status: 'ready', travelSeconds: from.id === 'b' && departAt === at(135) ? 3600 : 600,
   }) }
   assert.equal(applyProposal(state.plan, proposal, ctx), null)
+})
+
+test('a Calendar event moved by an accepted suggestion keeps its new time after it is fixed again', () => {
+  // The repro: unstar a Calendar event, accept a suggested move, star it again.
+  const state = initial()
+  const calendar = { ...state, plan: { ...state.plan, stops: state.plan.stops.map((s) => s.id === 'b'
+    ? { ...s, source: 'google-calendar', sourceEventId: 'gym', sourceCalendarId: 'primary' } : s) } }
+  const accepted = planReducer(apply(calendar), { type: 'accept-draft', ctx: context() })
+  const gym = accepted.plan.stops.find((s) => s.id === 'b')
+  assert.equal(gym.timing.scheduledStartAt, at(105))
+  assert.deepEqual(gym.localEdits, ['time'])
+  const pinned = planReducer(accepted, { type: 'set-stop-kind', stopId: 'b', kind: 'fixed' })
+  const fixed = pinned.plan.stops.find((s) => s.id === 'b')
+  assert.equal(fixed.timing.fixedStartAt, at(105))
+  assert.deepEqual(fixed.localEdits, ['time'])
+  assert.equal(accepted.plan.stops.find((s) => s.id === 'c').localEdits, undefined)
 })

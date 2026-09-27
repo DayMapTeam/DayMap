@@ -3,6 +3,7 @@ import { usePlan } from '../app/planContext.js'
 import { listStopChanges } from '../app/planEdits.js'
 import { calendarLocationText, locationQuestionFor, placeStatus } from '../app/planLocations.js'
 import EventRow from './EventRow.jsx'
+import { overlapNote } from './stopEditCopy.js'
 import DayPlaceRow from './DayPlaceRow.jsx'
 import JourneyPopup from './JourneyPopup.jsx'
 import { journeySummary, pickService } from './journeySummary.js'
@@ -149,12 +150,14 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
               flashKey={revealRequest?.stopId === stop.id ? revealRequest.key : null}
               onToggle={toggle}
               onSave={save}
+              onResize={editStopDraft}
               onDelete={onRequestDelete}
               placeState={placeStatus(shown, stop)}
               calendarPlace={calendarLocationText(locationQuestionFor(shown, stop.id))}
               onSetPlace={setStopLocation}
               onSetKind={draft === null ? setStopKind : null}
               kindHint={draft === null ? null : 'Accept or keep your pending changes first.'}
+              overlap={stop.id === openStopId ? overlapNote(analysis.conflicts, stop.id, shown.stops) : null}
             />}
           </li>
         })}

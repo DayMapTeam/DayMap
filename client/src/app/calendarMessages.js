@@ -31,15 +31,16 @@ export function calendarReturnMessage({ outcome, reason }) {
   return { tone: 'error', text: REASONS[reason] ?? 'Google Calendar couldn’t be connected. Try again.' }
 }
 
-/** A one-line result for an import. */
-export function importSummaryMessage({ added, updated, removed }) {
+/** A one-line result for an import, noting events the person removed that stay hidden. */
+export function importSummaryMessage({ added, updated, removed, hidden = 0 }) {
   const parts = []
   if (added) parts.push(`${added} added`)
   if (updated) parts.push(`${updated} updated`)
   if (removed) parts.push(`${removed} removed`)
-  if (!parts.length) return 'Your day is up to date with Google Calendar.'
   const events = added + updated + removed === 1 ? 'event' : 'events'
-  return `Calendar ${events} imported: ${parts.join(', ')}.`
+  const result = parts.length ? `Calendar ${events} imported: ${parts.join(', ')}.` : 'Your day is up to date with Google Calendar.'
+  if (!hidden) return result
+  return `${result} ${hidden} ${hidden === 1 ? 'event' : 'events'} you removed ${hidden === 1 ? 'stays' : 'stay'} hidden.`
 }
 
 /** What to tell the person when an import or status request fails. */

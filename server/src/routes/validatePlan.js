@@ -24,7 +24,7 @@ export function validateSave(id, body) {
   keys(body, ['baseVersion', 'plan'])
   const { baseVersion, plan } = body
   check(Number.isInteger(baseVersion) && baseVersion >= 0 && baseVersion < 2147483647, 'Invalid baseVersion.')
-  keys(plan, ['id', 'date', 'timezone', 'version', 'dataMode', 'stops', 'legs', 'conflicts', 'questions', 'startPlace', 'endPlace'])
+  keys(plan, ['id', 'date', 'timezone', 'version', 'dataMode', 'stops', 'legs', 'conflicts', 'questions', 'startPlace', 'endPlace', 'removedEvents'])
   check(plan.id === id && plan.version === baseVersion, 'Plan ID and version must match the request.')
   validateDay(plan.date, plan.timezone)
   check(['demo', 'live'].includes(plan.dataMode), 'Invalid dataMode.')
@@ -41,9 +41,17 @@ export function validateSave(id, body) {
     check(text(place.label) && place.placeId === null && Number.isFinite(place.lat) && Math.abs(place.lat) <= 90
       && Number.isFinite(place.lng) && Math.abs(place.lng) <= 180, `Invalid ${field}.`)
   }
+  // Calendar events the person removed, so re-import leaves them out: absent, or up to 500.
+  if (plan.removedEvents !== undefined) {
+    check(Array.isArray(plan.removedEvents) && plan.removedEvents.length <= 500, 'Invalid removedEvents.')
+    for (const event of plan.removedEvents) {
+      keys(event, ['sourceCalendarId', 'sourceEventId', 'title'])
+      check(text(event.sourceCalendarId) && text(event.sourceEventId) && text(event.title), 'Invalid removed event.')
+    }
+  }
   const ids = new Set()
   for (const stop of plan.stops) {
-    keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode'])
+    keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode', 'localEdits'])
     // How the person chose to travel to this stop; absent or null means automatic.
     check(stop.travelMode === undefined || stop.travelMode === null || ['walk', 'transit', 'drive'].includes(stop.travelMode),
       'Invalid travelMode.')
@@ -55,6 +63,10 @@ export function validateSave(id, body) {
       check(stop[field] === null || text(stop[field]), `Invalid ${field}.`)
     }
     check(stop.source !== 'google-calendar' || (text(stop.sourceEventId) && text(stop.sourceCalendarId)), 'Calendar stops need source identifiers.')
+    // What the person changed on a Calendar event, kept on re-import: absent, or distinct 'title' / 'time'.
+    check(stop.localEdits === undefined || (stop.source === 'google-calendar' && Array.isArray(stop.localEdits)
+      && stop.localEdits.length > 0 && stop.localEdits.every(field => ['title', 'time'].includes(field))
+      && new Set(stop.localEdits).size === stop.localEdits.length), 'Invalid localEdits.')
     if (stop.location !== null) {
       keys(stop.location, ['label', 'placeId', 'lat', 'lng'])
       const { label, placeId, lat, lng } = stop.location

@@ -94,47 +94,12 @@
   color: var(--label-2);
 }
 
-/* Segmented control (radio group) */
-.segmented {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  padding: 2px;
-  background: var(--fill);
-  border-radius: var(--radius-segmented);
-}
-
 /* Each option anchors its visually hidden radio, so focusing it never scrolls the panel. */
-.segmented-option,
 .chip,
 .slot-option {
   position: relative;
 }
 
-.segmented-option {
-  display: grid;
-}
-
-.segmented-label {
-  display: grid;
-  place-items: center;
-  min-height: 32px;
-  padding: 0 var(--space-2);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--label-2);
-  border-radius: calc(var(--radius-segmented) - 2px);
-  cursor: pointer;
-  transition: background var(--duration-press) var(--ease-spring);
-}
-
-.segmented-option input:checked + .segmented-label {
-  color: var(--label);
-  background: var(--solid);
-  box-shadow: var(--shadow-thumb);
-}
-
-.segmented-option input:focus-visible + .segmented-label,
 .chip input:focus-visible + .chip-label,
 .slot-option input:focus-visible ~ .slot-option-radio {
   outline: var(--focus-ring);

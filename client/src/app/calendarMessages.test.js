@@ -27,6 +27,10 @@ test('import summaries count what changed', () => {
   assert.equal(importSummaryMessage({ added: 0, updated: 0, removed: 0 }), 'Your day is up to date with Google Calendar.')
   assert.equal(importSummaryMessage({ added: 1, updated: 0, removed: 0 }), 'Calendar event imported: 1 added.')
   assert.equal(importSummaryMessage({ added: 3, updated: 1, removed: 2 }), 'Calendar events imported: 3 added, 1 updated, 2 removed.')
+  assert.equal(importSummaryMessage({ added: 0, updated: 0, removed: 0, hidden: 2 }),
+    'Your day is up to date with Google Calendar. 2 events you removed stay hidden.')
+  assert.equal(importSummaryMessage({ added: 1, updated: 0, removed: 0, hidden: 1 }),
+    'Calendar event imported: 1 added. 1 event you removed stays hidden.')
   assert.match(calendarErrorMessage({ code: 'CALENDAR_RECONNECT_REQUIRED' }), /Reconnect/)
   assert.equal(calendarErrorMessage({ code: 'X', message: 'Server says' }), 'Server says')
 })

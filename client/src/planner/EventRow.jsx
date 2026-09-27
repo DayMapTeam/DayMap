@@ -1,20 +1,56 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
+import { canEditStop } from '../app/planEdits.js'
 import { formatDuration, formatTimeRange } from '../components/formatTime.js'
-import { WhenModeToggle } from './AddEventFields.jsx'
 import EventEditForm from './EventEditForm.jsx'
+import LengthStepper from './LengthStepper.jsx'
 import PlacePicker from './PlacePicker.jsx'
 import { KIND_LABELS } from './stopLabels.js'
 
 const KIND_NOTES = {
-  fixed: 'DayMap will never move a fixed event.',
-  flexible: 'DayMap may suggest changes to this, and will always ask first.',
+  fixed: 'Starred — DayMap will never move this or suggest changes to it.',
+  flexible: 'Not starred — DayMap may suggest moving this into free time, and always asks first. Star it to keep it where it is.',
   'all-day': 'All-day items stay visible and are never given an arrival time.',
 }
 
+const EDITED_FIELDS = { title: 'name', time: 'time' }
+
+/** Why a stop has no edit form, for the few stops that can't be edited. */
+function notEditableReason(stop, hasTimes) {
+  if (stop.timing.kind === 'all-day') return 'All-day items have no times to change. You can still delete this.'
+  if (stop.status !== 'planned') return 'This stop is finished, so it can’t be edited. You can still delete it.'
+  if (!hasTimes) return 'This stop doesn’t have a time yet, so it can’t be edited. You can still delete it.'
+  return 'This stop can’t be edited here. You can still delete it.'
+}
+
+/** "You changed the name and time in DayMap…", or null for stops not from Google Calendar. */
+function calendarNote(stop) {
+  if (stop.source !== 'google-calendar') return null
+  const fields = (stop.localEdits ?? []).map((field) => EDITED_FIELDS[field]).filter(Boolean)
+  if (fields.length === 0) return 'From Google Calendar. Importing again updates it with any changes made there.'
+  return `From Google Calendar. You changed the ${fields.join(' and ')} in DayMap, so importing again keeps your version.`
+}
+
+function StarIcon({ filled }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        d="M9 1.9l2.13 4.46 4.9.64-3.58 3.4.9 4.86L9 12.9l-4.35 2.36.9-4.86-3.58-3.4 4.9-.64Z"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 /**
- * One stop in the planner. The header selects and expands it; the expanded
- * area shows details and, for flexible stops, the edit form. Colour is never
- * the only signal: kind, location status, changes and finished are written out.
+ * One stop in the planner. The header selects and expands it, and a star
+ * beside it (a separate button, never inside the header) makes the stop fixed
+ * (starred) or flexible. The expanded area shows details, quick length
+ * controls and the edit form for every stop that can be edited, and Delete
+ * for every stop. Colour is never the only signal: kind, location status,
+ * changes and finished are written out.
  *
  * @param {object} props
  * @param {object} props.stop Stop in the §5 shape (from the draft when there is one).
@@ -28,15 +64,18 @@ const KIND_NOTES = {
  * @param {number | null} props.flashKey Changes each time "View in planner" reveals this row.
  * @param {(stopId: string) => void} props.onToggle
  * @param {(stopId: string, edit: object) => void} props.onSave
+ * @param {(stopId: string, edit: object) => void} props.onResize Puts a longer or shorter stop in the draft; the row stays open.
  * @param {(stopId: string) => void} props.onDelete
  * @param {'set' | 'needed' | 'none'} props.placeState Whether the stop has a place, needs one, or needs none.
  * @param {string | null} props.calendarPlace The location text from Google Calendar, if any.
  * @param {(stopId: string, location: object | null) => void} props.onSetPlace Sets a place, or null for "no place needed".
  * @param {((stopId: string, kind: 'fixed' | 'flexible') => void) | null} props.onSetKind Null when the kind can't change now.
  * @param {string | null} props.kindHint Why the kind can't change right now, if it can't.
+ * @param {string | null} [props.overlap] Which stops this one overlaps, e.g. "Overlaps ‘Lecture’ by 15 min.", while open.
  */
-export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onDelete, conflict,
-  placeState, calendarPlace, onSetPlace, onSetKind, kindHint }) {
+export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onResize, onDelete, conflict,
+  placeState, calendarPlace, onSetPlace, onSetKind, kindHint, overlap = null }) {
+  const id = useId()
   const [picking, setPicking] = useState(false)
   if (!open && picking) setPicking(false)
   const { timing } = stop
@@ -44,12 +83,30 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
   const detailsId = `stop-details-${stop.id}`
   const hasTimes = timing.scheduledStartAt !== null && timing.scheduledEndAt !== null
   const duration = timing.kind === 'all-day' ? null : formatDuration(timing.durationMinutes)
+  const editedInDayMap = stop.source === 'google-calendar' && (stop.localEdits?.length ?? 0) > 0
+  const sourceNote = calendarNote(stop)
+  const editable = canEditStop(stop)
+  // The star is for stops DayMap could still move: not all-day, finished or unscheduled.
+  const showStar = editable && !past
+  const fixed = timing.kind === 'fixed'
+  const kindLocked = onSetKind === null
   const details = [
     past ? 'Finished' : null,
     KIND_LABELS[timing.kind],
     placeText,
     duration,
+    editedInDayMap ? 'Edited in DayMap' : null,
   ].filter(Boolean)
+  const starTitle = kindLocked && kindHint
+    ? kindHint
+    : fixed
+      ? 'Fixed: DayMap won’t move this. Select to make it flexible.'
+      : 'Flexible: DayMap may suggest moving this. Select to keep it fixed.'
+
+  function toggleStar() {
+    if (kindLocked) return
+    onSetKind(stop.id, fixed ? 'flexible' : 'fixed')
+  }
 
   return (
     <div
@@ -60,6 +117,23 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
     >
       {/* A new key restarts the highlight animation on every reveal. */}
       {flashKey !== null && <span key={flashKey} className="event-item-flash" aria-hidden="true" />}
+      {/* A sibling of the row button, drawn over the dot's column, so it never toggles the row. */}
+      {showStar && (
+        <button
+          type="button"
+          className="event-star"
+          data-kind={timing.kind}
+          aria-label={`Keep ${stop.title} fixed`}
+          aria-pressed={fixed}
+          aria-disabled={kindLocked || undefined}
+          aria-describedby={kindLocked && kindHint ? `${id}-kind-hint` : undefined}
+          title={starTitle}
+          onClick={toggleStar}
+        >
+          <StarIcon filled={fixed} />
+        </button>
+      )}
+      {showStar && kindLocked && kindHint && <span id={`${id}-kind-hint`} className="visually-hidden">{kindHint}</span>}
       <button
         type="button"
         className="event-row"
@@ -69,7 +143,7 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
         data-past={past || undefined}
         onClick={() => onToggle(stop.id)}
       >
-        <span className="event-row-dot" data-kind={timing.kind} aria-hidden="true" />
+        {showStar ? <span aria-hidden="true" /> : <span className="event-row-dot" data-kind={timing.kind} aria-hidden="true" />}
         <span className="event-row-text">
           <span className="event-row-name">
             {stop.title}
@@ -106,33 +180,33 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
               )}
             </div>
           )}
-          {timing.kind !== 'all-day' && stop.status === 'planned' && hasTimes && (
-            <div className="event-kind">
-              <span className="event-form-label event-kind-label">Can DayMap move this?</span>
-              <WhenModeToggle
-                value={timing.kind}
-                onChange={(kind) => onSetKind?.(stop.id, kind)}
-                options={[['fixed', 'No, fixed'], ['flexible', 'Yes, flexible']]}
-                label="Can DayMap move this?"
-                disabled={onSetKind === null}
-              />
-              {kindHint && <span className="event-place-hint">{kindHint}</span>}
-            </div>
-          )}
           <p className="event-details-info">
             {[duration, placeText].filter(Boolean).join(' · ')}. {KIND_NOTES[timing.kind]}
           </p>
-          {timing.kind === 'flexible' ? (
-            <EventEditForm
-              stop={stop}
-              date={date}
-              timezone={timezone}
-              onSave={(edit) => onSave(stop.id, edit)}
-              onDelete={() => onDelete(stop.id)}
-              onCancel={() => onToggle(stop.id)}
-            />
+          {showStar && kindLocked && kindHint && <p className="event-details-info">{kindHint}</p>}
+          {sourceNote && <p className="event-details-info">{sourceNote}</p>}
+          {editable ? (
+            <>
+              {overlap && <p className="event-overlap-note">{overlap}</p>}
+              <LengthStepper stop={stop} onResize={(edit) => onResize(stop.id, edit)} />
+              <EventEditForm
+                stop={stop}
+                date={date}
+                timezone={timezone}
+                onSave={(edit) => onSave(stop.id, edit)}
+                onDelete={() => onDelete(stop.id)}
+                onCancel={() => onToggle(stop.id)}
+              />
+            </>
           ) : (
-            <p className="event-details-info">Only flexible stops can be edited here.</p>
+            <>
+              <p className="event-details-info">{notEditableReason(stop, hasTimes)}</p>
+              <div className="event-form-actions">
+                <button type="button" className="button-destructive" data-delete-stop={stop.id} onClick={() => onDelete(stop.id)}>
+                  Delete
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}

@@ -34,6 +34,9 @@ export function PlanProvider({ initialPlan, children }) {
   const undoAdd = useCallback((stopId) => {
     dispatch({ type: 'undo-add', stopId })
   }, [])
+  const undoRemove = useCallback((stopId) => {
+    dispatch({ type: 'undo-remove', stopId })
+  }, [])
   const setDayPlace = useCallback((which, location) => {
     dispatch({ type: 'set-day-place', which, location })
   }, [])
@@ -64,12 +67,15 @@ export function PlanProvider({ initialPlan, children }) {
     discardDraft,
     addStop,
     undoAdd,
+    // The last removal while it can still be undone: { stopId, title, previousPlan, version } or null.
+    lastRemove: state.lastRemove?.version === state.plan.version ? state.lastRemove : null,
+    undoRemove,
     setDayPlace,
     setStopTravelMode,
     setStopKind,
     setStopLocation,
     loadPlan,
-  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, setDayPlace, setStopTravelMode, setStopKind, setStopLocation, loadPlan])
+  }), [state, selectStop, clearSelection, editStopDraft, applySuggestion, revertSuggestion, removeStop, acceptDraft, discardDraft, addStop, undoAdd, undoRemove, setDayPlace, setStopTravelMode, setStopKind, setStopLocation, loadPlan])
 
   return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>
 }
