@@ -32,7 +32,7 @@ GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3001/api/calendar/callback
 TOKEN_ENCRYPTION_KEY=<base64-encoded 32-byte key>
 ```
 
-Generate the encryption key with `openssl rand -base64 32`. Keep one stable
+Locally, `npm run setup` fills in all five and generates the encryption key. By hand, generate it with `openssl rand -base64 32`. Keep one stable
 key for an environment; changing it makes existing stored refresh tokens
 unreadable. Never commit the values. The direct database credential can read
 the `private` schema and must stay on the server. Apply

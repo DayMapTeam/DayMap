@@ -5,7 +5,9 @@ day-plan persistence. Signed-in frontend users load and save their day through t
 
 ## Local setup
 
-Use Node 22.9 or newer. From the repository root:
+For the whole app, use `npm run setup` and `npm run dev` from the repository
+root (see the root README). To run only the server, use Node 22.9 or newer. From
+the repository root:
 
 ```sh
 npm --prefix server ci
