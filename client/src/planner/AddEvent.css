@@ -94,44 +94,6 @@
   color: var(--label-2);
 }
 
-/* Each option anchors its visually hidden radio, so focusing it never scrolls the panel. */
-.chip,
-.slot-option {
-  position: relative;
-}
-
-.chip input:focus-visible + .chip-label,
-.slot-option input:focus-visible ~ .slot-option-radio {
-  outline: var(--focus-ring);
-  outline-offset: var(--focus-offset);
-}
-
-/* Duration chips */
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chip-label {
-  display: grid;
-  place-items: center;
-  min-height: 34px;
-  padding: 0 var(--space-3);
-  font-size: 13px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  background: var(--fill);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-  transition: background var(--duration-press) var(--ease-spring);
-}
-
-.chip input:checked + .chip-label {
-  color: var(--on-accent);
-  background: var(--blue);
-}
-
 /* Start / End */
 .time-range {
   display: grid;
@@ -225,135 +187,6 @@
   border-top: 1px solid var(--separator);
 }
 
-/* Slot options */
-.slot-option {
-  display: grid;
-  grid-template-columns: 20px 1fr;
-  gap: var(--space-3);
-  align-items: start;
-  min-height: var(--hit-target);
-  padding: 10px var(--space-3);
-  cursor: pointer;
-}
-
-.slot-option-radio {
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
-  border: 1.5px solid var(--label-3);
-  border-radius: 50%;
-}
-
-.slot-option input:checked ~ .slot-option-radio {
-  border: 6px solid var(--blue);
-}
-
-.slot-option-text {
-  display: grid;
-  gap: 2px;
-}
-
-.slot-option-time {
-  display: flex;
-  gap: var(--space-2);
-  align-items: baseline;
-  font-size: 14px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.slot-option-tag {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--blue);
-}
-
-.slot-option-reason {
-  font-size: 12px;
-  color: var(--red-ink);
-}
-
-.slot-option[data-ok] .slot-option-reason {
-  color: var(--label-2);
-}
-
-/* Change list */
-.change-row {
-  display: grid;
-  grid-template-columns: 24px 1fr auto;
-  gap: 10px;
-  align-items: center;
-  min-height: 52px;
-  padding: var(--space-2) var(--space-3);
-}
-
-.change-row[data-type='new'] {
-  background: var(--blue-tint);
-}
-
-.change-row-badge {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--on-accent);
-  background: var(--label);
-  border-radius: 50%;
-}
-
-.change-row[data-type='new'] .change-row-badge {
-  color: var(--blue);
-  background: var(--solid);
-  border: 2px dashed var(--blue);
-}
-
-.change-row-text,
-.change-row-when {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.change-row-name {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.change-row-sub {
-  overflow: hidden;
-  font-size: 12px;
-  color: var(--label-2);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.change-row-when {
-  justify-items: end;
-}
-
-.change-row-time {
-  font-size: 13px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.change-row-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--label-2);
-}
-
-.change-row[data-type='new'] .change-row-label {
-  color: var(--blue);
-}
-
-.change-row[data-type='shifted'] .change-row-label {
-  color: var(--orange-ink);
-}
-
 /* Guided sheet: takes over the planner, same size and glass. */
 .planner-takeover,
 .add-sheet {
@@ -408,36 +241,11 @@
   outline: none;
 }
 
-.sheet-progress {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--blue);
-}
-
-.sheet-progress-bars {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.sheet-progress-bar {
-  width: 22px;
-  height: 4px;
-  background: var(--fill-2);
-  border-radius: 2px;
-}
-
-.sheet-progress-bar[data-done] {
-  background: var(--blue);
-}
-
 .sheet-body {
   display: grid;
   flex: 1;
   align-content: start;
-  /* Rows keep their full height so the body scrolls; without this, grid shrinks overflow-hidden groups (the change list) and cuts off stops. */
+  /* Rows keep their full height so the body scrolls; without this, grid shrinks overflow-hidden groups (the place rows) and cuts them off. */
   grid-auto-rows: max-content;
   gap: 14px;
   min-height: 0;

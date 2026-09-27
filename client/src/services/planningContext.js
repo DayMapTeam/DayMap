@@ -1,7 +1,5 @@
 import { stopInterval } from '../../../shared/planning/timeline.js'
 
-/** How the person gets around: the default is walking plus public transport. */
-export const TRAVEL_PREFERENCES = ['auto', 'drive', 'walk']
 /** Minutes added to each journey, per mode: waiting, transfers, parking. */
 export const TRAVEL_BUFFERS = { walk: 5, transit: 5, drive: 10 }
 /** Journeys up to this straight-line distance are walked in every setting. */
@@ -38,10 +36,6 @@ export function demoEstimate(from, to, { mode = 'walk', departAt = null } = {}) 
     travelSeconds: Math.ceil(meters * detour / speed + fixed),
     ...(mode === 'transit' ? { timeDependent: true, departAt } : {}),
   }
-}
-
-export function demoWalkingEstimate(from, to) {
-  return demoEstimate(from, to, { mode: 'walk' })
 }
 
 /**

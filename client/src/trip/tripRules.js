@@ -18,11 +18,7 @@ export const RULES = Object.freeze({
   departReadings: 3,
 })
 
-// The same straight-line walking assumptions as the demo travel estimate.
-const DETOUR_FACTOR = 1.3
-const WALKING_METERS_PER_SECOND = 1.3
 const EARTH_RADIUS_METERS = 6371000
-const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
 
 const rad = (degrees) => degrees * Math.PI / 180
 
@@ -56,15 +52,6 @@ export function offsetPoint(from, bearing, meters) {
   const lng2 = lng1 + Math.atan2(Math.sin(theta) * Math.sin(angular) * Math.cos(lat1),
     Math.cos(angular) - Math.sin(lat1) * Math.sin(lat2))
   return { lat: lat2 * 180 / Math.PI, lng: ((lng2 * 180 / Math.PI + 540) % 360) - 180 }
-}
-
-export function compassLabel(bearing) {
-  return COMPASS[Math.round(bearing / 45) % 8]
-}
-
-/** Rough walking time for a straight-line distance. Always shown as approximate. */
-export function walkingSecondsEstimate(meters) {
-  return Math.ceil(meters * DETOUR_FACTOR / WALKING_METERS_PER_SECOND)
 }
 
 function accuracyBonus(reading) {
