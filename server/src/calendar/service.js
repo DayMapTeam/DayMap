@@ -9,6 +9,29 @@ const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const REVOKE_URL = 'https://oauth2.googleapis.com/revoke'
 const stateHash = state => createHash('sha256').update(state).digest('hex')
+// A pooled connection the database (or Supabase's pooler) closed while it sat idle.
+const CONNECTION_LOST = /Connection terminated|ECONNRESET|EPIPE|Client has encountered a connection error/i
+const connectionLost = error => ['ECONNRESET', 'EPIPE', '57P01'].includes(error?.code) || CONNECTION_LOST.test(error?.message ?? '')
+
+/** A new pool that survives idle disconnects: it drops stale clients and retries a lost connection once. */
+function resilientPool(connectionString) {
+  const pool = new Pool({ connectionString, max: 5, idleTimeoutMillis: 10_000, keepAlive: true })
+  // An idle client losing its connection emits here; without a listener it would crash the server.
+  pool.on('error', error => console.error('Calendar database connection closed:', error?.code ?? '', error?.message))
+  return {
+    async query(...args) {
+      try {
+        return await pool.query(...args)
+      } catch (error) {
+        if (!connectionLost(error)) throw error
+        try { return await pool.query(...args) } catch (retryError) {
+          if (!connectionLost(retryError)) throw retryError
+          throw new ApiError(503, 'DATABASE_UNAVAILABLE', 'DayMap couldn’t reach its database. Please try again.', true)
+        }
+      }
+    },
+  }
+}
 
 export function createCalendarService({
   env = process.env,
@@ -27,7 +50,7 @@ export function createCalendarService({
         ['localhost', '127.0.0.1'].includes(redirect.hostname)))) {
     throw new Error('GOOGLE_OAUTH_REDIRECT_URI must be an exact HTTPS callback URL (HTTP only for localhost)')
   }
-  const pool = db ?? new Pool({ connectionString: env.DATABASE_URL, max: 5 })
+  const pool = db ?? resilientPool(env.DATABASE_URL)
   const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEY)
   const request = async (url, body, expectJson = true) => {
     let response
