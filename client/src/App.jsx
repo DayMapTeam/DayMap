@@ -12,6 +12,7 @@ import CalendarSection from './components/CalendarSection.jsx'
 import { Notice, SyncBanner, SyncChip } from './components/PlanSyncStatus.jsx'
 import PlaceSearch from './components/PlaceSearch.jsx'
 import PlacePopup from './components/PlacePopup.jsx'
+import { eventArtworkType } from './components/eventArtwork.js'
 import { splitPlaceLabel } from './planner/addEventCopy.js'
 import { usePlanClock } from './components/usePlanClock.js'
 import MapView from './map/MapView.jsx'
@@ -289,7 +290,7 @@ function App() {
         calendar={userId ? calendar : null}
       />
       {previewPlace && searchPopup && (
-        <PlacePopup anchor={searchPopup} title={splitPlaceLabel(previewPlace.label).name} onClose={closeSearchPopup}>
+        <PlacePopup anchor={searchPopup} title={splitPlaceLabel(previewPlace.label).name} artworkType={eventArtworkType(previewPlace.label)} onClose={closeSearchPopup}>
           <p className="place-popup-sub">{previewPlace.label}</p>
           <p className="place-popup-time">{draft === null ? 'Preview · choose a time to add this event.' : 'Accept or discard your pending changes first.'}</p>
           <button type="button" className="button-filled place-popup-action" disabled={draft !== null}

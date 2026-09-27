@@ -54,12 +54,6 @@
   object-fit: cover;
 }
 
-.place-popup-photo-empty {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--label-2);
-}
-
 .place-popup-close {
   position: absolute;
   top: 6px;
