@@ -95,7 +95,7 @@ export default function JourneyPopup({ from, to, planning, onClose }) {
   const titleId = useId()
   const closeRef = useRef(null)
   const { timezone } = planning.shown
-  const departAt = planning.departureFor(from)
+  const departAt = planning.departureFor(from, to)
   const estimates = planning.journeyEstimates(from, to)
   const automatic = chooseMode(from, { ...to, travelMode: null }, 'auto', planning.ctx.travel).mode
   const chosen = to.travelMode ?? null

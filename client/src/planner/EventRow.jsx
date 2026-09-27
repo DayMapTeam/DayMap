@@ -1,10 +1,11 @@
 import { useId, useState } from 'react'
-import { canEditStop } from '../app/planEdits.js'
+import { canEditStop, moveBounds, movedStopEdit } from '../app/planEdits.js'
 import { formatDuration, formatTimeRange } from '../components/formatTime.js'
 import EventEditForm from './EventEditForm.jsx'
 import LengthStepper from './LengthStepper.jsx'
 import PlacePicker from './PlacePicker.jsx'
 import { KIND_LABELS } from './stopLabels.js'
+import { useVerticalDrag } from './useVerticalDrag.js'
 import { isDayNote } from '../app/planEdits.js'
 
 const KIND_NOTES = {
@@ -14,6 +15,17 @@ const KIND_NOTES = {
 }
 
 const EDITED_FIELDS = { title: 'name', time: 'time' }
+
+const MINUTE = 60000
+/** Moves snap to five-minute marks; dragging this far moves one mark. */
+const MOVE_STEP = 5 * MINUTE
+const PX_PER_STEP = 8
+const KEY_STEPS = { ArrowUp: -1, ArrowDown: 1 }
+
+/** The start `ms` rounded to a five-minute mark, kept within `bounds`. */
+function snapStart(ms, bounds) {
+  return Math.min(bounds.latest, Math.max(bounds.earliest, Math.round(ms / MOVE_STEP) * MOVE_STEP))
+}
 
 /** Why a stop has no edit form, for the few stops that can't be edited. */
 function notEditableReason(stop, hasTimes) {
@@ -73,9 +85,11 @@ function StarIcon({ filled }) {
  * @param {((stopId: string, kind: 'fixed' | 'flexible') => void) | null} props.onSetKind Null when the kind can't change now.
  * @param {string | null} props.kindHint Why the kind can't change right now, if it can't.
  * @param {string | null} [props.overlap] Which stops this one overlaps, e.g. "Overlaps ‘Lecture’ by 15 min.", while open.
+ * @param {((stopId: string, edit: object) => void) | null} [props.onMove] Puts the stop at new times of the same length in
+ *   the draft. Dragging the row (or Alt+↑/↓) moves it; null when it can't move.
  */
 export default function EventRow({ stop, date, timezone, selected, open, past, changed, added, flashKey, onToggle, onSave, onResize, onDelete, conflict,
-  placeState, calendarPlace, onSetPlace, onSetKind, kindHint, overlap = null }) {
+  placeState, calendarPlace, onSetPlace, onSetKind, kindHint, overlap = null, onMove = null }) {
   const id = useId()
   const [picking, setPicking] = useState(false)
   if (!open && picking) setPicking(false)
@@ -92,6 +106,29 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
   const showStar = editable && !past && !note
   const fixed = timing.kind === 'fixed'
   const kindLocked = onSetKind === null
+  // Dragging keeps the length and changes the time; journeys follow from the new times.
+  const bounds = onMove && editable && !note && !past ? moveBounds(stop, { date, timezone }) : null
+  const startMs = hasTimes ? Date.parse(timing.scheduledStartAt) : NaN
+  const lengthMs = hasTimes ? Date.parse(timing.scheduledEndAt) - startMs : NaN
+  const draggedStart = (offset) => snapStart(startMs + Math.round(offset / PX_PER_STEP) * MOVE_STEP, bounds)
+  function moveTo(start) {
+    const edit = movedStopEdit(stop, start, { date, timezone })
+    if (edit) onMove(stop.id, edit)
+  }
+  const { ref: dragRef, offset, dragging, handlers } = useVerticalDrag({
+    enabled: bounds !== null, onDrop: (dropOffset) => moveTo(draggedStart(dropOffset)),
+  })
+  const shownStart = dragging && bounds ? draggedStart(offset) : startMs
+  const timeText = note ? '' : hasTimes
+    ? formatTimeRange(new Date(shownStart).toISOString(), new Date(shownStart + lengthMs).toISOString(), timezone)
+    : timing.kind === 'all-day' ? 'All day' : 'Time not set'
+
+  function onKeyDown(event) {
+    const direction = KEY_STEPS[event.key]
+    if (!bounds || !event.altKey || !direction) return
+    event.preventDefault()
+    moveTo(snapStart(startMs + direction * (event.shiftKey ? 6 : 1) * MOVE_STEP, bounds))
+  }
   const details = [
     past ? 'Finished' : null,
     isDayNote(stop) ? 'Note' : KIND_LABELS[timing.kind],
@@ -116,6 +153,8 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
       data-stop-id={stop.id}
       data-selected={selected || undefined}
       data-open={open || undefined}
+      data-dragging={dragging || undefined}
+      style={dragging ? { transform: `translateY(${offset}px)` } : undefined}
     >
       {/* A new key restarts the highlight animation on every reveal. */}
       {flashKey !== null && <span key={flashKey} className="event-item-flash" aria-hidden="true" />}
@@ -136,14 +175,21 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
         </button>
       )}
       {showStar && kindLocked && kindHint && <span id={`${id}-kind-hint`} className="visually-hidden">{kindHint}</span>}
+      {bounds && <span id={`${id}-move-hint`} className="visually-hidden">Drag, or press Alt with the up or down arrow, to move it 5 minutes. Add Shift for 30.</span>}
       <button
+        ref={dragRef}
         type="button"
         className="event-row"
         aria-expanded={open}
         aria-controls={open ? detailsId : undefined}
         aria-current={selected || undefined}
+        aria-describedby={bounds ? `${id}-move-hint` : undefined}
+        aria-keyshortcuts={bounds ? 'Alt+ArrowUp Alt+ArrowDown' : undefined}
         data-past={past || undefined}
+        data-movable={bounds ? '' : undefined}
         onClick={() => onToggle(stop.id)}
+        onKeyDown={onKeyDown}
+        {...handlers}
       >
         {showStar ? <span aria-hidden="true" /> : <span className="event-row-dot" data-kind={timing.kind} aria-hidden="true" />}
         <span className="event-row-text">
@@ -155,9 +201,7 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
           <span className="event-row-details">{details.join(' · ')}</span>
           {conflict && <span className="event-row-conflict">Schedule conflict</span>}
         </span>
-        <span className="event-row-time">
-          {note ? '' : hasTimes ? formatTimeRange(timing.scheduledStartAt, timing.scheduledEndAt, timezone) : timing.kind === 'all-day' ? 'All day' : 'Time not set'}
-        </span>
+        <span className="event-row-time" data-moving={dragging && shownStart !== startMs ? '' : undefined}>{timeText}</span>
         <svg className="event-row-chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
           <path d="M4 2.5 7.5 6 4 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
