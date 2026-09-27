@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isDayNote } from '../app/planEdits.js'
 import { usePlan } from '../app/planContext.js'
 import AddEventSheet from './AddEventSheet.jsx'
 import AddToast from './AddToast.jsx'
@@ -178,7 +179,7 @@ export default function Planner({ now, revealRequest, planning, emptyState, cale
         }
         overlay={pendingStop && (
           <ConfirmDialog
-            title="Delete event"
+            title={isDayNote(pendingStop) ? 'Delete note' : 'Delete event'}
             message={deleteMessage(pendingStop)}
             confirmLabel="Delete"
             returnFocusSelector={pendingDelete.returnFocus}

@@ -86,15 +86,16 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
   const duration = timing.kind === 'all-day' ? null : formatDuration(timing.durationMinutes)
   const editedInDayMap = stop.source === 'google-calendar' && (stop.localEdits?.length ?? 0) > 0
   const sourceNote = calendarNote(stop)
-  const editable = canEditStop(stop) || isDayNote(stop)
+  const note = isDayNote(stop)
+  const editable = canEditStop(stop) || note
   // The star is for stops DayMap could still move: not all-day, finished or unscheduled.
-  const showStar = editable && !past
+  const showStar = editable && !past && !note
   const fixed = timing.kind === 'fixed'
   const kindLocked = onSetKind === null
   const details = [
     past ? 'Finished' : null,
     isDayNote(stop) ? 'Note' : KIND_LABELS[timing.kind],
-    placeText,
+    note ? stop.location?.label : placeText,
     duration,
     editedInDayMap ? 'Edited in DayMap' : null,
   ].filter(Boolean)
@@ -155,7 +156,7 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
           {conflict && <span className="event-row-conflict">Schedule conflict</span>}
         </span>
         <span className="event-row-time">
-          {hasTimes ? formatTimeRange(timing.scheduledStartAt, timing.scheduledEndAt, timezone) : timing.kind === 'all-day' ? 'All day' : 'Time not set'}
+          {note ? '' : hasTimes ? formatTimeRange(timing.scheduledStartAt, timing.scheduledEndAt, timezone) : timing.kind === 'all-day' ? 'All day' : 'Time not set'}
         </span>
         <svg className="event-row-chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
           <path d="M4 2.5 7.5 6 4 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -163,7 +164,7 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
       </button>
       {open && (
         <div id={detailsId} className="event-details">
-          {picking ? (
+          {!note && (picking ? (
             <PlacePicker
               initialQuery={placeState === 'set' ? '' : calendarPlace ?? ''}
               onPick={(place) => { setPicking(false); onSetPlace(stop.id, place) }}
@@ -180,9 +181,9 @@ export default function EventRow({ stop, date, timezone, selected, open, past, c
                 <span className="event-place-hint">Google Calendar says “{calendarPlace}”.</span>
               )}
             </div>
-          )}
+          ))}
           <p className="event-details-info">
-            {[duration, placeText].filter(Boolean).join(' · ')}. {KIND_NOTES[timing.kind]}
+            {note ? 'A note for today. It does not affect your schedule or travel.' : `${[duration, placeText].filter(Boolean).join(' · ')}. ${KIND_NOTES[timing.kind]}`}
           </p>
           {showStar && kindLocked && kindHint && <p className="event-details-info">{kindHint}</p>}
           {sourceNote && <p className="event-details-info">{sourceNote}</p>}

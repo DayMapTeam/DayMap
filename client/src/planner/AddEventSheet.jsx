@@ -251,7 +251,7 @@ export default function AddEventSheet({ now, planning, returnFocusSelector, onCo
                 <FitVerdict verdict={draft.checkingTravel ? { tone: 'neutral', text: 'Checking travel time…' } : verdict} />
               </div>
             ) : draft.role === 'note' ? (
-              <p className="add-hint">A note for today. No set time, and it won’t change your schedule.</p>
+              <p className="add-hint">Saved in Day notes above your itinerary. No set time, and it won’t change your schedule or travel.</p>
             ) : (
               <div className="add-field">
                 <label className="add-section-label" htmlFor={`${titleId}-day-role`}>Use this place for</label>
