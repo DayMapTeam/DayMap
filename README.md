@@ -139,9 +139,23 @@ Open <http://localhost:5173>.
 - **Sign in with Google** and **Connect Google Calendar** only work with a
   Google account on the test-user list. Google shows "Google hasn't verified
   this app": choose **Continue**. That is expected while the app is in testing.
-- On an empty day, **Import from Google Calendar** copies that day's events
-  into DayMap. From then on they are DayMap's own copy: star, edit, resize or
-  remove them without changing your Google Calendar.
+
+**Import your Google Calendar:**
+
+1. Sign in (email or Google).
+2. Click **Connect Google Calendar**. It is on an empty day in the planner, and
+   in the Calendar section of the account menu.
+3. Choose the Google account that was added as a test user. On "Google hasn't
+   verified this app" choose **Continue**, then allow DayMap to **see your
+   calendar events**. DayMap only reads events and never changes your Google
+   Calendar.
+4. You're back in DayMap, now connected. Click **Import from Google Calendar** to copy
+   that day's events into the planner. Opening a day later imports it
+   quietly again, keeping your own changes.
+5. The imported events are now DayMap's own copy:
+   - Tap the **star** to make an event fixed. Suggestions never move a fixed event.
+   - Open an event to edit its name and times, or use **−15 / +15 min** to make it shorter or longer.
+   - Use **Delete** to remove an event (with Undo). A removed event stays hidden when you import again, until you choose **Bring back**.
 
 Each computer has its own local database, so accounts and saved days are not
 shared between teammates.
