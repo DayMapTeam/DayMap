@@ -46,6 +46,7 @@
   --mode-bus: #0a84ff;
   --mode-walk: #30b0c7;
   --mode-drive: #5e5ce6;
+  --route-done: #8e8e93; /* journeys already travelled, on the map */
 
   /*
    * Map placeholder until DM-03. Stays a gradient: committing a Google map

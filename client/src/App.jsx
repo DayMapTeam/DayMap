@@ -5,6 +5,7 @@ import { readDemoPlan, sessionStore, writeDemoPlan } from './app/planPersistence
 import { useAccount } from './app/useAccount.js'
 import { useCalendar } from './app/useCalendar.js'
 import { usePlanSync } from './app/usePlanSync.js'
+import { useRouteLegs } from './app/useRouteLegs.js'
 import AccountMenu from './components/AccountMenu.jsx'
 import AppHeader from './components/AppHeader.jsx'
 import CalendarSection from './components/CalendarSection.jsx'
@@ -26,6 +27,9 @@ import { useTrip } from './trip/useTrip.js'
 import { demoPlan } from '../../shared/fixtures/demoPlan.js'
 import './App.css'
 
+// While navigating, the trip's own route is the only one on the map.
+const noLegs = []
+
 function App() {
   const { plan, draft, selectedStopId, selectStop, clearSelection, loadPlan } = usePlan()
   const account = useAccount()
@@ -39,6 +43,7 @@ function App() {
   const [previewPlace, setPreviewPlace] = useState(null)
   const { now, isDemoTime } = usePlanClock(plan)
   const planning = usePlanAnalysis(plan, draft, now)
+  const routeLegs = useRouteLegs(planning, now)
   // The popup opens only from a pin click on the map: { stopId, anchor } or null.
   const [popup, setPopup] = useState(null)
   const [revealRequest, setRevealRequest] = useState(null)
@@ -130,6 +135,7 @@ function App() {
     <div className="app" data-navigating={navigating || undefined}>
       <MapView
         stops={planning.shown.stops}
+        legs={navigating ? noLegs : routeLegs}
         stopStates={planning.stopStates}
         selectedStopId={selectedStopId}
         onSelectStop={selectFromMap}

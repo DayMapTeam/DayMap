@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { numberStops } from '../app/stopNumbers.js'
 import { loadMapsLibrary, mapsApiKey as apiKey } from '../services/googleMaps.js'
+import { arcApex, arcPath, arcStyle, chipFont, dashes, travelChipSvg } from './journeyArc.js'
 import { markerColors, markerTemplate, stopMarkerSvg } from './stopMarker.js'
 import { navigationArrowSvg, userMarkerSvg } from './userMarker.js'
 import './MapView.css'
@@ -32,6 +33,58 @@ function isFinished(stop, now) {
     && Date.parse(stop.timing.scheduledEndAt) <= now.getTime()
 }
 
+// Chip priority among chips (3D markers reject negative zIndex). Pins are
+// REQUIRED, so a chip overlapping a pin number is the one hidden.
+const CHIP_Z = { current: 3, next: 2, later: 1, done: 0 }
+
+let measureContext = null
+function measureText(text, font) {
+  measureContext ??= document.createElement('canvas').getContext('2d')
+  measureContext.font = font
+  // A little slack: the chip image may fall back to another font than the page.
+  return measureContext.measureText(text).width + 4
+}
+
+/**
+ * The map elements for one journey: its arc (dashed on foot), the faint
+ * ground route under the current journey, and the travel chip at the apex.
+ */
+function journeyElements(runtime, leg) {
+  const { Polyline, PlainMarker, colors } = runtime
+  const style = arcStyle(leg.state, colors)
+  const arc = arcPath(leg.path, leg.distanceMeters)
+  const line = (path, options) => new Polyline({ ...options, path })
+  const elements = []
+  if (style.ground) {
+    elements.push(line(leg.path.map(({ lat, lng }) => ({ lat, lng, altitude: 0 })), {
+      altitudeMode: 'CLAMP_TO_GROUND', strokeColor: style.ground, strokeWidth: 3,
+      drawsOccludedSegments: true, zIndex: style.zIndex,
+    }))
+  }
+  const arcOptions = {
+    altitudeMode: 'RELATIVE_TO_GROUND', strokeColor: style.stroke, strokeWidth: style.width,
+    ...(style.outer ? { outerColor: style.outer, outerWidth: style.outerWidth } : {}),
+    drawsOccludedSegments: style.occluded, zIndex: style.zIndex,
+  }
+  // Walking is dashed and riding or driving solid; the current journey is always solid blue.
+  const pieces = leg.mode === 'walk' && leg.state !== 'current' ? dashes(arc) : [arc]
+  for (const piece of pieces) elements.push(line(piece, arcOptions))
+
+  const apex = arcApex(arc)
+  const chip = new PlainMarker({
+    position: apex,
+    altitudeMode: 'RELATIVE_TO_GROUND',
+    collisionBehavior: 'OPTIONAL_AND_HIDES_LOWER_PRIORITY',
+    drawsWhenOccluded: true,
+    zIndex: CHIP_Z[leg.state] ?? CHIP_Z.later,
+    label: leg.label,
+  })
+  chip.append(markerTemplate(travelChipSvg({ label: leg.label, faded: leg.state === 'done' }, colors,
+    measureText(leg.label, chipFont(colors)))))
+  elements.push(chip)
+  return elements
+}
+
 /**
  * The 3D map. Every stop pin is drawn by stopMarkerSvg, and "you are here" by
  * userMarkerSvg; nothing else creates markers.
@@ -46,11 +99,13 @@ function isFinished(stop, now) {
  * - follow: { center, heading } moves the camera with the person during a trip,
  *   or null. Only trips move the camera like this; nothing in the background does.
  * - onUserCameraMove(): the person dragged, scrolled or used keys on the map.
+ * - legs: the day's journeys ({ id, mode, state, path, distanceMeters, label }
+ *   from useRouteLegs), each drawn as an arc over its route with a travel chip.
  * - route: the trip's route ({ steps: [{ kind, path, ride }] }) drawn on the ground, or null.
  * - routeSplit: { travelled, remaining } from splitRoute, to grey out what's behind you.
  */
 export default function MapView({
-  stops, selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, stopStates = {},
+  stops, legs = [], selectedStopId, onSelectStop, onClearSelection, onCameraMove, now, previewPlace = null, stopStates = {},
   userPosition = null, tripActive = false, follow = null, onUserCameraMove, route = null, routeSplit = null,
 }) {
   const containerRef = useRef(null)
@@ -334,6 +389,36 @@ export default function MapView({
     lines.steps.forEach((line, index) => show(line, remaining[index] ?? []))
     show(lines.travelled, routeSplit?.travelled ?? [])
   }, [runtime, route, routeSplit])
+
+  // The day's journeys. A journey is redrawn only when its state, route or
+  // chip changes, so the clock ticking doesn't rebuild the whole map.
+  const journeysRef = useRef(new Map())
+  useEffect(() => {
+    if (!runtime?.Polyline) return
+    const drawn = journeysRef.current
+    const ids = new Set(legs.map((leg) => leg.id))
+    for (const [id, { elements }] of drawn) {
+      if (ids.has(id)) continue
+      for (const element of elements) element.remove()
+      drawn.delete(id)
+    }
+    for (const leg of legs) {
+      const signature = JSON.stringify([leg.state, leg.mode, leg.label, leg.distanceMeters, leg.path])
+      const existing = drawn.get(leg.id)
+      if (existing?.signature === signature) continue
+      for (const element of existing?.elements ?? []) element.remove()
+      const elements = journeyElements(runtime, leg)
+      for (const element of elements) runtime.map.append(element)
+      drawn.set(leg.id, { signature, elements })
+    }
+  }, [runtime, legs])
+  useEffect(() => {
+    const drawn = journeysRef.current
+    return () => {
+      for (const { elements } of drawn.values()) for (const element of elements) element.remove()
+      drawn.clear()
+    }
+  }, [runtime])
 
   // Follow the person during a trip, heading-up.
   useEffect(() => {
