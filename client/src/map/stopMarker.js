@@ -24,6 +24,8 @@ const COLOR_TOKENS = {
   dotHalo: '--marker-dot-halo',
   shadow: '--marker-shadow-color',
   font: '--font-sans',
+  label: '--label',
+  routeDone: '--route-done',
 }
 
 /** Read marker colours from the design tokens. Browser only. */
