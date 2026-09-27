@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePlan } from '../app/planContext.js'
-import { listStopChanges } from '../app/planEdits.js'
+import { isDayNote, listStopChanges } from '../app/planEdits.js'
 import { calendarLocationText, locationQuestionFor, placeStatus } from '../app/planLocations.js'
 import EventRow from './EventRow.jsx'
 import { overlapNote } from './stopEditCopy.js'
@@ -46,7 +46,9 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
   const needle = filter.trim().toLocaleLowerCase()
   const filtering = needle !== ''
   const ordered = sortStopsForDisplay(shown.stops)
-  const stops = filtering ? ordered.filter((stop) => matchesFilter(stop, needle)) : ordered
+  const visible = filtering ? ordered.filter((stop) => matchesFilter(stop, needle)) : ordered
+  const notes = visible.filter(isDayNote)
+  const stops = visible.filter((stop) => !isDayNote(stop))
   const changedIds = new Set(draft ? listStopChanges(plan, draft.plan).map(({ after }) => after.id) : [])
 
   useEffect(() => {
@@ -80,6 +82,8 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
     const item = listRef.current.querySelector(`[data-stop-id="${CSS.escape(revealRequest.stopId)}"]`)
     const body = item?.closest('.planner-body')
     if (!item || !body) return
+    const section = item.closest('details')
+    if (section) section.open = true
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     body.scrollTo({ top: item.offsetTop - 12, behavior: reduceMotion ? 'auto' : 'smooth' })
     item.querySelector('.event-row').focus({ preventScroll: true })
@@ -113,16 +117,37 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
   const journeyStops = journeyFrom?.location && journeyTo?.location ? { from: journeyFrom, to: journeyTo } : null
 
   return (
-    <>
+    <div ref={listRef}>
       <p className="event-list-count" role="status">
-        {filtering && (stops.length === 0 ? 'No stops match.' : `Showing ${stops.length} of ${shown.stops.length} stops`)}
+        {filtering && (visible.length === 0 ? 'No items match.' : `Showing ${visible.length} of ${shown.stops.length} items`)}
       </p>
       {shown.stops.length === 0 && emptyState}
+      {notes.length > 0 && <details className="day-notes" open={filtering || undefined}>
+        <summary>Day notes <span>{notes.length}</span></summary>
+        <ul className="event-list" aria-label="Day notes">
+          {notes.map((stop) => <li key={stop.id}>
+            <EventRow
+              stop={stop}
+              date={shown.date}
+              timezone={shown.timezone}
+              selected={stop.id === selectedStopId}
+              open={stop.id === openStopId}
+              changed={changedIds.has(stop.id)}
+              added={stop.id === newStopId}
+              flashKey={revealRequest?.stopId === stop.id ? revealRequest.key : null}
+              onToggle={toggle}
+              onSave={save}
+              onDelete={onRequestDelete}
+              placeState={placeStatus(shown, stop)}
+            />
+          </li>)}
+        </ul>
+      </details>}
       {!filtering && bookends.start && <>
         <DayPlaceRow which="start" place={bookends.start.place} onRemove={() => setDayPlace('start', null)} />
         {bookends.start.leg && <TravelConnector leg={bookends.start.leg} summary={journeySummary(bookends.start.leg, null, shown.timezone)} />}
       </>}
-      <ol ref={listRef} className="event-list" aria-label="Stops">
+      <ol className="event-list" aria-label="Stops">
         {stops.map((stop, index) => {
           const gap = index > 0 && !filtering && planning.displayGaps.find((g) => g.fromStopId === stops[index - 1].id && g.toStopId === stop.id)
           return <li key={stop.id}>
@@ -169,6 +194,6 @@ export default function EventList({ now, filter, openStopId, onOpenStopChange, r
         <DayPlaceRow which="end" place={bookends.end.place} onRemove={() => setDayPlace('end', null)} />
       </>}
       {journeyStops && <JourneyPopup from={journeyStops.from} to={journeyStops.to} planning={planning} onClose={() => setJourney(null)} />}
-    </>
+    </div>
   )
 }

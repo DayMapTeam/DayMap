@@ -95,10 +95,10 @@ export default function EventEditForm({ stop, date, timezone, onSave, onCancel, 
             aria-describedby={invalid('title') && errorId}
           />
         </label>
-        <div className="event-form-field">
+        {!note && <div className="event-form-field">
           <span className="event-form-label">Place</span>
           <span className="event-form-value">{stop.location?.label ?? 'Not set'}</span>
-        </div>
+        </div>}
         {!note && (
           <>
             <label className="event-form-field" htmlFor={`${id}-start`}>

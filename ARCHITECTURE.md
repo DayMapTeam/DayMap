@@ -206,6 +206,8 @@ Each journey line reads like a Google Maps route summary (issue #46): the mode i
 
 **Adding (issues #52, #60)** starts with a place search or arbitrary text. The same compact choices are always available: **Activity** (default, From–To times), **Note** (no time), and **Day start/end** (reveals a start/end/both selector). Names never infer a day endpoint: visiting home and reading afterwards are ordinary activities. A separate optional place picker preserves the typed name and can reuse an explicitly selected location already in the day. Day endpoints require resolved coordinates; typed “Home” never invents an address. Existing endpoints are named before replacement.
 
+The planner displays manual notes in a separate collapsible **Day notes** section above the itinerary. Adding, restoring, or revealing a note opens the section and highlights its row; filtering searches notes too. Notes have edit/delete controls without time, fixed/flexible, or place controls, and are excluded from itinerary row adjacency so they cannot interrupt travel connectors.
+
 Notes reuse manual `all-day` stops with null duration and timestamps, so they never occupy a time slot, move appointments, or request journeys. Unlocated notes use the existing deferred location question (“no place needed”). They can be renamed through the draft/accept flow, deleted, undone after adding, and saved with the existing API shape. Imported all-day Calendar entries retain their existing edit restrictions. No new backend fields or endpoints are introduced.
 
 The planner shows *Day starts* above the first stop and *Day ends* after the last; these are explicit route endpoints, not an automatic consequence of adding Home.

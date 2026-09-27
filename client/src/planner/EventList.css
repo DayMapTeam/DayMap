@@ -605,3 +605,33 @@
 .day-place-remove:hover {
   background: var(--fill);
 }
+
+/* Notes sit outside the itinerary and its travel connectors. */
+.day-notes {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--fill);
+  border-radius: var(--radius-card);
+}
+
+.day-notes > summary {
+  min-height: 36px;
+  align-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.day-notes > summary span {
+  margin-left: var(--space-2);
+  color: var(--label-2);
+}
+
+.day-notes > summary:focus-visible {
+  outline: var(--focus-ring);
+  border-radius: var(--radius-control);
+}
+
+.day-notes .event-row-name {
+  overflow-wrap: anywhere;
+}
