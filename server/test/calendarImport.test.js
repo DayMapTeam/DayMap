@@ -287,6 +287,22 @@ test('the chosen way to travel to a Calendar event survives re-import and valida
   validateSave(none.id, { baseVersion: none.version, plan: none })
 })
 
+test('when to leave for a Calendar event survives re-import and validation', () => {
+  const saved = structuredClone(planWith(eventsToStops([lecture, standup], day)).plan)
+  saved.stops[1].leaveTiming = 'late'
+  const { plan } = planWith(eventsToStops([lecture, standup], day), saved)
+  assert.equal(plan.stops[1].leaveTiming, 'late')
+  validateSave(plan.id, { baseVersion: plan.version, plan })
+  const bad = structuredClone(plan)
+  bad.stops[1].leaveTiming = 'whenever'
+  assert.throws(() => validateSave(bad.id, { baseVersion: bad.version, plan: bad }), { code: 'INVALID_PLAN' })
+  for (const timing of [null, 'early']) {
+    const other = structuredClone(plan)
+    other.stops[1].leaveTiming = timing
+    validateSave(other.id, { baseVersion: other.version, plan: other })
+  }
+})
+
 test('where the day starts and ends is validated and kept by Calendar import', () => {
   const home = { label: 'Home', placeId: null, lat: -34.95, lng: 138.6 }
   const saved = { ...structuredClone(planWith(eventsToStops([lecture], day)).plan), startPlace: home, endPlace: home }

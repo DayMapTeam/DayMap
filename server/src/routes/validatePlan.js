@@ -51,10 +51,13 @@ export function validateSave(id, body) {
   }
   const ids = new Set()
   for (const stop of plan.stops) {
-    keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode', 'localEdits'])
+    keys(stop, ['id', 'title', 'source', 'sourceEventId', 'sourceCalendarId', 'location', 'timing', 'status', 'travelMode', 'leaveTiming', 'localEdits'])
     // How the person chose to travel to this stop; absent or null means automatic.
     check(stop.travelMode === undefined || stop.travelMode === null || ['walk', 'transit', 'drive'].includes(stop.travelMode),
       'Invalid travelMode.')
+    // When to leave for this stop: 'late' is just in time; absent, null or 'early' leaves when the stop before ends.
+    check(stop.leaveTiming === undefined || stop.leaveTiming === null || ['early', 'late'].includes(stop.leaveTiming),
+      'Invalid leaveTiming.')
     check(text(stop.id) && (plan.dataMode === 'demo' || uuid.test(stop.id)) && !ids.has(stop.id), 'Stop IDs must be unique; live IDs must be UUIDs.')
     ids.add(stop.id)
     check(text(stop.title) && ['manual', 'google-calendar'].includes(stop.source)
