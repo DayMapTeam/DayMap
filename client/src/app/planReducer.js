@@ -170,7 +170,6 @@ function withRemovedEvent(plan, stop) {
 function removeStop(state, { stopId }) {
   const stop = state.plan.stops.find((candidate) => candidate.id === stopId)
   if (!stop) return state
-  if (stop.timing.kind === 'all-day' && !isDayNote(stop)) return state
   if (state.draft?.suggestion) return removeStop(revertSuggestion(state), { stopId })
 
   const version = state.plan.version + 1

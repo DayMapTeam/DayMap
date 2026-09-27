@@ -5,7 +5,7 @@ import './buttons.css'
 import './RemovedCalendarEvents.css'
 
 /**
- * "2 removed Calendar events hidden", opening to the list with a Bring back
+ * "2 removed Calendar events", opening to the list with a Bring back
  * button for each and Bring back all. Calendar events the person removed stay
  * out of later imports until brought back here, which imports the day again
  * with them included, as they are in Google Calendar. Shows only while

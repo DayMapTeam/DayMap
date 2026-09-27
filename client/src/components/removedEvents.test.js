@@ -3,8 +3,8 @@ import test from 'node:test'
 import { focusKeysAfterRestore, removedEventKey, removedEventsSummary } from './removedEvents.js'
 
 test('removed events are counted in plain words', () => {
-  assert.equal(removedEventsSummary(1), '1 removed Calendar event hidden')
-  assert.equal(removedEventsSummary(3), '3 removed Calendar events hidden')
+  assert.equal(removedEventsSummary(1), '1 removed Calendar event')
+  assert.equal(removedEventsSummary(3), '3 removed Calendar events')
 })
 
 test('each removed event has its own key, even with the same event ID in two calendars', () => {
